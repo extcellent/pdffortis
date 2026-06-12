@@ -220,11 +220,40 @@ input,select,textarea{font-family:var(--font)}
 
 /* Overlay elements */
 .pdf-overlay{position:absolute;cursor:move;user-select:none}
-.pdf-text-box{border:1px dashed #93c5fd;border-radius:3px;padding:3px 6px;font-size:14px;min-width:80px;min-height:24px;outline:none;background:rgba(255,255,255,.9);resize:both;overflow:auto;line-height:1.4}
-.pdf-text-box:focus{border-color:var(--blue);background:white;box-shadow:0 0 0 2px rgba(37,99,235,.1)}
-.pdf-text-box.select-mode{pointer-events:none}
+.pdf-text-box{
+  border:1.5px dashed #6366f1;
+  border-radius:4px;
+  padding:4px 8px;
+  font-size:14px;
+  min-width:100px;min-height:26px;
+  outline:none;
+  background:rgba(255,255,255,0.0);
+  resize:none;
+  overflow:visible;
+  line-height:1.5;
+  cursor:text;
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.pdf-text-box:focus{
+  border-color:#6366f1;
+  border-style:solid;
+  background:rgba(255,255,255,0.95);
+  box-shadow:0 0 0 3px rgba(99,102,241,0.15);
+}
 .pdf-img-overlay{border:2px dashed #93c5fd;border-radius:3px;max-width:240px}
-.overlay-delete{position:absolute;top:-8px;right:-8px;width:18px;height:18px;background:#ef4444;color:white;border:none;border-radius:50%;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center;line-height:1;z-index:10}
+.overlay-delete{
+  position:absolute;top:-10px;right:-10px;
+  width:22px;height:22px;
+  background:#ef4444;color:white;
+  border:2px solid white;border-radius:50%;
+  font-size:13px;font-weight:700;
+  cursor:pointer;
+  display:none;
+  align-items:center;justify-content:center;
+  line-height:1;z-index:20;
+  box-shadow:0 2px 6px rgba(0,0,0,.25);
+}
 .pdf-overlay:hover .overlay-delete{display:flex}
 
 /* Look-around cursor */
@@ -296,6 +325,32 @@ input,select,textarea{font-family:var(--font)}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--gray-900);color:white;padding:9px 18px;border-radius:8px;font-size:12px;font-weight:500;z-index:600;opacity:0;transition:all .2s;pointer-events:none;box-shadow:var(--shadow-md)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+   /* PDF Text Layer */
+.pdf-text-layer{z-index:2}
+.pdf-text-item{
+  position:absolute;
+  color:transparent;
+  cursor:text;
+  border-radius:2px;
+  transition:background .1s;
+}
+.pdf-text-item:hover{
+  background:rgba(99,102,241,0.12);
+  color:transparent;
+}
+.pdf-text-item.editing{
+  color:#111;
+  background:rgba(255,255,255,0.97);
+  border:1.5px solid #6366f1;
+  box-shadow:0 0 0 3px rgba(99,102,241,0.15);
+  outline:none;
+  z-index:15;
+  padding:2px 4px;
+  min-width:40px;
+  white-space:pre;
+  cursor:text;
+  border-radius:3px;
+}
 /* Buttons */
 .btn{padding:9px 18px;border-radius:7px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all .15s}
 .btn-primary{background:var(--gray-900);color:white}.btn-primary:hover{background:var(--gray-700)}
@@ -880,10 +935,58 @@ async function renderPage(n){
   canvas.width=vp.width;canvas.height=vp.height;
   const ol=document.getElementById('overlay-layer');
   ol.style.width=vp.width+'px';ol.style.height=vp.height+'px';
+  // Behalte bestehende User-Overlays (Textboxen, Signaturen)
+  const userEls=Array.from(ol.querySelectorAll('.pdf-overlay'));
   ol.innerHTML='';
+  userEls.forEach(el=>ol.appendChild(el));
+  // PDF rendern
   await page.render({canvasContext:ctx,viewport:vp}).promise;
+  // Text-Layer aufbauen
+  await buildTextLayer(page, vp, ol);
   document.getElementById('page-info-txt').textContent=`${n} / ${totalPages}`;
   document.querySelectorAll('.thumb-item').forEach((t,i)=>t.classList.toggle('active',i===n-1));
+}
+
+async function buildTextLayer(page, vp, container){
+  const textContent=await page.getTextContent();
+  // Alten text layer entfernen
+  const old=container.querySelector('.pdf-text-layer');
+  if(old)old.remove();
+  const layer=document.createElement('div');
+  layer.className='pdf-text-layer';
+  layer.style.cssText=`
+    position:absolute;inset:0;
+    pointer-events:none;
+    overflow:hidden;
+    line-height:1;
+    user-select:none;
+  `;
+  const {items,styles}=textContent;
+  items.forEach(item=>{
+    if(!item.str||!item.str.trim())return;
+    const tx=pdfjsLib.Util.transform(vp.transform, item.transform);
+    const style=styles[item.fontName]||{};
+    const span=document.createElement('span');
+    span.className='pdf-text-item';
+    span.dataset.originalText=item.str;
+    span.textContent=item.str;
+    const angle=Math.atan2(tx[1],tx[0]);
+    const fontSize=Math.sqrt(tx[2]*tx[2]+tx[3]*tx[3]);
+    span.style.cssText=`
+      position:absolute;
+      left:${tx[4]}px;
+      top:${tx[5]-fontSize}px;
+      font-size:${fontSize}px;
+      font-family:${style.fontFamily||'Arial'};
+      white-space:pre;
+      transform-origin:left bottom;
+      transform:rotate(${angle}rad) scaleX(${item.width/(item.str.length*fontSize*0.6)||1});
+      color:transparent;
+      cursor:text;
+    `;
+    layer.appendChild(span);
+  });
+  container.appendChild(layer);
 }
 
 async function buildThumbs(){
@@ -918,14 +1021,9 @@ function setMode(m){
   const ca=document.getElementById('canvas-area');
   ca.className='canvas-area '+(m==='look'?'look-mode':'edit-mode');
   const ol=document.getElementById('overlay-layer');
-  ol.classList.toggle('can-edit',m==='edit');
-  if(m==='edit'){
-    ol.style.pointerEvents='all';
-    ol.style.cursor='text';
-  } else {
-    ol.style.pointerEvents='none';
-    ol.style.cursor='default';
-  }
+  ol.style.pointerEvents=m==='edit'?'all':'none';
+  // Text layer klickbar machen
+  document.dispatchEvent(new CustomEvent('modeChange',{detail:m}));
 }
 
 // ═══════════════════════════════════════
@@ -1010,12 +1108,21 @@ function addImageOverlay(){
     const f=e.target.files[0];if(!f)return;
     const rd=new FileReader();
     rd.onload=ev=>{
+      const wrap=document.createElement('div');
+      wrap.className='pdf-overlay';
+      wrap.style.position='absolute';
+      wrap.style.left='80px';wrap.style.top='80px';
       const img=document.createElement('img');
       img.src=ev.target.result;
-      img.className='pdf-overlay pdf-img-overlay';
-      img.style.left='80px';img.style.top='80px';
-      addDelBtn(img);makeDraggable(img);
-      document.getElementById('overlay-layer').appendChild(img);
+      img.style.maxWidth='240px';
+      img.style.display='block';
+      img.style.borderRadius='3px';
+      img.style.border='2px dashed #6366f1';
+      img.draggable=false;
+      addDelBtn(wrap);
+      makeDraggable(wrap);
+      wrap.appendChild(img);
+      document.getElementById('overlay-layer').appendChild(wrap);
     };rd.readAsDataURL(f);
   };inp.click();
 }
@@ -1433,16 +1540,65 @@ function toast(msg,type='info'){
 // Canvas click to place text in edit mode
 document.addEventListener('DOMContentLoaded',()=>{
   const ol=document.getElementById('overlay-layer');
-  if(ol){
-    ol.addEventListener('click',function(e){
-      if(editorMode!=='edit')return;
-      if(e.target!==ol)return; // nur klick auf leere Fläche
-      if(currentTab==='add'||currentTab==='edit'){
+  if(!ol)return;
+
+  // Klick auf leere Fläche im Add-Modus = neue Textbox
+  ol.addEventListener('click',function(e){
+    if(editorMode!=='edit')return;
+    if(e.target===ol||e.target.id==='pdf-canvas'){
+      if(currentTab==='add'){
         const rect=ol.getBoundingClientRect();
-        addTextBox(e.clientX-rect.left-4, e.clientY-rect.top-4);
+        addTextBox(e.clientX-rect.left-4,e.clientY-rect.top-4);
       }
+    }
+  });
+
+  // Klick auf bestehenden PDF-Text im Edit-Modus = direkt bearbeiten
+  ol.addEventListener('click',function(e){
+    if(editorMode!=='edit')return;
+    if(!e.target.classList.contains('pdf-text-item'))return;
+    if(currentTab!=='edit')return;
+    const span=e.target;
+    if(span.classList.contains('editing'))return;
+    // Alle anderen schließen
+    document.querySelectorAll('.pdf-text-item.editing').forEach(s=>{
+      s.contentEditable='false';
+      s.classList.remove('editing');
+      s.style.color='transparent';
+      s.style.pointerEvents='none';
     });
-  }
+    // Diesen öffnen
+    span.contentEditable='true';
+    span.classList.add('editing');
+    span.style.pointerEvents='all';
+    span.style.transform='none'; // Reset scaleX beim Bearbeiten
+    span.style.whiteSpace='pre-wrap';
+    span.focus();
+    // Cursor ans Ende
+    const range=document.createRange();
+    range.selectNodeContents(span);
+    range.collapse(false);
+    const sel=window.getSelection();
+    sel.removeAllRanges();sel.addRange(range);
+    // Enter oder Klick woanders = schließen
+    span.addEventListener('blur',function close(){
+      span.contentEditable='false';
+      span.classList.remove('editing');
+      span.style.color='transparent';
+      span.style.pointerEvents='none';
+      span.removeEventListener('blur',close);
+    });
+  });
+
+  // Text-Layer nur im Edit-Modus klickbar
+  document.addEventListener('modeChange',function(e){
+    const layer=document.querySelector('.pdf-text-layer');
+    if(!layer)return;
+    layer.style.pointerEvents=e.detail==='edit'?'all':'none';
+    document.querySelectorAll('.pdf-text-item').forEach(s=>{
+      s.style.pointerEvents=e.detail==='edit'?'all':'none';
+    });
+  });
 });
 // ═══════════════════════════════════════
 // INIT
