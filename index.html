@@ -1765,8 +1765,14 @@ function openInlineEditor(span){
 
 async function closeInlineEditor(save=true){
   if(!activeInlineSpan || !activeInlineInput) return;
+
+  // WICHTIGER FIX: Sofort Referenzen sichern und auf null setzen!
+  // Das verhindert, dass das 'blur'-Event die Funktion parallel ein zweites Mal startet.
   const span = activeInlineSpan;
   const ed = activeInlineInput;
+  activeInlineSpan = null;
+  activeInlineInput = null;
+
   const newText = ed.value;
   const origText = span.dataset.originalText||'';
 
@@ -1777,22 +1783,14 @@ async function closeInlineEditor(save=true){
   // Editor entfernen
   if(ed.parentNode) ed.remove();
 
-  if(!save) {
-    activeInlineSpan = null;
-    activeInlineInput = null;
-    return;
-  }
+  if(!save) return;
 
   // Geänderten Text merken
   span.dataset.editedText=newText;
 
-  if(newText===origText||!pdfLibDoc) {
-    activeInlineSpan = null;
-    activeInlineInput = null;
-    return;
-  }
+  if(newText===origText||!pdfLibDoc) return;
 
-  // ── Ins PDF schreiben ──
+  // ── Ins PDF schreiben und Live-Vorschau aktualisieren ──
   try{
     const pageIndex=parseInt(span.dataset.pageNumber||currentPage,10)-1;
     const page=pdfLibDoc.getPages()[pageIndex];
@@ -1831,16 +1829,12 @@ async function closeInlineEditor(save=true){
     // 3. Das pdf-lib Dokument neu laden, damit Folgebearbeitungen darauf aufbauen
     pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
 
-    // 4. Die aktuelle Seite sofort live im Browser neu zeichnen
+    // 4. Die aktuelle Seite sofort live im Browser neu zeichnen (wie in Word)
     await renderPage(currentPage);
 
   } catch(e) {
     console.error("Fehler beim Live-Update des PDFs:", e);
   }
-
-  // Referenzen zurücksetzen
-  activeInlineSpan = null;
-  activeInlineInput = null;
 }
    
 // ═══════════════════════════════════════
