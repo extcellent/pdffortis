@@ -1642,39 +1642,97 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 
   // ── EDIT TEXT: Klick auf PDF-Text-Span ──
-  ol.addEventListener('click',function(e){
-    if(editorMode!=='edit')return;
-    if(currentTab!=='edit')return;
-    if(!e.target.classList.contains('pdf-text-item'))return;
-    const span=e.target;
-    if(span.classList.contains('editing'))return;
-    document.querySelectorAll('.pdf-text-item.editing').forEach(s=>{
-      s.contentEditable='false';
-      s.classList.remove('editing');
-      s.style.color='transparent';
-      s.style.pointerEvents='none';
-      s.style.background='';
-    });
-    span.contentEditable='true';
-    span.classList.add('editing');
-    span.style.pointerEvents='all';
-    span.style.transform='none';
-    span.style.whiteSpace='pre-wrap';
-    span.focus();
+// ── EDIT TEXT: Klick auf PDF-Text-Span ──
+ol.addEventListener('click',function(e){
+  if(editorMode!=='edit')return;
+  if(currentTab!=='edit')return;
+  if(!e.target.classList.contains('pdf-text-item'))return;
+  const span=e.target;
+  if(span.classList.contains('editing'))return;
+
+  // Alle anderen schließen
+  document.querySelectorAll('.pdf-text-item.editing').forEach(s=>{
+    s.classList.remove('editing');
+    s.style.cssText=s.dataset.origStyle||'';
+    s.style.color='transparent';
+    s.style.pointerEvents='all';
+    if(s.dataset.edited){
+      s.textContent=s.dataset.editedText||s.dataset.originalText;
+    }
+  });
+
+  // Original-Style sichern
+  span.dataset.origStyle=span.style.cssText;
+
+  // Inline-Editor ÜBER dem Span erstellen statt Span selbst editieren
+  const existingEditor=document.getElementById('inline-text-editor');
+  if(existingEditor)existingEditor.remove();
+
+  const rect=span.getBoundingClientRect();
+  const olRect=ol.getBoundingClientRect();
+
+  const editor=document.createElement('div');
+  editor.id='inline-text-editor';
+  editor.contentEditable='true';
+  editor.setAttribute('spellcheck','false');
+  editor.style.cssText=`
+    position:absolute;
+    left:${rect.left-olRect.left}px;
+    top:${rect.top-olRect.top}px;
+    min-width:${Math.max(rect.width,60)}px;
+    min-height:${rect.height}px;
+    font-size:${span.style.fontSize};
+    font-family:${span.style.fontFamily};
+    color:#000000;
+    background:rgba(255,255,255,0.95);
+    border:1.5px solid #6366f1;
+    box-shadow:0 0 0 3px rgba(99,102,241,0.15);
+    border-radius:3px;
+    padding:2px 4px;
+    outline:none;
+    z-index:50;
+    white-space:pre-wrap;
+    line-height:1.4;
+    cursor:text;
+  `;
+  editor.textContent=span.dataset.editedText||span.dataset.originalText||span.textContent;
+
+  // Span verstecken während Edit
+  span.style.color='transparent';
+  span.classList.add('editing');
+
+  ol.appendChild(editor);
+
+  // Cursor ans Ende
+  setTimeout(()=>{
+    editor.focus();
     const range=document.createRange();
-    range.selectNodeContents(span);
+    range.selectNodeContents(editor);
     range.collapse(false);
     const sel=window.getSelection();
     sel.removeAllRanges();sel.addRange(range);
-    span.addEventListener('blur',function close(){
-      span.contentEditable='false';
-      span.classList.remove('editing');
-      span.style.color='transparent';
-      span.style.pointerEvents='none';
-      span.style.background='';
-      span.removeEventListener('blur',close);
-    });
+  },20);
+
+  // Schließen bei Blur
+  editor.addEventListener('blur',function(){
+    span.dataset.editedText=editor.textContent;
+    span.dataset.edited='true';
+    span.textContent=editor.textContent;
+    span.style.color='transparent';
+    span.style.transform='none';
+    span.style.whiteSpace='pre-wrap';
+    span.classList.remove('editing');
+    editor.remove();
   });
+
+  // Escape = abbrechen
+  editor.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){
+      span.classList.remove('editing');
+      editor.remove();
+    }
+  });
+});
 
   // ── modeChange: Text-Layer pointer-events ──
   document.addEventListener('modeChange',function(e){
