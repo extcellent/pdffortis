@@ -1705,13 +1705,13 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 
   // ── EDIT TEXT: Klick auf PDF-Text-Span → Floating Editor ──
-  ol.addEventListener('click',function(e){
-    if(editorMode!=='edit')return;
-    if(currentTab!=='edit')return;
-    if(!e.target.classList.contains('pdf-text-item'))return;
-    e.stopPropagation();
-    openInlineEditor(e.target);
-  });
+document.addEventListener('click',function(e){
+  if(editorMode!=='edit')return;
+  if(currentTab!=='edit')return;
+  if(!e.target.classList.contains('pdf-text-item'))return;
+  e.stopPropagation();
+  openInlineEditor(e.target);
+});
 
   // Klick auf leere Fläche im Edit-Tab → Editor schließen
   ol.addEventListener('click',function(e){
