@@ -515,6 +515,10 @@ input,select,textarea{font-family:var(--font)}
   <!-- Ribbon -->
   <div class="editor-ribbon">
     <div class="ribbon-tabs">
+      <button class="rtab" data-tab="nav" onclick="switchRTab('nav')">
+        <svg width="13" height="13" fill="none" viewBox="0 0 16 16"><path d="M3 3l10 5-5 1-2 5-3-11z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        <span>Navigate</span>
+      </button>
       <button class="rtab active" data-tab="edit" onclick="switchRTab('edit')">
         <svg width="13" height="13" fill="none" viewBox="0 0 16 16"><path d="M11 2.5l2.5 2.5L5 13.5H2.5V11L11 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
         <span data-i="tab_edit">Edit Text</span>
@@ -535,6 +539,10 @@ input,select,textarea{font-family:var(--font)}
     </div>
 
     <!-- Edit text panel -->
+   <!-- Navigate panel -->
+   <div class="ribbon-panel" id="panel-nav">
+     <span style="font-size:12px;color:var(--gray-400);padding:0 8px">Click to scroll · Zoom with mouse wheel · No editing active</span>
+   </div>
     <div class="ribbon-panel active" id="panel-edit">
       <div class="rgrp">
         <select class="font-select" id="font-family" onchange="applyFormat('font')">
@@ -1030,15 +1038,17 @@ function setMode(m){
 // RIBBON TABS
 // ═══════════════════════════════════════
 function switchRTab(tab){
+  // Bei Navigate-Tab: Edit-Mode ausschalten
+  if(tab==='nav'){setMode('look')}
   currentTab=tab;
   document.querySelectorAll('.rtab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
   document.querySelectorAll('.ribbon-panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+tab));
   if(tab==='sign'&&!currentUser&&!currentToken){showSignLock();return}
-}
-
-function showSignLock(){
-  toast(lang==='de'?'Für Signaturen bitte einloggen':'Please sign in to use signatures','warn');
-  openAuth('signup');
+  // Text-layer nur bei 'edit' tab klickbar, bei 'add' tab NICHT
+  const layer=document.querySelector('.pdf-text-layer');
+  if(layer){
+    layer.style.pointerEvents=(tab==='edit'&&editorMode==='edit')?'all':'none';
+  }
 }
 
 // ═══════════════════════════════════════
@@ -1110,18 +1120,14 @@ function addImageOverlay(){
     rd.onload=ev=>{
       const wrap=document.createElement('div');
       wrap.className='pdf-overlay';
-      wrap.style.position='absolute';
-      wrap.style.left='80px';wrap.style.top='80px';
+      wrap.style.cssText='position:absolute;left:80px;top:80px;display:inline-block;';
       const img=document.createElement('img');
       img.src=ev.target.result;
-      img.style.maxWidth='240px';
-      img.style.display='block';
-      img.style.borderRadius='3px';
-      img.style.border='2px dashed #6366f1';
+      img.style.cssText='max-width:240px;display:block;border-radius:3px;border:2px dashed #6366f1;pointer-events:none;';
       img.draggable=false;
+      wrap.appendChild(img);
       addDelBtn(wrap);
       makeDraggable(wrap);
-      wrap.appendChild(img);
       document.getElementById('overlay-layer').appendChild(wrap);
     };rd.readAsDataURL(f);
   };inp.click();
@@ -1129,9 +1135,13 @@ function addImageOverlay(){
 
 function addDelBtn(el){
   const btn=document.createElement('button');
-  btn.className='overlay-delete';btn.textContent='×';
-  btn.onclick=e=>{e.stopPropagation();el.remove()};
-  el.style.position='absolute';
+  btn.className='overlay-delete';
+  btn.innerHTML='&times;';
+  btn.onclick=e=>{e.stopPropagation();e.preventDefault();el.remove()};
+  // Position nur setzen wenn noch nicht gesetzt
+  if(!el.style.position||el.style.position==='static'){
+    el.style.position='absolute';
+  }
   el.appendChild(btn);
 }
 
@@ -1542,16 +1552,18 @@ document.addEventListener('DOMContentLoaded',()=>{
   const ol=document.getElementById('overlay-layer');
   if(!ol)return;
 
-  // Klick auf leere Fläche im Add-Modus = neue Textbox
-  ol.addEventListener('click',function(e){
-    if(editorMode!=='edit')return;
-    if(e.target===ol||e.target.id==='pdf-canvas'){
-      if(currentTab==='add'){
-        const rect=ol.getBoundingClientRect();
-        addTextBox(e.clientX-rect.left-4,e.clientY-rect.top-4);
-      }
-    }
-  });
+// Klick auf leere Fläche im Add-Modus = neue Textbox
+ol.addEventListener('click',function(e){
+  if(editorMode!=='edit')return;
+  if(currentTab!=='add')return;
+  // Klick auf Text-Layer Items oder bestehende Overlays ignorieren
+  if(e.target.classList.contains('pdf-text-item'))return;
+  if(e.target.classList.contains('pdf-overlay'))return;
+  if(e.target.classList.contains('pdf-text-box'))return;
+  if(e.target.classList.contains('overlay-delete'))return;
+  const rect=ol.getBoundingClientRect();
+  addTextBox(e.clientX-rect.left-4,e.clientY-rect.top-4);
+});
 
   // Klick auf bestehenden PDF-Text im Edit-Modus = direkt bearbeiten
   ol.addEventListener('click',function(e){
