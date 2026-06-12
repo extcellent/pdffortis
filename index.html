@@ -1817,34 +1817,13 @@ async function closeInlineEditor(save=true){
       });
     }
 
-    // ─── AB HIER ERSETZEN / ERWEITERN ───
-    
-    // 1. Die modifizierten PDF-Bytes generieren
-    pdfBytes = await pdfLibDoc.save();
-
-    // 2. Das pdf.js-Dokument (Viewer) mit den neuen Bytes füttern
-    // (Hinweis: Falls deine pdf.js-Variable nicht 'pdfDoc' heißt, passe den Namen an)
-    if (typeof pdfjsLib !== 'undefined' && pdfDoc) {
-      pdfDoc = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
-    }
-
-    // 3. Das pdf-lib Dokument neu laden, damit die nächsten Edits auf diesem Stand aufbauen
-    pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
-
-    // 4. Die aktuelle Seite im Viewer sofort live neu zeichnen
-    // WICHTIG: Ersetze 'renderPage' durch den echten Namen deiner Render-Funktion im Code!
-    const pageIndex = parseInt(span.dataset.pageNumber || currentPage, 10);
-    if (typeof renderPage === 'function') {
-      await renderPage(pageIndex);
-    } else if (typeof displayPage === 'function') {
-      await displayPage(pageIndex);
-    } else if (typeof loadPage === 'function') {
-      await loadPage(pageIndex);
-    }
-
-  } catch(e) {
-    console.error("Fehler beim Live-Update des PDFs:", e);
+    pdfBytes=await pdfLibDoc.save();
+    toast('✓ Text saved','ok');
+  }catch(err){
+    console.error(err);
+    toast('Error: '+err.message,'err');
   }
+}
    
 // ═══════════════════════════════════════
 // INIT
