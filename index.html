@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PDFortis — Free PDF Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Dancing+Script:wght@600&family=Caveat:wght@600&family=Pacifico&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<style>
+/* ═══════════════════════════════════════
+   RESET + TOKENS
+═══════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --white:#ffffff;
+  --off:#f8f8f8;
+  --gray-50:#f9fafb;
+  --gray-100:#f3f4f6;
+  --gray-200:#e5e7eb;
+  --gray-300:#d1d5db;
+  --gray-400:#9ca3af;
+  --gray-500:#6b7280;
+  --gray-600:#4b5563;
+  --gray-700:#374151;
+  --gray-900:#111827;
+  --blue:#2563eb;
+  --blue-l:#eff6ff;
+  --radius:8px;
+  --shadow:0 1px 4px rgba(0,0,0,.08);
+  --shadow-md:0 4px 16px rgba(0,0,0,.10);
+  --shadow-lg:0 20px 60px rgba(0,0,0,.13);
+  --font:'Inter',system-ui,sans-serif;
+  --rb1:#6366f1;--rb2:#8b5cf6;--rb3:#ec4899;--rb4:#f59e0b;--rb5:#10b981;--rb6:#3b82f6;
+}
+html,body{height:100%;font-family:var(--font);background:var(--white);color:var(--gray-900);overflow:hidden}
+.hidden{display:none!important}
+button{font-family:var(--font);cursor:pointer}
+input,select,textarea{font-family:var(--font)}
+
+/* ═══════════════════════════════════════
+   RAINBOW UTILITIES
+═══════════════════════════════════════ */
+.rb-text{
+  background:linear-gradient(135deg,var(--rb1),var(--rb2),var(--rb3),var(--rb4),var(--rb5),var(--rb6));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  background-size:200% 200%;animation:rbShift 4s ease infinite;
+}
+@keyframes rbShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+.rb-border{border:1.5px solid transparent;background:linear-gradient(white,white) padding-box,linear-gradient(135deg,var(--rb1),var(--rb3),var(--rb5)) border-box}
+.rb-glow{box-shadow:0 0 0 1px rgba(99,102,241,.15),0 4px 20px rgba(99,102,241,.08)}
+
+/* ═══════════════════════════════════════
+   PAGE SYSTEM
+═══════════════════════════════════════ */
+.page{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--white);transition:opacity .35s ease,transform .35s ease;z-index:10}
+.page.out{opacity:0;transform:translateY(-8px);pointer-events:none}
+
+/* ═══════════════════════════════════════
+   NAV BAR (shared)
+═══════════════════════════════════════ */
+.nav{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid var(--gray-100);flex-shrink:0;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);position:relative;z-index:100}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo-icon{width:28px;height:28px}
+.nav-logo-text{font-size:15px;font-weight:700;color:var(--gray-900);letter-spacing:-.3px}
+.nav-logo-text span{background:linear-gradient(135deg,var(--rb1),var(--rb3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.nav-right{display:flex;align-items:center;gap:10px}
+.lang-toggle{display:flex;background:var(--gray-100);border-radius:99px;padding:2px;border:none}
+.lang-btn{padding:3px 10px;font-size:11px;font-weight:600;border:none;background:none;border-radius:99px;color:var(--gray-500);transition:all .15s;cursor:pointer}
+.lang-btn.active{background:white;color:var(--gray-900);box-shadow:var(--shadow)}
+.nav-auth-btn{padding:6px 14px;font-size:12px;font-weight:600;border-radius:99px;border:none;cursor:pointer;transition:all .15s}
+.nav-login{background:none;color:var(--gray-600);border:1px solid var(--gray-200)}
+.nav-login:hover{background:var(--gray-50);color:var(--gray-900)}
+.nav-signup{background:var(--gray-900);color:white}
+.nav-signup:hover{background:var(--gray-700)}
+.nav-user{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--gray-700)}
+.nav-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--rb1),var(--rb3));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white}
+
+/* ═══════════════════════════════════════
+   PAGE 1 — LANDING
+═══════════════════════════════════════ */
+#page-landing{overflow-y:auto}
+.landing-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 24px 60px;text-align:center;min-height:calc(100vh - 52px - 200px)}
+
+.hero-cycle-wrapper{height:64px;overflow:hidden;position:relative;margin-bottom:16px}
+.hero-cycle-item{position:absolute;left:0;right:0;font-size:clamp(28px,5vw,52px);font-weight:800;letter-spacing:-1.5px;opacity:0;transform:translateY(24px);transition:opacity .5s ease,transform .5s ease;line-height:1.1}
+.hero-cycle-item.active{opacity:1;transform:translateY(0)}
+
+.hero-tagline{font-size:clamp(14px,2vw,17px);color:var(--gray-400);font-weight:400;margin-bottom:36px;letter-spacing:.1px}
+.hero-tagline em{font-style:italic;color:var(--gray-500)}
+
+.hero-cta{display:inline-flex;align-items:center;gap:10px;padding:14px 32px;background:var(--gray-900);color:white;border:none;border-radius:99px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+.hero-cta:hover{background:var(--gray-700);transform:translateY(-1px);box-shadow:0 8px 28px rgba(0,0,0,.18)}
+.hero-cta svg{transition:transform .2s}
+.hero-cta:hover svg{transform:translateX(3px)}
+
+.hero-privacy{display:flex;align-items:center;gap:6px;margin-top:16px;font-size:12px;color:var(--gray-400)}
+.hero-privacy svg{flex-shrink:0}
+
+/* Feature cards */
+.features-scroll-area{padding:0 28px 60px;overflow:hidden}
+.features-label{text-align:center;font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:20px}
+.features-track-wrapper{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;cursor:grab;user-select:none}
+.features-track-wrapper::-webkit-scrollbar{display:none}
+.features-track-wrapper.grabbing{cursor:grabbing}
+.features-track{display:flex;gap:12px;width:max-content;padding:4px 2px 16px}
+
+.feat-card{width:200px;flex-shrink:0;background:white;border:1px solid var(--gray-200);border-radius:12px;padding:20px;transition:all .2s;box-shadow:var(--shadow)}
+.feat-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:var(--gray-300)}
+.feat-icon{width:40px;height:40px;border-radius:10px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;margin-bottom:12px;font-size:18px}
+.feat-title{font-size:13px;font-weight:700;color:var(--gray-900);margin-bottom:4px}
+.feat-desc{font-size:11px;color:var(--gray-500);line-height:1.5}
+
+.privacy-banner{margin:0 28px 40px;padding:14px 20px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:10px;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--gray-600)}
+.privacy-banner svg{flex-shrink:0;color:var(--gray-400)}
+
+/* ═══════════════════════════════════════
+   PAGE 2 — UPLOAD
+═══════════════════════════════════════ */
+#page-upload{align-items:center;justify-content:flex-start;overflow-y:auto}
+.upload-container{width:100%;max-width:680px;margin:0 auto;padding:40px 24px}
+.upload-heading{font-size:22px;font-weight:700;letter-spacing:-.4px;margin-bottom:6px}
+.upload-sub{font-size:13px;color:var(--gray-500);margin-bottom:32px}
+
+.drop-zone{border:2px dashed var(--gray-300);border-radius:16px;padding:56px 32px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;transition:all .2s;cursor:pointer;background:white;position:relative}
+.drop-zone:hover,.drop-zone.over{border-color:var(--blue);background:var(--blue-l);transform:scale(1.005)}
+.drop-zone.over{border-style:solid}
+.drop-zone-icon{width:64px;height:64px;margin-bottom:4px}
+.drop-zone-title{font-size:18px;font-weight:700;color:var(--gray-900);letter-spacing:-.3px}
+.drop-zone-sub{font-size:13px;color:var(--gray-400)}
+.drop-browse{display:inline-block;padding:10px 24px;background:var(--gray-900);color:white;border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+.drop-browse:hover{background:var(--gray-700)}
+.drop-browse input{display:none}
+.drop-note{font-size:11px;color:var(--gray-400);margin-top:4px}
+
+.upload-recent{margin-top:32px}
+.upload-recent-title{font-size:12px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.recent-list{display:flex;flex-direction:column;gap:8px}
+.recent-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--gray-200);border-radius:10px;cursor:pointer;transition:all .15s;background:white}
+.recent-item:hover{border-color:var(--gray-300);background:var(--gray-50)}
+.recent-icon{width:32px;height:32px;background:var(--blue-l);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.recent-name{font-size:13px;font-weight:500;color:var(--gray-900);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-date{font-size:11px;color:var(--gray-400)}
+
+/* ═══════════════════════════════════════
+   PAGE 3 — EDITOR
+═══════════════════════════════════════ */
+#page-editor{flex-direction:column;overflow:hidden}
+
+/* Editor top bar */
+.editor-bar{height:44px;background:white;border-bottom:1px solid var(--gray-200);display:flex;align-items:center;padding:0 14px;gap:8px;flex-shrink:0;box-shadow:var(--shadow)}
+.editor-filename{font-size:13px;font-weight:600;color:var(--gray-700);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.editor-sep{width:1px;height:20px;background:var(--gray-200);margin:0 4px}
+.editor-mode-toggle{display:flex;background:var(--gray-100);border-radius:99px;padding:2px;border:none;gap:1px}
+.mode-btn{padding:4px 12px;font-size:11px;font-weight:600;border:none;background:none;border-radius:99px;color:var(--gray-500);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px}
+.mode-btn.active{background:white;color:var(--gray-900);box-shadow:var(--shadow)}
+.editor-bar-right{margin-left:auto;display:flex;align-items:center;gap:6px}
+.bar-btn{display:flex;align-items:center;gap:5px;padding:5px 10px;font-size:11px;font-weight:600;border:1px solid var(--gray-200);border-radius:6px;background:white;color:var(--gray-600);cursor:pointer;transition:all .15s}
+.bar-btn:hover{background:var(--gray-50);border-color:var(--gray-300);color:var(--gray-900)}
+.bar-btn.primary{background:var(--gray-900);color:white;border-color:var(--gray-900)}
+.bar-btn.primary:hover{background:var(--gray-700)}
+.dl-count{font-size:10px;padding:2px 7px;background:var(--gray-100);border-radius:99px;color:var(--gray-500);font-weight:600}
+
+/* Editor ribbon */
+.editor-ribbon{background:white;border-bottom:1px solid var(--gray-200);flex-shrink:0}
+.ribbon-tabs{display:flex;padding:0 14px;background:var(--gray-50);border-bottom:1px solid var(--gray-200)}
+.rtab{display:flex;align-items:center;gap:5px;padding:7px 14px;font-size:12px;font-weight:500;color:var(--gray-500);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all .15s;margin-bottom:-1px}
+.rtab:hover{color:var(--blue)}
+.rtab.active{color:var(--blue);border-bottom-color:var(--blue);background:white;font-weight:600}
+.rtab.locked{opacity:.5;cursor:not-allowed}
+
+.ribbon-panel{display:none;align-items:center;gap:4px;padding:7px 14px;min-height:56px;flex-wrap:wrap}
+.ribbon-panel.active{display:flex}
+.rgrp{display:flex;align-items:center;gap:2px}
+.rsep{width:1px;height:32px;background:var(--gray-200);margin:0 6px;flex-shrink:0}
+.rbtn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 9px;border:1px solid transparent;border-radius:6px;background:none;cursor:pointer;color:var(--gray-700);font-size:10px;font-weight:500;min-width:46px;transition:all .12s}
+.rbtn:hover{background:var(--gray-100);border-color:var(--gray-200)}
+.rbtn.active-tool{background:var(--blue-l);border-color:#bfdbfe;color:var(--blue)}
+.rbtn.primary{background:var(--gray-900);color:white;border-color:var(--gray-900)}
+.rbtn.primary:hover{background:var(--gray-700)}
+.font-select{padding:4px 8px;font-size:12px;border:1px solid var(--gray-200);border-radius:5px;background:white;color:var(--gray-700);height:30px}
+.font-size-input{width:44px;padding:4px 6px;font-size:12px;border:1px solid var(--gray-200);border-radius:5px;text-align:center;height:30px}
+.color-dot{width:20px;height:20px;border-radius:4px;border:2px solid var(--gray-300);cursor:pointer}
+
+/* Editor body */
+.editor-body{flex:1;display:flex;overflow:hidden;min-height:0}
+
+/* Left panel — page thumbnails */
+.pages-panel{width:100px;background:var(--gray-50);border-right:1px solid var(--gray-200);overflow-y:auto;flex-shrink:0;padding:10px 8px;display:flex;flex-direction:column;gap:8px}
+.thumb-item{cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid transparent;transition:all .15s;position:relative}
+.thumb-item.active{border-color:var(--blue)}
+.thumb-item canvas{width:100%;display:block}
+.thumb-num{font-size:9px;text-align:center;color:var(--gray-400);margin-top:3px;font-weight:500}
+
+/* Main canvas */
+.canvas-area{flex:1;overflow:auto;background:#e8e8e8;display:flex;align-items:flex-start;justify-content:center;padding:24px;position:relative}
+.canvas-wrap{position:relative;box-shadow:0 4px 32px rgba(0,0,0,.18);border-radius:1px;background:white;display:inline-block}
+#pdf-canvas{display:block}
+#overlay-layer{position:absolute;inset:0;pointer-events:none}
+#overlay-layer.can-edit{pointer-events:all}
+
+/* Right panel — tools */
+.tools-panel{width:200px;flex-shrink:0;background:white;border-left:1px solid var(--gray-200);overflow-y:auto;padding:12px}
+.tools-section{margin-bottom:16px}
+.tools-section-title{font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.tool-btn{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--gray-200);border-radius:7px;background:white;font-size:12px;font-weight:500;color:var(--gray-700);cursor:pointer;margin-bottom:4px;transition:all .15s;text-align:left}
+.tool-btn:hover{background:var(--gray-50);border-color:var(--gray-300);color:var(--gray-900)}
+.tool-btn svg{flex-shrink:0;color:var(--gray-400)}
+
+.compress-group{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+.quality-row{display:flex;gap:4px}
+.qbtn{flex:1;padding:4px;font-size:10px;font-weight:600;border:1px solid var(--gray-200);border-radius:5px;background:white;cursor:pointer;color:var(--gray-500);transition:all .12s}
+.qbtn.active,.qbtn:hover{background:var(--gray-900);color:white;border-color:var(--gray-900)}
+
+.page-nav-row{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.pnav{background:none;border:1px solid var(--gray-200);border-radius:5px;padding:3px 7px;font-size:14px;cursor:pointer;color:var(--gray-600);transition:all .12s}
+.pnav:hover{background:var(--gray-100)}
+#page-info-txt{font-size:11px;color:var(--gray-500);flex:1;text-align:center}
+
+/* Overlay elements */
+.pdf-overlay{position:absolute;cursor:move;user-select:none}
+.pdf-text-box{border:1px dashed #93c5fd;border-radius:3px;padding:3px 6px;font-size:14px;min-width:80px;min-height:24px;outline:none;background:rgba(255,255,255,.9);resize:both;overflow:auto;line-height:1.4}
+.pdf-text-box:focus{border-color:var(--blue);background:white;box-shadow:0 0 0 2px rgba(37,99,235,.1)}
+.pdf-text-box.select-mode{pointer-events:none}
+.pdf-img-overlay{border:2px dashed #93c5fd;border-radius:3px;max-width:240px}
+.overlay-delete{position:absolute;top:-8px;right:-8px;width:18px;height:18px;background:#ef4444;color:white;border:none;border-radius:50%;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center;line-height:1;z-index:10}
+.pdf-overlay:hover .overlay-delete{display:flex}
+
+/* Look-around cursor */
+.canvas-area.look-mode{cursor:default}
+.canvas-area.edit-mode{cursor:text}
+
+/* ═══════════════════════════════════════
+   MODALS
+═══════════════════════════════════════ */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.modal{background:white;border-radius:14px;box-shadow:var(--shadow-lg);width:480px;max-width:94vw;overflow:hidden;animation:modalIn .2s ease}
+@keyframes modalIn{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid var(--gray-100)}
+.modal-hd h3{font-size:15px;font-weight:700}
+.modal-x{background:none;border:none;font-size:18px;color:var(--gray-400);cursor:pointer;line-height:1;padding:2px 5px;border-radius:4px;transition:all .12s}
+.modal-x:hover{background:var(--gray-100);color:var(--gray-700)}
+.modal-body{padding:20px}
+
+/* Auth modal */
+.auth-tabs{display:flex;gap:0;border-bottom:1px solid var(--gray-200);margin:-20px -20px 20px}
+.auth-tab{flex:1;padding:12px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;color:var(--gray-400);transition:all .15s;margin-bottom:-1px}
+.auth-tab.active{color:var(--gray-900);border-bottom-color:var(--gray-900)}
+.form-field{margin-bottom:14px}
+.form-field label{display:block;font-size:11px;font-weight:600;color:var(--gray-600);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.form-input{width:100%;padding:10px 12px;border:1px solid var(--gray-300);border-radius:7px;font-size:13px;outline:none;transition:border-color .12s;font-family:var(--font)}
+.form-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+.form-submit{width:100%;padding:11px;background:var(--gray-900);color:white;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;margin-top:4px}
+.form-submit:hover{background:var(--gray-700)}
+.form-note{font-size:11px;color:var(--gray-400);text-align:center;margin-top:10px}
+.form-error{font-size:12px;color:#ef4444;margin-top:-8px;margin-bottom:8px}
+
+/* Sign modal */
+.sign-tabs{display:flex;gap:0;border-bottom:1px solid var(--gray-200);margin:-20px -20px 16px}
+.sign-tab{flex:1;padding:10px;font-size:12px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;color:var(--gray-400);transition:all .15s;margin-bottom:-1px}
+.sign-tab.active{color:var(--gray-900);border-bottom-color:var(--gray-900)}
+.sign-panel{display:none}.sign-panel.active{display:block}
+#sig-canvas{width:100%;height:160px;border:1px solid var(--gray-200);border-radius:8px;background:#fafafa;cursor:crosshair;touch-action:none}
+#typed-sig-canvas{width:100%;height:80px;border:1px solid var(--gray-200);border-radius:6px;background:#fafafa}
+.sig-font-sel{width:100%;padding:8px;border:1px solid var(--gray-200);border-radius:6px;font-size:13px;margin-bottom:10px;background:white}
+.sig-name-input{width:100%;padding:9px 12px;border:1px solid var(--gray-300);border-radius:6px;font-size:15px;outline:none;margin-bottom:10px;transition:border-color .12s}
+.sig-name-input:focus{border-color:var(--blue)}
+.sign-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.sign-upload-area{border:2px dashed var(--gray-300);border-radius:8px;padding:28px;text-align:center;cursor:pointer;transition:all .15s;font-size:13px;color:var(--gray-500)}
+.sign-upload-area:hover{border-color:var(--blue);background:var(--blue-l)}
+
+/* Token modal */
+.token-modal-inner{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:4px 0}
+.token-input-field{width:100%;padding:11px 14px;border:1px solid var(--gray-300);border-radius:7px;font-size:14px;font-family:monospace;text-align:center;letter-spacing:1.5px;outline:none;transition:border-color .12s}
+.token-input-field:focus{border-color:var(--blue)}
+.token-contact{display:block;padding:9px;text-align:center;border:1px solid var(--gray-200);border-radius:7px;font-size:12px;color:var(--blue);text-decoration:none;transition:all .15s;background:var(--blue-l)}
+.token-contact:hover{background:#dbeafe}
+.token-active{display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;color:#16a34a;width:100%}
+
+/* Limit modal */
+.limit-modal{text-align:center}
+.limit-modal h3{font-size:20px;font-weight:800;margin:12px 0 6px;letter-spacing:-.3px}
+.limit-modal p{font-size:13px;color:var(--gray-500);line-height:1.6;margin-bottom:20px}
+.limit-options{display:flex;flex-direction:column;gap:10px}
+.limit-opt{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:10px;padding:14px 16px;text-align:left}
+.limit-opt-title{font-size:13px;font-weight:700;margin-bottom:3px}
+.limit-opt-desc{font-size:11px;color:var(--gray-500);margin-bottom:10px;line-height:1.5}
+
+/* Soft nudge */
+.nudge-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--gray-900);color:white;padding:12px 20px;border-radius:12px;font-size:13px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-lg);z-index:400;animation:slideUp .3s ease;max-width:90vw}
+@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.nudge-bar .nudge-btn{padding:5px 12px;background:white;color:var(--gray-900);border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--gray-900);color:white;padding:9px 18px;border-radius:8px;font-size:12px;font-weight:500;z-index:600;opacity:0;transition:all .2s;pointer-events:none;box-shadow:var(--shadow-md)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Buttons */
+.btn{padding:9px 18px;border-radius:7px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all .15s}
+.btn-primary{background:var(--gray-900);color:white}.btn-primary:hover{background:var(--gray-700)}
+.btn-ghost{background:none;color:var(--gray-600);border:1px solid var(--gray-300)}.btn-ghost:hover{background:var(--gray-50)}
+.btn-blue{background:var(--blue);color:white}.btn-blue:hover{background:#1d4ed8}
+.full{width:100%}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════
+     PAGE 1: LANDING
+═══════════════════════ -->
+<div class="page" id="page-landing">
+  <nav class="nav">
+    <a class="nav-logo" href="#">
+      <svg class="nav-logo-icon" viewBox="0 0 28 28" fill="none"><rect x="3" y="2" width="16" height="21" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="16" height="21" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="16" height="21" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span class="nav-logo-text">PDF<span>ortis</span></span>
+    </a>
+    <div class="nav-right">
+      <div class="lang-toggle">
+        <button class="lang-btn active" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" onclick="setLang('de')">DE</button>
+      </div>
+      <button class="nav-auth-btn nav-login" onclick="openAuth('login')" data-i="nav_login">Sign in</button>
+      <button class="nav-auth-btn nav-signup" onclick="openAuth('signup')" data-i="nav_signup">Get started</button>
+    </div>
+  </nav>
+
+  <div class="landing-hero">
+    <div class="hero-cycle-wrapper" style="width:100%;max-width:700px">
+      <div class="hero-cycle-item rb-text" id="hc0">Pecunia Deficit Fortis</div>
+      <div class="hero-cycle-item rb-text" id="hc1">Penny Drop Free</div>
+      <div class="hero-cycle-item rb-text" id="hc2">Pas De Frais</div>
+    </div>
+    <p class="hero-tagline"><em data-i="tagline">why would you need to pay for such a thing anyway?</em></p>
+    <button class="hero-cta" onclick="goToUpload()">
+      <span data-i="hero_cta">Start Editing</span>
+      <svg width="16" height="16" fill="none" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="hero-privacy">
+      <svg width="13" height="13" fill="none" viewBox="0 0 16 16"><path d="M8 2L3 4v4c0 3 2.5 5.5 5 6 2.5-.5 5-3 5-6V4L8 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+      <span data-i="privacy_note">Your files never leave your browser · 100% private</span>
+    </div>
+  </div>
+
+  <div class="features-scroll-area">
+    <p class="features-label" data-i="tools_label">Everything you need</p>
+    <div class="features-track-wrapper" id="feat-track-wrap">
+      <div class="features-track" id="feat-track">
+        <div class="feat-card"><div class="feat-icon">✏️</div><div class="feat-title" data-i="f1t">Edit PDF Text</div><div class="feat-desc" data-i="f1d">Click any text and edit directly. Copy-paste works perfectly.</div></div>
+        <div class="feat-card"><div class="feat-icon">✍️</div><div class="feat-title" data-i="f2t">Sign & Fill</div><div class="feat-desc" data-i="f2d">Draw, type or upload your signature. Save it for next time.</div></div>
+        <div class="feat-card"><div class="feat-icon">🗜️</div><div class="feat-title" data-i="f3t">Compress</div><div class="feat-desc" data-i="f3d">Shrink your PDF without losing quality. Great for email.</div></div>
+        <div class="feat-card"><div class="feat-icon">🔀</div><div class="feat-title" data-i="f4t">Merge & Split</div><div class="feat-desc" data-i="f4d">Combine multiple PDFs or extract individual pages.</div></div>
+        <div class="feat-card"><div class="feat-icon">🔄</div><div class="feat-title" data-i="f5t">Organize Pages</div><div class="feat-desc" data-i="f5d">Rotate, delete or reorder pages with one click.</div></div>
+        <div class="feat-card"><div class="feat-icon">🏢</div><div class="feat-title" data-i="f6t">Team Dashboard</div><div class="feat-desc" data-i="f6d">Company accounts with shared access and activity logs.</div></div>
+        <div class="feat-card"><div class="feat-icon">🔒</div><div class="feat-title" data-i="f7t">100% Private</div><div class="feat-desc" data-i="f7d">Processing happens in your browser. No uploads to servers.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="privacy-banner">
+    <svg width="16" height="16" fill="none" viewBox="0 0 16 16"><path d="M8 2L3 4v4c0 3 2.5 5.5 5 6 2.5-.5 5-3 5-6V4L8 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8l1.5 1.5L10 6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span data-i="privacy_banner">PDFs are never stored or uploaded without your account. Processing is done locally in your browser.</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════
+     PAGE 2: UPLOAD
+═══════════════════════ -->
+<div class="page out" id="page-upload">
+  <nav class="nav">
+    <a class="nav-logo" href="#" onclick="goTo('landing')">
+      <svg class="nav-logo-icon" viewBox="0 0 28 28" fill="none"><rect x="3" y="2" width="16" height="21" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="16" height="21" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="16" height="21" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span class="nav-logo-text">PDF<span>ortis</span></span>
+    </a>
+    <div class="nav-right">
+      <div class="lang-toggle">
+        <button class="lang-btn active" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" onclick="setLang('de')">DE</button>
+      </div>
+      <div id="upload-auth-btns">
+        <button class="nav-auth-btn nav-login" onclick="openAuth('login')" data-i="nav_login">Sign in</button>
+        <button class="nav-auth-btn nav-signup" onclick="openAuth('signup')" data-i="nav_signup">Get started</button>
+      </div>
+      <div id="upload-user-area" class="nav-user hidden">
+        <div class="nav-avatar" id="upload-avatar">?</div>
+        <span id="upload-username"></span>
+        <button class="nav-auth-btn nav-login" onclick="logout()" style="font-size:11px" data-i="logout">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="upload-container">
+    <h1 class="upload-heading" data-i="upload_heading">Upload your PDF</h1>
+    <p class="upload-sub" data-i="upload_sub">Drag and drop or browse — editing starts immediately in your browser.</p>
+
+    <div class="drop-zone" id="drop-zone">
+      <svg class="drop-zone-icon" viewBox="0 0 64 64" fill="none">
+        <rect x="8" y="6" width="34" height="44" rx="4" fill="#e0e7ff" stroke="#a5b4fc" stroke-width="1.5"/>
+        <rect x="14" y="6" width="34" height="44" rx="4" fill="#c7d2fe" stroke="#818cf8" stroke-width="1.5"/>
+        <rect x="18" y="6" width="34" height="44" rx="4" fill="#eff6ff" stroke="#6366f1" stroke-width="1.5"/>
+        <path d="M30 28v12M26 36l4 4 4-4" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M38 16h-8a2 2 0 01-2-2v-8" stroke="#a5b4fc" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M37 7l7 7h-5a2 2 0 01-2-2V7z" fill="#a5b4fc"/>
+      </svg>
+      <div class="drop-zone-title" data-i="drop_title">Drop your PDF here</div>
+      <div class="drop-zone-sub" data-i="drop_or">or</div>
+      <label class="drop-browse">
+        <span data-i="drop_browse">Browse files</span>
+        <input type="file" id="file-input" accept=".pdf" onchange="handleFile(event)"/>
+      </label>
+      <div class="drop-note" data-i="drop_note">PDF files only · processed locally · never uploaded</div>
+    </div>
+
+    <div class="upload-recent hidden" id="recent-section">
+      <div class="upload-recent-title" data-i="recent_title">Recent documents</div>
+      <div class="recent-list" id="recent-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════
+     PAGE 3: EDITOR
+═══════════════════════ -->
+<div class="page out" id="page-editor">
+  <!-- Editor top bar -->
+  <div class="editor-bar">
+    <button class="bar-btn" onclick="goTo('upload')" title="Back">
+      <svg width="13" height="13" fill="none" viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <span class="editor-filename" id="editor-filename">document.pdf</span>
+    <div class="editor-sep"></div>
+    <div class="editor-mode-toggle">
+      <button class="mode-btn active" id="mode-look" onclick="setMode('look')">
+        <svg width="12" height="12" fill="none" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M2 8c1.5-3 4-4.5 6-4.5S12.5 5 14 8c-1.5 3-4 4.5-6 4.5S3.5 11 2 8z" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span data-i="mode_look">View</span>
+      </button>
+      <button class="mode-btn" id="mode-edit" onclick="setMode('edit')">
+        <svg width="12" height="12" fill="none" viewBox="0 0 16 16"><path d="M11 2.5l2.5 2.5L5 13.5H2.5V11L11 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        <span data-i="mode_edit">Edit</span>
+      </button>
+    </div>
+    <div class="editor-sep"></div>
+    <div class="lang-toggle">
+      <button class="lang-btn active" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" onclick="setLang('de')">DE</button>
+    </div>
+    <div class="editor-bar-right">
+      <span class="dl-count" id="dl-count-display">5 left</span>
+      <button class="bar-btn" onclick="openTokenModal()">
+        <svg width="12" height="12" fill="none" viewBox="0 0 16 16"><rect x="2" y="7" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span id="token-label-bar" data-i="token_btn">Token</span>
+      </button>
+      <button class="bar-btn primary" onclick="triggerDownload()">
+        <svg width="12" height="12" fill="none" viewBox="0 0 16 16"><path d="M8 2v8M4 7l4 4 4-4M2 14h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span data-i="save_btn">Save PDF</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Ribbon -->
+  <div class="editor-ribbon">
+    <div class="ribbon-tabs">
+      <button class="rtab active" data-tab="edit" onclick="switchRTab('edit')">
+        <svg width="13" height="13" fill="none" viewBox="0 0 16 16"><path d="M11 2.5l2.5 2.5L5 13.5H2.5V11L11 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        <span data-i="tab_edit">Edit Text</span>
+      </button>
+      <button class="rtab" data-tab="add" onclick="switchRTab('add')">
+        <svg width="13" height="13" fill="none" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span data-i="tab_add">Add Text</span>
+      </button>
+      <button class="rtab" data-tab="sign" id="tab-sign-btn" onclick="switchRTab('sign')">
+        <svg width="13" height="13" fill="none" viewBox="0 0 16 16"><path d="M2 13c3-3 5-8 7-8s2 4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span data-i="tab_sign">Sign</span>
+        <span id="sign-lock-icon" style="font-size:10px;margin-left:2px">🔒</span>
+      </button>
+      <button class="rtab" data-tab="organize" onclick="switchRTab('organize')">
+        <svg width="13" height="13" fill="none" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="5" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="10" width="5" height="4" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="10" width="5" height="4" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span data-i="tab_organize">Organize</span>
+      </button>
+    </div>
+
+    <!-- Edit text panel -->
+    <div class="ribbon-panel active" id="panel-edit">
+      <div class="rgrp">
+        <select class="font-select" id="font-family" onchange="applyFormat('font')">
+          <option>Arial</option><option>Times New Roman</option><option>Courier New</option><option>Georgia</option><option>Verdana</option>
+        </select>
+        <input class="font-size-input" id="font-size" type="number" value="14" min="6" max="96" onchange="applyFormat('size')"/>
+      </div>
+      <div class="rsep"></div>
+      <div class="rgrp">
+        <button class="rbtn" id="fmt-bold" onclick="applyFormat('bold')" title="Bold">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M4 3h5a3 3 0 010 6H4V3zM4 9h6a3 3 0 010 6H4V9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          <span>Bold</span>
+        </button>
+        <button class="rbtn" id="fmt-italic" onclick="applyFormat('italic')">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M10 3H6M10 13H6M9 3L7 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>Italic</span>
+        </button>
+        <button class="rbtn" id="fmt-underline" onclick="applyFormat('underline')">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M4 3v5a4 4 0 008 0V3M2 13h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>Underline</span>
+        </button>
+      </div>
+      <div class="rsep"></div>
+      <div class="rgrp">
+        <button class="rbtn" onclick="applyFormat('align-left')"><svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Left</span></button>
+        <button class="rbtn" onclick="applyFormat('align-center')"><svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M2 4h12M4 8h8M3 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Center</span></button>
+      </div>
+      <div class="rsep"></div>
+      <div class="rgrp">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 6px">
+          <input type="color" id="text-color" value="#000000" onchange="applyFormat('color')" style="width:30px;height:22px;border:1px solid var(--gray-200);border-radius:4px;cursor:pointer;padding:1px"/>
+          <span style="font-size:10px;color:var(--gray-500)" data-i="color_lbl">Color</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add text panel -->
+    <div class="ribbon-panel" id="panel-add">
+      <div class="rgrp">
+        <button class="rbtn primary" onclick="addTextBox()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M3 4h10M8 4v8M5 12h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span data-i="add_text">Add Text Box</span>
+        </button>
+        <button class="rbtn" onclick="addImageOverlay()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="7" r="1.2" fill="currentColor"/><path d="M2 11l3-3 2.5 2.5 2-2 4.5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span data-i="add_img">Image</span>
+        </button>
+        <button class="rbtn" onclick="addDateBox()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M2 7h12M5 1v4M11 1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span data-i="add_date">Date</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Sign panel -->
+    <div class="ribbon-panel" id="panel-sign">
+      <div class="rgrp">
+        <button class="rbtn primary" onclick="openSignModal()" id="sign-draw-btn">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M2 13c3-3 4-8 6-8s3 5 5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span data-i="sign_draw">Sign Here</span>
+        </button>
+        <button class="rbtn" onclick="addInitials()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M3 12V4l4 4 4-4v8M14 4v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span data-i="sign_init">Initials</span>
+        </button>
+        <button class="rbtn" onclick="addDateBox()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M2 7h12M5 1v4M11 1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span data-i="add_date">Date</span>
+        </button>
+      </div>
+      <div class="rsep"></div>
+      <div id="firm-sig-info" class="hidden" style="font-size:11px;color:var(--gray-500);padding:4px 8px">
+        <span data-i="firm_sig">Company signature:</span> <strong id="firm-sig-name"></strong>
+      </div>
+    </div>
+
+    <!-- Organize panel -->
+    <div class="ribbon-panel" id="panel-organize">
+      <div class="rgrp">
+        <button class="rbtn" onclick="rotatePage()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M3 8a5 5 0 1010 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13 5l1 3-3 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span data-i="rotate">Rotate</span>
+        </button>
+        <button class="rbtn" onclick="deletePage()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M4 6h8M7 6V4h2v2M6 10v3M10 10v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="3" y="6" width="10" height="9" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span data-i="delete_pg">Delete Page</span>
+        </button>
+        <button class="rbtn" onclick="mergePDFs()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span data-i="merge">Merge</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Editor body -->
+  <div class="editor-body">
+    <!-- Left: page thumbnails -->
+    <div class="pages-panel" id="pages-panel"></div>
+
+    <!-- Center: PDF canvas -->
+    <div class="canvas-area look-mode" id="canvas-area">
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="pdf-canvas"></canvas>
+        <div id="overlay-layer"></div>
+      </div>
+    </div>
+
+    <!-- Right: tools -->
+    <div class="tools-panel">
+      <div class="tools-section">
+        <div class="tools-section-title" data-i="nav_pages">Pages</div>
+        <div class="page-nav-row">
+          <button class="pnav" onclick="prevPage()">‹</button>
+          <span id="page-info-txt">1 / 1</span>
+          <button class="pnav" onclick="nextPage()">›</button>
+        </div>
+      </div>
+
+      <div class="tools-section">
+        <div class="tools-section-title" data-i="tools_compress">Compress</div>
+        <div class="compress-group">
+          <div class="quality-row">
+            <button class="qbtn" onclick="setQ('high')" data-i="q_high">High</button>
+            <button class="qbtn active" onclick="setQ('medium')" data-i="q_med">Med</button>
+            <button class="qbtn" onclick="setQ('low')" data-i="q_low">Small</button>
+          </div>
+          <button class="tool-btn" onclick="compressAndSave()">
+            <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M8 2v8M4 7l4 4 4-4M2 14h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span data-i="compress_save">Compress & Save</span>
+          </button>
+          <div style="font-size:11px;color:var(--gray-400)" id="file-size-txt"></div>
+        </div>
+      </div>
+
+      <div class="tools-section">
+        <div class="tools-section-title" data-i="tools_actions">Actions</div>
+        <button class="tool-btn" onclick="mergePDFs()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span data-i="merge">Merge PDFs</span>
+        </button>
+        <button class="tool-btn" onclick="rotatePage()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M3 8a5 5 0 1010 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M13 5l1 3-3 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span data-i="rotate">Rotate Page</span>
+        </button>
+        <button class="tool-btn" onclick="deletePage()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M4 6h8M7 6V4h2v2M6 10v3M10 10v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><rect x="3" y="6" width="10" height="9" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
+          <span data-i="delete_pg">Delete Page</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════
+     MODALS
+═══════════════════════ -->
+
+<!-- Auth Modal -->
+<div class="modal-bg hidden" id="auth-modal">
+  <div class="modal">
+    <div class="modal-hd">
+      <h3 id="auth-modal-title">Sign in</h3>
+      <button class="modal-x" onclick="closeModal('auth-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="auth-tab-login" onclick="switchAuthTab('login')" data-i="nav_login">Sign in</button>
+        <button class="auth-tab" id="auth-tab-signup" onclick="switchAuthTab('signup')" data-i="nav_signup">Create account</button>
+      </div>
+      <div id="auth-login-form">
+        <div class="form-field"><label data-i="email_lbl">Email</label><input class="form-input" id="login-email" type="email" placeholder="you@example.com"/></div>
+        <div class="form-field"><label data-i="pw_lbl">Password</label><input class="form-input" id="login-pw" type="password" placeholder="••••••••"/></div>
+        <div class="form-error hidden" id="login-error"></div>
+        <button class="form-submit" onclick="doLogin()" data-i="nav_login">Sign in</button>
+        <p class="form-note" data-i="no_account">No account? Create one free →</p>
+      </div>
+      <div id="auth-signup-form" class="hidden">
+        <div class="form-field"><label data-i="name_lbl">Name</label><input class="form-input" id="signup-name" type="text" placeholder="Your name"/></div>
+        <div class="form-field"><label data-i="email_lbl">Email</label><input class="form-input" id="signup-email" type="email" placeholder="you@example.com"/></div>
+        <div class="form-field"><label data-i="pw_lbl">Password</label><input class="form-input" id="signup-pw" type="password" placeholder="min. 8 characters"/></div>
+        <div class="form-error hidden" id="signup-error"></div>
+        <button class="form-submit" onclick="doSignup()" data-i="nav_signup">Create free account</button>
+        <p class="form-note" data-i="has_account">Already have an account? Sign in →</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sign Modal -->
+<div class="modal-bg hidden" id="sign-modal">
+  <div class="modal">
+    <div class="modal-hd"><h3 data-i="sign_modal_title">Add Signature</h3><button class="modal-x" onclick="closeModal('sign-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="sign-tabs">
+        <button class="sign-tab active" onclick="switchSignTab('draw')" data-i="sign_draw_tab">Draw</button>
+        <button class="sign-tab" onclick="switchSignTab('type')" data-i="sign_type_tab">Type</button>
+        <button class="sign-tab" onclick="switchSignTab('upload')" data-i="sign_upload_tab">Upload</button>
+      </div>
+      <div class="sign-panel active" id="sp-draw">
+        <canvas id="sig-canvas" width="440" height="160"></canvas>
+        <div class="sign-actions">
+          <button class="btn btn-ghost" onclick="clearSig()" data-i="clear">Clear</button>
+          <button class="btn btn-primary" onclick="applySig()" data-i="insert">Insert</button>
+        </div>
+      </div>
+      <div class="sign-panel" id="sp-type">
+        <select class="sig-font-sel" id="sig-font" onchange="updateTypedSig()">
+          <option value="'Dancing Script', cursive">Handwriting 1</option>
+          <option value="'Caveat', cursive">Handwriting 2</option>
+          <option value="'Pacifico', cursive">Handwriting 3</option>
+        </select>
+        <input class="sig-name-input" id="sig-type-input" type="text" placeholder="Your name..." oninput="updateTypedSig()"/>
+        <canvas id="typed-sig-canvas" width="440" height="80"></canvas>
+        <div class="sign-actions"><button class="btn btn-primary" onclick="applyTypedSig()" data-i="insert">Insert</button></div>
+      </div>
+      <div class="sign-panel" id="sp-upload">
+        <label class="sign-upload-area">
+          <svg width="36" height="36" fill="none" viewBox="0 0 36 36"><path d="M18 6v16M10 14l8-8 8 8M6 28h24" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/></svg>
+          <span style="margin-top:8px;display:block" data-i="upload_sig">Upload signature image</span>
+          <input type="file" accept="image/*" onchange="loadSigImage(event)" hidden/>
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Token Modal -->
+<div class="modal-bg hidden" id="token-modal">
+  <div class="modal">
+    <div class="modal-hd"><h3 data-i="token_title">Company Token</h3><button class="modal-x" onclick="closeModal('token-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="token-modal-inner">
+        <svg width="48" height="48" fill="none" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/><rect x="14" y="20" width="20" height="16" rx="3" stroke="#6366f1" stroke-width="1.5"/><path d="M18 20v-4a6 6 0 0112 0v4" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <p style="font-size:13px;color:var(--gray-500);max-width:300px;text-align:center" data-i="token_desc">Enter your company token for unlimited downloads and company branding.</p>
+        <div id="token-input-area" style="width:100%;display:flex;flex-direction:column;gap:8px">
+          <input class="token-input-field" id="token-val" placeholder="COMPANY-XXXX-XXXX"/>
+          <button class="btn btn-primary full" onclick="validateToken()" data-i="token_activate">Activate Token</button>
+        </div>
+        <div id="token-active-display" class="hidden" style="width:100%">
+          <div class="token-active">
+            <svg width="18" height="18" fill="none" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="#dcfce7" stroke="#16a34a" stroke-width="1.3"/><path d="M5.5 9l2.5 2.5 4.5-4.5" stroke="#16a34a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="token-company-name">Company Active</span>
+          </div>
+          <button class="btn btn-ghost full" style="margin-top:8px" onclick="removeToken()" data-i="remove_token">Remove token</button>
+        </div>
+        <div style="width:100%;display:flex;align-items:center;gap:10px;font-size:11px;color:var(--gray-400)"><div style="flex:1;height:1px;background:var(--gray-200)"></div><span data-i="or_request">No token yet?</span><div style="flex:1;height:1px;background:var(--gray-200)"></div></div>
+        <a href="mailto:token@pdfortis.com?subject=Company Token Request" class="token-contact" data-i="token_request">Request a free company token →</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Limit Modal -->
+<div class="modal-bg hidden" id="limit-modal">
+  <div class="modal">
+    <div class="modal-hd"><h3>—</h3><button class="modal-x" onclick="closeModal('limit-modal')">✕</button></div>
+    <div class="modal-body limit-modal">
+      <svg width="52" height="52" fill="none" viewBox="0 0 52 52"><circle cx="26" cy="26" r="22" fill="#fef3c7" stroke="#fde68a" stroke-width="1.5"/><path d="M26 16v12" stroke="#d97706" stroke-width="2.5" stroke-linecap="round"/><circle cx="26" cy="33" r="2.5" fill="#d97706"/></svg>
+      <h3 id="limit-title" data-i="limit_title">Daily limit reached</h3>
+      <p id="limit-sub"><span data-i="limit_sub">You've used all 5 free downloads.</span> <strong data-i="limit_reset">Resets in</strong> <strong id="reset-countdown">--:--:--</strong></p>
+      <div class="limit-options">
+        <div class="limit-opt">
+          <div class="limit-opt-title">🏢 <span data-i="company_q">Are you a company?</span></div>
+          <div class="limit-opt-desc" data-i="company_desc">Get a free company token for unlimited downloads, company letterhead and team dashboard.</div>
+          <a href="mailto:token@pdfortis.com?subject=Company Token" class="btn btn-primary full" style="text-align:center;text-decoration:none;display:block" data-i="contact_us">Contact us →</a>
+        </div>
+        <div class="limit-opt">
+          <div class="limit-opt-title">👤 <span data-i="create_acc_q">Create a free account?</span></div>
+          <div class="limit-opt-desc" data-i="create_acc_desc">Save your signature, view document history and get more downloads per day.</div>
+          <button class="btn btn-primary full" onclick="closeModal('limit-modal');openAuth('signup')" data-i="nav_signup">Create free account</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Nudge bar (soft prompt at download 3) -->
+<div class="nudge-bar hidden" id="nudge-bar">
+  <span data-i="nudge_msg">💾 Save your signature for next time</span>
+  <button class="nudge-btn" onclick="closeNudge();openAuth('signup')" data-i="nudge_cta">Create free account</button>
+  <button style="background:none;border:none;color:rgba(255,255,255,.5);cursor:pointer;font-size:18px;margin-left:4px" onclick="closeNudge()">×</button>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════
+// SUPABASE CONFIG — replace these values
+// ═══════════════════════════════════════
+const SB_URL = 'https://YOUR_PROJECT.supabase.co';
+const SB_KEY = 'YOUR_ANON_KEY';
+const SB_H = {'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Prefer':'return=representation'};
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let pdfDoc=null, pdfLibDoc=null, pdfBytes=null;
+let currentPage=1, totalPages=0, fileName='';
+let editorMode='look', currentTab='edit', compressQ='medium';
+let sigDrawing=false, sigLX=0, sigLY=0;
+let currentUser=null, currentToken=null;
+let clientFP=null;
+let thumbCanvases=[];
+const MAX_DL=5, LIMIT_MS=8*60*60*1000;
+const LS_DL='pf_dl', LS_TOKEN='pf_tok', LS_TOKDAT='pf_tokdat', LS_USER='pf_user';
+let lang='en';
+
+// ═══════════════════════════════════════
+// i18n
+// ═══════════════════════════════════════
+const i18n={
+  en:{nav_login:'Sign in',nav_signup:'Get started',logout:'Logout',tagline:'why would you need to pay for such a thing anyway?',hero_cta:'Start Editing',privacy_note:'Your files never leave your browser · 100% private',tools_label:'Everything you need',f1t:'Edit PDF Text',f1d:'Click any text and edit directly. Copy-paste works perfectly.',f2t:'Sign & Fill',f2d:'Draw, type or upload your signature.',f3t:'Compress',f3d:'Shrink your PDF for easy email sharing.',f4t:'Merge & Split',f4d:'Combine PDFs or extract pages.',f5t:'Organize Pages',f5d:'Rotate, delete or reorder pages.',f6t:'Team Dashboard',f6d:'Company accounts with shared access.',f7t:'100% Private',f7d:'Processing happens in your browser only.',privacy_banner:'PDFs are never stored or uploaded without your account.',upload_heading:'Upload your PDF',upload_sub:'Drag and drop or browse — editing starts immediately in your browser.',drop_title:'Drop your PDF here',drop_or:'or',drop_browse:'Browse files',drop_note:'PDF files only · processed locally · never uploaded',recent_title:'Recent documents',mode_look:'View',mode_edit:'Edit',tab_edit:'Edit Text',tab_add:'Add Text',tab_sign:'Sign',tab_organize:'Organize',add_text:'Add Text Box',add_img:'Image',add_date:'Date',sign_draw:'Sign Here',sign_init:'Initials',rotate:'Rotate',delete_pg:'Delete Page',merge:'Merge',nav_pages:'Pages',tools_compress:'Compress',q_high:'High',q_med:'Med',q_low:'Small',compress_save:'Compress & Save',tools_actions:'Actions',token_btn:'Token',save_btn:'Save PDF',color_lbl:'Color',firm_sig:'Company sig:',sign_modal_title:'Add Signature',sign_draw_tab:'Draw',sign_type_tab:'Type',sign_upload_tab:'Upload',clear:'Clear',insert:'Insert',upload_sig:'Upload signature image',token_title:'Company Token',token_desc:'Enter your company token for unlimited downloads and company branding.',token_activate:'Activate Token',remove_token:'Remove token',or_request:'No token yet?',token_request:'Request a free company token →',limit_title:'Daily limit reached',limit_sub:"You've used all 5 free downloads.",limit_reset:'Resets in',company_q:'Are you a company?',company_desc:'Get a free company token for unlimited downloads.',contact_us:'Contact us →',create_acc_q:'Create a free account?',create_acc_desc:'Save your signature, view document history.',nudge_msg:'💾 Save your signature for next time',nudge_cta:'Create free account',email_lbl:'Email',pw_lbl:'Password',name_lbl:'Name',no_account:'No account? Create one free →',has_account:'Already have an account? Sign in →',auth_tab_login:'Sign in',auth_tab_signup:'Create account'},
+  de:{nav_login:'Anmelden',nav_signup:'Loslegen',logout:'Abmelden',tagline:'warum sollte man dafür bezahlen müssen?',hero_cta:'Jetzt bearbeiten',privacy_note:'Deine Dateien verlassen nie deinen Browser · 100% privat',tools_label:'Alles was du brauchst',f1t:'PDF Text bearbeiten',f1d:'Klicke auf Text und bearbeite ihn direkt.',f2t:'Signieren & Ausfüllen',f2d:'Zeichne, tippe oder lade deine Unterschrift hoch.',f3t:'Komprimieren',f3d:'PDF verkleinern ohne Qualitätsverlust.',f4t:'Zusammenfügen & Trennen',f4d:'PDFs verbinden oder Seiten herauslösen.',f5t:'Seiten organisieren',f5d:'Seiten drehen, löschen oder neu anordnen.',f6t:'Team Dashboard',f6d:'Firmenkonten mit gemeinsamem Zugriff.',f7t:'100% Privat',f7d:'Verarbeitung findet nur in deinem Browser statt.',privacy_banner:'PDFs werden ohne Konto nicht gespeichert oder hochgeladen.',upload_heading:'PDF hochladen',upload_sub:'Ablegen oder durchsuchen — Bearbeitung startet sofort.',drop_title:'PDF hier ablegen',drop_or:'oder',drop_browse:'Datei auswählen',drop_note:'Nur PDF-Dateien · lokal verarbeitet · nie hochgeladen',recent_title:'Zuletzt bearbeitete Dokumente',mode_look:'Ansicht',mode_edit:'Bearbeiten',tab_edit:'Text bearbeiten',tab_add:'Text hinzufügen',tab_sign:'Signieren',tab_organize:'Organisieren',add_text:'Textfeld hinzufügen',add_img:'Bild',add_date:'Datum',sign_draw:'Hier unterschreiben',sign_init:'Initialen',rotate:'Drehen',delete_pg:'Seite löschen',merge:'Zusammenfügen',nav_pages:'Seiten',tools_compress:'Komprimieren',q_high:'Hoch',q_med:'Mittel',q_low:'Klein',compress_save:'Komprimieren & Speichern',tools_actions:'Aktionen',token_btn:'Token',save_btn:'PDF speichern',color_lbl:'Farbe',firm_sig:'Firmensignatur:',sign_modal_title:'Unterschrift hinzufügen',sign_draw_tab:'Zeichnen',sign_type_tab:'Tippen',sign_upload_tab:'Hochladen',clear:'Löschen',insert:'Einfügen',upload_sig:'Unterschriftsbild hochladen',token_title:'Firmen-Token',token_desc:'Gib deinen Firmen-Token ein für unbegrenzte Downloads.',token_activate:'Token aktivieren',remove_token:'Token entfernen',or_request:'Noch kein Token?',token_request:'Kostenlosen Firmen-Token anfragen →',limit_title:'Tageslimit erreicht',limit_sub:'Du hast heute alle 5 Downloads verbraucht.',limit_reset:'Zurücksetzen in',company_q:'Bist du ein Unternehmen?',company_desc:'Erhalte einen kostenlosen Firmen-Token für unbegrenzte Downloads.',contact_us:'Jetzt anfragen →',create_acc_q:'Kostenloses Konto erstellen?',create_acc_desc:'Unterschrift speichern und Dokumentverlauf ansehen.',nudge_msg:'💾 Unterschrift für das nächste Mal speichern',nudge_cta:'Konto erstellen',email_lbl:'E-Mail',pw_lbl:'Passwort',name_lbl:'Name',no_account:'Noch kein Konto? Kostenlos registrieren →',has_account:'Bereits ein Konto? Anmelden →',auth_tab_login:'Anmelden',auth_tab_signup:'Konto erstellen'}
+};
+
+function setLang(l){
+  lang=l;
+  document.querySelectorAll('.lang-btn').forEach(b=>{b.classList.toggle('active',b.textContent===l.toUpperCase())});
+  document.querySelectorAll('[data-i]').forEach(el=>{const k=el.dataset.i;if(i18n[l][k])el.textContent=i18n[l][k]});
+}
+
+// ═══════════════════════════════════════
+// PAGE NAVIGATION
+// ═══════════════════════════════════════
+function goTo(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.add('out'));
+  document.getElementById('page-'+id).classList.remove('out');
+}
+function goToUpload(){goTo('upload')}
+
+// ═══════════════════════════════════════
+// LANDING HERO ANIMATION
+// ═══════════════════════════════════════
+(function(){
+  const items=['hc0','hc1','hc2'];let i=0;
+  function next(){
+    document.querySelectorAll('.hero-cycle-item').forEach(e=>e.classList.remove('active'));
+    document.getElementById(items[i]).classList.add('active');
+    i=(i+1)%items.length;
+  }
+  next();setInterval(next,3000);
+})();
+
+// ═══════════════════════════════════════
+// FEATURE CARDS DRAG SCROLL
+// ═══════════════════════════════════════
+(function(){
+  const wrap=document.getElementById('feat-track-wrap');
+  let down=false,startX,scrollL;
+  wrap.addEventListener('mousedown',e=>{down=true;startX=e.pageX-wrap.offsetLeft;scrollL=wrap.scrollLeft;wrap.classList.add('grabbing')});
+  wrap.addEventListener('mouseleave',()=>{down=false;wrap.classList.remove('grabbing')});
+  wrap.addEventListener('mouseup',()=>{down=false;wrap.classList.remove('grabbing')});
+  wrap.addEventListener('mousemove',e=>{if(!down)return;e.preventDefault();wrap.scrollLeft=scrollL-(e.pageX-wrap.offsetLeft-startX)});
+})();
+
+// ═══════════════════════════════════════
+// DROP ZONE
+// ═══════════════════════════════════════
+(function(){
+  const dz=document.getElementById('drop-zone');
+  ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('over')}));
+  ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('over')}));
+  dz.addEventListener('drop',e=>{const f=e.dataTransfer?.files?.[0];if(f?.type==='application/pdf')loadPDF(f);else toast('Please drop a PDF file','err')});
+})();
+function handleFile(e){const f=e.target.files?.[0];if(f)loadPDF(f)}
+
+// ═══════════════════════════════════════
+// LOAD PDF
+// ═══════════════════════════════════════
+async function loadPDF(file){
+  fileName=file.name;
+  document.getElementById('editor-filename').textContent=fileName;
+  const buf=await file.arrayBuffer();
+  pdfBytes=new Uint8Array(buf);
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  pdfDoc=await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
+  totalPages=pdfDoc.numPages;
+  currentPage=1;
+  pdfLibDoc=await PDFLib.PDFDocument.load(pdfBytes);
+  const kb=Math.round(pdfBytes.length/1024);
+  document.getElementById('file-size-txt').textContent=kb>1024?`${(kb/1024).toFixed(1)} MB`:`${kb} KB`;
+  await buildThumbs();
+  await renderPage(currentPage);
+  logRecent(fileName);
+  goTo('editor');
+}
+
+async function renderPage(n){
+  if(!pdfDoc)return;
+  const page=await pdfDoc.getPage(n);
+  const vw=document.getElementById('canvas-area').clientWidth-48;
+  const scale=Math.min(1.6,vw/page.getViewport({scale:1}).width);
+  const vp=page.getViewport({scale});
+  const canvas=document.getElementById('pdf-canvas');
+  const ctx=canvas.getContext('2d');
+  canvas.width=vp.width;canvas.height=vp.height;
+  const ol=document.getElementById('overlay-layer');
+  ol.style.width=vp.width+'px';ol.style.height=vp.height+'px';
+  ol.innerHTML='';
+  await page.render({canvasContext:ctx,viewport:vp}).promise;
+  document.getElementById('page-info-txt').textContent=`${n} / ${totalPages}`;
+  document.querySelectorAll('.thumb-item').forEach((t,i)=>t.classList.toggle('active',i===n-1));
+}
+
+async function buildThumbs(){
+  const panel=document.getElementById('pages-panel');
+  panel.innerHTML='';
+  for(let i=1;i<=totalPages;i++){
+    const wrap=document.createElement('div');
+    wrap.className='thumb-item'+(i===1?' active':'');
+    wrap.onclick=(()=>{const pg=i;return()=>{currentPage=pg;renderPage(pg)}})();
+    const tc=document.createElement('canvas');
+    wrap.appendChild(tc);
+    const num=document.createElement('div');
+    num.className='thumb-num';num.textContent=i;
+    wrap.appendChild(num);
+    panel.appendChild(wrap);
+    const page=await pdfDoc.getPage(i);
+    const vp=page.getViewport({scale:.2});
+    tc.width=vp.width;tc.height=vp.height;
+    await page.render({canvasContext:tc.getContext('2d'),viewport:vp}).promise;
+  }
+}
+
+function prevPage(){if(currentPage>1){currentPage--;renderPage(currentPage)}}
+function nextPage(){if(currentPage<totalPages){currentPage++;renderPage(currentPage)}}
+
+// ═══════════════════════════════════════
+// EDITOR MODE
+// ═══════════════════════════════════════
+function setMode(m){
+  editorMode=m;
+  ['look','edit'].forEach(x=>{document.getElementById('mode-'+x).classList.toggle('active',x===m)});
+  const ca=document.getElementById('canvas-area');
+  ca.className='canvas-area '+(m==='look'?'look-mode':'edit-mode');
+  const ol=document.getElementById('overlay-layer');
+  ol.classList.toggle('can-edit',m==='edit');
+}
+
+// ═══════════════════════════════════════
+// RIBBON TABS
+// ═══════════════════════════════════════
+function switchRTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.rtab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  document.querySelectorAll('.ribbon-panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+tab));
+  if(tab==='sign'&&!currentUser&&!currentToken){showSignLock();return}
+}
+
+function showSignLock(){
+  toast(lang==='de'?'Für Signaturen bitte einloggen':'Please sign in to use signatures','warn');
+  openAuth('signup');
+}
+
+// ═══════════════════════════════════════
+// TEXT BOX (Add)
+// ═══════════════════════════════════════
+function addTextBox(){
+  if(!pdfDoc){toast('Load a PDF first','err');return}
+  setMode('edit');
+  const ol=document.getElementById('overlay-layer');
+  const el=document.createElement('div');
+  el.contentEditable='true';
+  el.className='pdf-overlay pdf-text-box';
+  el.style.left='60px';el.style.top='60px';
+  el.textContent='Text here';
+  addDelBtn(el);
+  makeDraggable(el);
+  ol.appendChild(el);
+  el.focus();
+  const r=document.createRange();r.selectNodeContents(el);
+  const s=window.getSelection();s.removeAllRanges();s.addRange(r);
+}
+
+function addDateBox(){
+  if(!pdfDoc){toast('Load a PDF first','err');return}
+  setMode('edit');
+  const ol=document.getElementById('overlay-layer');
+  const el=document.createElement('div');
+  el.contentEditable='true';
+  el.className='pdf-overlay pdf-text-box';
+  el.style.left='60px';el.style.top='140px';
+  el.textContent=new Date().toLocaleDateString(lang==='de'?'de-DE':'en-GB');
+  addDelBtn(el);
+  makeDraggable(el);
+  ol.appendChild(el);
+}
+
+function addInitials(){
+  if(!pdfDoc){toast('Load a PDF first','err');return}
+  const ol=document.getElementById('overlay-layer');
+  const el=document.createElement('div');
+  el.contentEditable='true';
+  el.className='pdf-overlay pdf-text-box';
+  el.style.left='60px';el.style.top='180px';
+  el.style.fontWeight='800';el.style.fontSize='18px';
+  el.textContent='A.B.';
+  addDelBtn(el);
+  makeDraggable(el);
+  ol.appendChild(el);
+}
+
+function addImageOverlay(){
+  const inp=document.createElement('input');
+  inp.type='file';inp.accept='image/*';
+  inp.onchange=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const rd=new FileReader();
+    rd.onload=ev=>{
+      const img=document.createElement('img');
+      img.src=ev.target.result;
+      img.className='pdf-overlay pdf-img-overlay';
+      img.style.left='80px';img.style.top='80px';
+      addDelBtn(img);makeDraggable(img);
+      document.getElementById('overlay-layer').appendChild(img);
+    };rd.readAsDataURL(f);
+  };inp.click();
+}
+
+function addDelBtn(el){
+  const btn=document.createElement('button');
+  btn.className='overlay-delete';btn.textContent='×';
+  btn.onclick=e=>{e.stopPropagation();el.remove()};
+  el.style.position='absolute';
+  el.appendChild(btn);
+}
+
+// ═══════════════════════════════════════
+// FORMAT (ribbon Edit tab)
+// ═══════════════════════════════════════
+function applyFormat(cmd){
+  const sel=window.getSelection();
+  if(!sel||sel.rangeCount===0)return;
+  if(cmd==='bold'){document.execCommand('bold')}
+  else if(cmd==='italic'){document.execCommand('italic')}
+  else if(cmd==='underline'){document.execCommand('underline')}
+  else if(cmd==='font'){document.execCommand('fontName',false,document.getElementById('font-family').value)}
+  else if(cmd==='size'){document.execCommand('fontSize',false,'3');const nodes=document.querySelectorAll('font[size="3"]');nodes.forEach(n=>{n.removeAttribute('size');n.style.fontSize=document.getElementById('font-size').value+'px'})}
+  else if(cmd==='color'){document.execCommand('foreColor',false,document.getElementById('text-color').value)}
+  else if(cmd==='align-left'){document.execCommand('justifyLeft')}
+  else if(cmd==='align-center'){document.execCommand('justifyCenter')}
+}
+
+// ═══════════════════════════════════════
+// DRAGGABLE
+// ═══════════════════════════════════════
+function makeDraggable(el){
+  let sx,sy,il,it;
+  el.addEventListener('mousedown',e=>{
+    if(e.target.contentEditable==='true'&&e.target!==el)return;
+    if(e.target.tagName==='BUTTON')return;
+    sx=e.clientX;sy=e.clientY;
+    il=parseInt(el.style.left)||0;it=parseInt(el.style.top)||0;
+    function mv(e){el.style.left=(il+e.clientX-sx)+'px';el.style.top=(it+e.clientY-sy)+'px'}
+    function up(){document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up)}
+    document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
+    e.preventDefault();
+  });
+}
+
+// ═══════════════════════════════════════
+// SIGNATURE
+// ═══════════════════════════════════════
+(function initSig(){
+  window.addEventListener('load',()=>{
+    const c=document.getElementById('sig-canvas');
+    if(!c)return;
+    const ctx=c.getContext('2d');
+    ctx.lineWidth=2.5;ctx.strokeStyle='#111';ctx.lineCap='round';ctx.lineJoin='round';
+    function pos(e){const r=c.getBoundingClientRect();return[(e.clientX-r.left)*(c.width/r.width),(e.clientY-r.top)*(c.height/r.height)]}
+    c.addEventListener('mousedown',e=>{sigDrawing=true;[sigLX,sigLY]=pos(e);ctx.beginPath();ctx.moveTo(sigLX,sigLY)});
+    c.addEventListener('mousemove',e=>{if(!sigDrawing)return;const[x,y]=pos(e);ctx.lineTo(x,y);ctx.stroke();sigLX=x;sigLY=y});
+    ['mouseup','mouseleave'].forEach(ev=>c.addEventListener(ev,()=>sigDrawing=false));
+    c.addEventListener('touchstart',e=>{e.preventDefault();c.dispatchEvent(new MouseEvent('mousedown',{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}))},{passive:false});
+    c.addEventListener('touchmove',e=>{e.preventDefault();c.dispatchEvent(new MouseEvent('mousemove',{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}))},{passive:false});
+    c.addEventListener('touchend',()=>sigDrawing=false);
+  });
+})();
+
+function clearSig(){const c=document.getElementById('sig-canvas');c.getContext('2d').clearRect(0,0,c.width,c.height)}
+function applySig(){placeSig(document.getElementById('sig-canvas').toDataURL());closeModal('sign-modal')}
+function applyTypedSig(){placeSig(document.getElementById('typed-sig-canvas').toDataURL());closeModal('sign-modal')}
+function loadSigImage(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{placeSig(ev.target.result);closeModal('sign-modal')};r.readAsDataURL(f)}
+
+function placeSig(src){
+  const ol=document.getElementById('overlay-layer');
+  const img=document.createElement('img');
+  img.src=src;img.className='pdf-overlay pdf-img-overlay';
+  img.style.left='80px';img.style.top='100px';img.style.width='180px';
+  addDelBtn(img);makeDraggable(img);
+  ol.appendChild(img);
+  setMode('edit');
+  toast(lang==='de'?'Unterschrift eingefügt':'Signature inserted — drag to position');
+}
+
+function updateTypedSig(){
+  const t=document.getElementById('sig-type-input').value||'Signature';
+  const f=document.getElementById('sig-font').value;
+  const c=document.getElementById('typed-sig-canvas');
+  const ctx=c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.font=`38px ${f}`;ctx.fillStyle='#111';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(t,c.width/2,c.height/2);
+}
+
+function switchSignTab(t){
+  ['draw','type','upload'].forEach(x=>{
+    document.getElementById('sp-'+x).classList.toggle('active',x===t);
+    document.getElementById('sp-'+x).style.display=x===t?'block':'none';
+  });
+  document.querySelectorAll('.sign-tab').forEach((b,i)=>b.classList.toggle('active',['draw','type','upload'][i]===t));
+  if(t==='type')updateTypedSig();
+}
+
+// ═══════════════════════════════════════
+// ORGANIZE
+// ═══════════════════════════════════════
+async function rotatePage(){
+  if(!pdfLibDoc){toast('No document loaded','err');return}
+  const pages=pdfLibDoc.getPages();
+  const p=pages[currentPage-1];
+  p.setRotation(PDFLib.degrees((p.getRotation().angle+90)%360));
+  await refreshDoc();
+  toast(lang==='de'?'Seite gedreht':'Page rotated 90°');
+}
+
+async function deletePage(){
+  if(!pdfLibDoc||totalPages<=1){toast(lang==='de'?'Mindestens eine Seite':'At least one page required','err');return}
+  if(!confirm(lang==='de'?`Seite ${currentPage} löschen?`:`Delete page ${currentPage}?`))return;
+  pdfLibDoc.removePage(currentPage-1);
+  pdfBytes=await pdfLibDoc.save();
+  pdfDoc=await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
+  totalPages=pdfDoc.numPages;
+  currentPage=Math.min(currentPage,totalPages);
+  await buildThumbs();
+  await renderPage(currentPage);
+  toast(lang==='de'?'Seite gelöscht':'Page deleted');
+}
+
+function mergePDFs(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.pdf';inp.multiple=true;
+  inp.onchange=async e=>{
+    const files=Array.from(e.target.files);if(!files.length)return;
+    toast(lang==='de'?'PDFs werden zusammengeführt...':'Merging PDFs...');
+    const merged=await PDFLib.PDFDocument.create();
+    if(pdfLibDoc){const pgs=await merged.copyPages(pdfLibDoc,pdfLibDoc.getPageIndices());pgs.forEach(p=>merged.addPage(p))}
+    for(const f of files){const b=new Uint8Array(await f.arrayBuffer());const doc=await PDFLib.PDFDocument.load(b);const pgs=await merged.copyPages(doc,doc.getPageIndices());pgs.forEach(p=>merged.addPage(p))}
+    pdfBytes=await merged.save();pdfLibDoc=merged;
+    pdfDoc=await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
+    totalPages=pdfDoc.numPages;currentPage=1;
+    await buildThumbs();await renderPage(1);
+    toast(`${lang==='de'?'Zusammengeführt':'Merged'}: ${totalPages} ${lang==='de'?'Seiten':'pages'}`);
+  };inp.click();
+}
+
+async function refreshDoc(){
+  pdfBytes=await pdfLibDoc.save();
+  pdfDoc=await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
+  totalPages=pdfDoc.numPages;
+  await buildThumbs();await renderPage(currentPage);
+}
+
+// ═══════════════════════════════════════
+// COMPRESS
+// ═══════════════════════════════════════
+function setQ(q){
+  compressQ=q;
+  document.querySelectorAll('.qbtn').forEach(b=>{
+    const map={high:'q_high',medium:'q_med',low:'q_low'};
+    b.classList.toggle('active',b.dataset.i===map[q]||(q==='high'&&b.textContent==='High')||(q==='medium'&&(b.textContent==='Med'||b.textContent==='Mittel'))||(q==='low'&&(b.textContent==='Small'||b.textContent==='Klein')));
+  });
+}
+async function compressAndSave(){
+  if(!pdfLibDoc){toast('No document loaded','err');return}
+  const bytes=await pdfLibDoc.save({useObjectStreams:true});
+  const before=pdfBytes.length,after=bytes.length;
+  const saved=Math.max(0,Math.round((1-after/before)*100));
+  const blob=new Blob([bytes],{type:'application/pdf'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='compressed_'+fileName;a.click();
+  URL.revokeObjectURL(url);
+  toast(`${lang==='de'?'Gespeichert':'Saved'}${saved>0?` (${saved}% ${lang==='de'?'kleiner':'smaller'})`:''}`)
+}
+
+// ═══════════════════════════════════════
+// DOWNLOAD GATE
+// ═══════════════════════════════════════
+async function triggerDownload(){
+  if(!pdfLibDoc){toast('No document loaded','err');return}
+  if(currentToken){await logTokenUsage('download');await performDownload();return}
+  const lsCount=getLSDLCount();
+  let sbCount=0;
+  try{sbCount=await sbGetDLCount(await getFingerprint())}catch(e){}
+  const used=Math.max(lsCount,sbCount);
+  if(used>=MAX_DL){showLimitModal();return}
+  if(used===2&&!currentUser){showNudge()}
+  logLSDL();
+  try{await sbLogDL(await getFingerprint())}catch(e){}
+  updateDLDisplay();
+  await performDownload();
+}
+
+async function performDownload(){
+  const bytes=await pdfLibDoc.save();
+  const blob=new Blob([bytes],{type:'application/pdf'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=fileName||'pdffortis.pdf';a.click();
+  URL.revokeObjectURL(url);
+  toast(lang==='de'?'PDF gespeichert!':'PDF saved!','ok');
+}
+
+function getLSDLCount(){
+  const raw=localStorage.getItem(LS_DL);if(!raw)return 0;
+  const cut=Date.now()-LIMIT_MS;
+  const fresh=JSON.parse(raw).filter(t=>t>cut);
+  localStorage.setItem(LS_DL,JSON.stringify(fresh));
+  return fresh.length;
+}
+function logLSDL(){
+  const raw=localStorage.getItem(LS_DL);
+  const d=raw?JSON.parse(raw):[];d.push(Date.now());
+  const cut=Date.now()-LIMIT_MS;
+  localStorage.setItem(LS_DL,JSON.stringify(d.filter(t=>t>cut)));
+}
+function updateDLDisplay(){
+  if(currentToken){document.getElementById('dl-count-display').textContent='∞';return}
+  const left=Math.max(0,MAX_DL-getLSDLCount());
+  document.getElementById('dl-count-display').textContent=`${left} left`;
+}
+
+// ═══════════════════════════════════════
+// SUPABASE HELPERS
+// ═══════════════════════════════════════
+async function getFingerprint(){
+  if(clientFP)return clientFP;
+  const fp=[navigator.userAgent,navigator.language,screen.width+'x'+screen.height,Intl.DateTimeFormat().resolvedOptions().timeZone].join('|');
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(fp));
+  clientFP=Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,32);
+  return clientFP;
+}
+async function sbGetDLCount(fp){
+  const since=new Date(Date.now()-LIMIT_MS).toISOString();
+  const r=await fetch(`${SB_URL}/rest/v1/download_logs?ip_hash=eq.${fp}&downloaded_at=gte.${since}&select=id`,{headers:SB_H});
+  const d=await r.json();return Array.isArray(d)?d.length:0;
+}
+async function sbLogDL(fp){
+  await fetch(`${SB_URL}/rest/v1/download_logs`,{method:'POST',headers:SB_H,body:JSON.stringify({ip_hash:fp})});
+}
+async function sbValidateToken(tok){
+  const r=await fetch(`${SB_URL}/rest/v1/company_tokens?token=eq.${encodeURIComponent(tok)}&select=*`,{headers:SB_H});
+  const d=await r.json();return d.length>0?d[0]:null;
+}
+async function logTokenUsage(action){
+  if(!currentToken)return;
+  await fetch(`${SB_URL}/rest/v1/token_usage`,{method:'POST',headers:SB_H,body:JSON.stringify({token:currentToken.token,action})});
+}
+
+// ═══════════════════════════════════════
+// TOKEN SYSTEM
+// ═══════════════════════════════════════
+function loadStoredToken(){
+  const raw=localStorage.getItem(LS_TOKDAT);if(!raw)return;
+  try{currentToken=JSON.parse(raw);applyTokenUI(currentToken)}catch(e){localStorage.removeItem(LS_TOKDAT)}
+}
+async function validateToken(){
+  const val=document.getElementById('token-val').value.trim();
+  if(!val){toast('Enter a token','err');return}
+  toast(lang==='de'?'Token wird geprüft...':'Checking token...');
+  try{
+    const data=await sbValidateToken(val);
+    if(!data){toast(lang==='de'?'Ungültiger Token':'Invalid token','err');return}
+    localStorage.setItem(LS_TOKDAT,JSON.stringify(data));
+    currentToken=data;applyTokenUI(data);
+    closeModal('token-modal');
+    toast(`${lang==='de'?'Token aktiviert':'Token activated'}: ${data.company_name}`,'ok');
+    updateDLDisplay();
+  }catch(e){toast(lang==='de'?'Verbindungsfehler':'Connection error','err')}
+}
+function applyTokenUI(d){
+  document.getElementById('token-label-bar').textContent=d.company_name;
+  document.getElementById('token-input-area').classList.add('hidden');
+  document.getElementById('token-active-display').classList.remove('hidden');
+  document.getElementById('token-company-name').textContent=d.company_name;
+  if(d.company_name){document.getElementById('firm-sig-info').classList.remove('hidden');document.getElementById('firm-sig-name').textContent=d.company_name}
+  document.getElementById('sign-lock-icon').style.display='none';
+  updateDLDisplay();
+}
+function removeToken(){
+  localStorage.removeItem(LS_TOKDAT);currentToken=null;
+  document.getElementById('token-label-bar').textContent=i18n[lang].token_btn;
+  document.getElementById('token-input-area').classList.remove('hidden');
+  document.getElementById('token-active-display').classList.add('hidden');
+  document.getElementById('sign-lock-icon').style.display='';
+  updateDLDisplay();closeModal('token-modal');
+}
+
+// ═══════════════════════════════════════
+// AUTH (Supabase Auth)
+// ═══════════════════════════════════════
+function openAuth(tab){
+  document.getElementById('auth-modal').classList.remove('hidden');
+  switchAuthTab(tab);
+}
+function switchAuthTab(tab){
+  ['login','signup'].forEach(t=>{
+    document.getElementById(`auth-${t}-form`).classList.toggle('hidden',t!==tab);
+    document.getElementById(`auth-tab-${t}`).classList.toggle('active',t===tab);
+  });
+}
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const pw=document.getElementById('login-pw').value;
+  const err=document.getElementById('login-error');
+  err.classList.add('hidden');
+  if(!email||!pw){err.textContent=lang==='de'?'Bitte alle Felder ausfüllen':'Please fill all fields';err.classList.remove('hidden');return}
+  try{
+    const r=await fetch(`${SB_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY},body:JSON.stringify({email,password:pw})});
+    const d=await r.json();
+    if(d.error){err.textContent=d.error_description||d.error;err.classList.remove('hidden');return}
+    currentUser={email,name:d.user?.user_metadata?.name||email.split('@')[0],token:d.access_token};
+    applyUserUI();closeModal('auth-modal');
+    toast(lang==='de'?`Willkommen zurück!`:`Welcome back!`,'ok');
+  }catch(e){err.textContent='Connection error';err.classList.remove('hidden')}
+}
+async function doSignup(){
+  const name=document.getElementById('signup-name').value.trim();
+  const email=document.getElementById('signup-email').value.trim();
+  const pw=document.getElementById('signup-pw').value;
+  const err=document.getElementById('signup-error');
+  err.classList.add('hidden');
+  if(!name||!email||!pw){err.textContent=lang==='de'?'Bitte alle Felder ausfüllen':'Please fill all fields';err.classList.remove('hidden');return}
+  if(pw.length<8){err.textContent=lang==='de'?'Passwort min. 8 Zeichen':'Password min. 8 characters';err.classList.remove('hidden');return}
+  try{
+    const r=await fetch(`${SB_URL}/auth/v1/signup`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY},body:JSON.stringify({email,password:pw,data:{name}})});
+    const d=await r.json();
+    if(d.error){err.textContent=d.error_description||d.error;err.classList.remove('hidden');return}
+    currentUser={email,name,token:d.access_token};
+    applyUserUI();closeModal('auth-modal');
+    toast(lang==='de'?'Konto erstellt! Willkommen.':'Account created! Welcome.','ok');
+  }catch(e){err.textContent='Connection error';err.classList.remove('hidden')}
+}
+function applyUserUI(){
+  const initials=(currentUser.name||'?').slice(0,2).toUpperCase();
+  ['upload-auth-btns'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
+  ['upload-user-area'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('hidden')});
+  const av=document.getElementById('upload-avatar');if(av)av.textContent=initials;
+  const un=document.getElementById('upload-username');if(un)un.textContent=currentUser.name;
+  document.getElementById('sign-lock-icon').style.display='none';
+  loadRecent();
+}
+function logout(){
+  currentUser=null;
+  ['upload-auth-btns'].forEach(id=>document.getElementById(id)?.classList.remove('hidden'));
+  ['upload-user-area'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
+  document.getElementById('sign-lock-icon').style.display='';
+  document.getElementById('recent-section').classList.add('hidden');
+  toast(lang==='de'?'Abgemeldet':'Logged out');
+}
+
+// ═══════════════════════════════════════
+// RECENT DOCS (localStorage, no real storage)
+// ═══════════════════════════════════════
+function logRecent(name){
+  const raw=localStorage.getItem('pf_recent');
+  const list=raw?JSON.parse(raw):[];
+  const existing=list.findIndex(r=>r.name===name);
+  if(existing>-1)list.splice(existing,1);
+  list.unshift({name,date:Date.now()});
+  if(list.length>5)list.pop();
+  localStorage.setItem('pf_recent',JSON.stringify(list));
+}
+function loadRecent(){
+  if(!currentUser)return;
+  const raw=localStorage.getItem('pf_recent');if(!raw)return;
+  const list=JSON.parse(raw);if(!list.length)return;
+  const section=document.getElementById('recent-section');
+  section.classList.remove('hidden');
+  const ul=document.getElementById('recent-list');ul.innerHTML='';
+  list.forEach(item=>{
+    const d=document.createElement('div');d.className='recent-item';
+    d.innerHTML=`<div class="recent-icon"><svg width="16" height="16" fill="none" viewBox="0 0 16 16"><rect x="2" y="1" width="9" height="12" rx="1.5" fill="#e0e7ff" stroke="#a5b4fc" stroke-width="1"/><path d="M5 5h4M5 7.5h4M5 10h2.5" stroke="#6366f1" stroke-width=".8" stroke-linecap="round"/></svg></div><span class="recent-name">${item.name}</span><span class="recent-date">${new Date(item.date).toLocaleDateString()}</span>`;
+    ul.appendChild(d);
+  });
+}
+
+// ═══════════════════════════════════════
+// LIMIT MODAL + NUDGE
+// ═══════════════════════════════════════
+function showLimitModal(){
+  document.getElementById('limit-modal').classList.remove('hidden');
+  const raw=localStorage.getItem(LS_DL);
+  if(!raw)return;
+  const times=JSON.parse(raw).sort((a,b)=>a-b);
+  if(!times.length)return;
+  const resetAt=times[0]+LIMIT_MS;
+  const el=document.getElementById('reset-countdown');
+  (function tick(){
+    const d=resetAt-Date.now();if(d<=0){el.textContent='00:00:00';return}
+    el.textContent=[Math.floor(d/3600000),Math.floor((d%3600000)/60000),Math.floor((d%60000)/1000)].map(n=>String(n).padStart(2,'0')).join(':');
+    setTimeout(tick,1000);
+  })();
+}
+function showNudge(){
+  const nb=document.getElementById('nudge-bar');nb.classList.remove('hidden');
+  setTimeout(()=>nb.classList.add('hidden'),8000);
+}
+function closeNudge(){document.getElementById('nudge-bar').classList.add('hidden')}
+
+// ═══════════════════════════════════════
+// MODALS
+// ═══════════════════════════════════════
+function openSignModal(){
+  if(!currentUser&&!currentToken){toast(lang==='de'?'Bitte zuerst einloggen':'Please sign in first','warn');openAuth('signup');return}
+  document.getElementById('sign-modal').classList.remove('hidden');
+}
+function openTokenModal(){document.getElementById('token-modal').classList.remove('hidden')}
+function closeModal(id){document.getElementById(id).classList.add('hidden')}
+document.addEventListener('click',e=>{if(e.target.classList.contains('modal-bg'))e.target.classList.add('hidden')});
+
+// ═══════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════
+function toast(msg,type='info'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.style.background=type==='err'?'#ef4444':type==='ok'?'#16a34a':type==='warn'?'#d97706':'#111827';
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+window.addEventListener('load',()=>{
+  setLang('en');
+  loadStoredToken();
+  updateDLDisplay();
+  loadRecent();
+});
+</script>
+</body>
+</html>
