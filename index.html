@@ -519,7 +519,7 @@ input,select,textarea{font-family:var(--font)}
     <!-- Add text panel -->
     <div class="ribbon-panel" id="panel-add">
       <div class="rgrp">
-        <button class="rbtn primary" onclick="addTextBox()">
+        <button class="rbtn primary" onclick="setMode('edit');switchRTab('add');toast('Klick auf das PDF um Text einzufügen')">
           <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M3 4h10M8 4v8M5 12h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           <span data-i="add_text">Add Text Box</span>
         </button>
@@ -919,6 +919,13 @@ function setMode(m){
   ca.className='canvas-area '+(m==='look'?'look-mode':'edit-mode');
   const ol=document.getElementById('overlay-layer');
   ol.classList.toggle('can-edit',m==='edit');
+  if(m==='edit'){
+    ol.style.pointerEvents='all';
+    ol.style.cursor='text';
+  } else {
+    ol.style.pointerEvents='none';
+    ol.style.cursor='default';
+  }
 }
 
 // ═══════════════════════════════════════
@@ -939,21 +946,33 @@ function showSignLock(){
 // ═══════════════════════════════════════
 // TEXT BOX (Add)
 // ═══════════════════════════════════════
-function addTextBox(){
-  if(!pdfDoc){toast('Load a PDF first','err');return}
+function addTextBox(x,y){
+  if(!pdfDoc){toast('Lade zuerst ein PDF','err');return}
   setMode('edit');
   const ol=document.getElementById('overlay-layer');
   const el=document.createElement('div');
   el.contentEditable='true';
   el.className='pdf-overlay pdf-text-box';
-  el.style.left='60px';el.style.top='60px';
-  el.textContent='Text here';
+  el.style.left=(x||60)+'px';
+  el.style.top=(y||60)+'px';
+  el.style.minWidth='120px';
+  el.style.minHeight='28px';
+  el.style.fontSize=(document.getElementById('font-size')?.value||'14')+'px';
+  el.style.fontFamily=document.getElementById('font-family')?.value||'Arial';
+  el.style.color=document.getElementById('text-color')?.value||'#000000';
+  el.style.background='rgba(255,255,255,0.01)';
+  el.style.border='1.5px dashed #6366f1';
+  el.style.borderRadius='3px';
+  el.style.padding='3px 6px';
+  el.style.outline='none';
+  el.style.lineHeight='1.4';
+  el.style.zIndex='10';
+  el.setAttribute('spellcheck','false');
+  el.textContent='';
   addDelBtn(el);
   makeDraggable(el);
   ol.appendChild(el);
-  el.focus();
-  const r=document.createRange();r.selectNodeContents(el);
-  const s=window.getSelection();s.removeAllRanges();s.addRange(r);
+  setTimeout(()=>el.focus(),50);
 }
 
 function addDateBox(){
@@ -1411,7 +1430,20 @@ function toast(msg,type='info'){
   el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'),3000);
 }
-
+// Canvas click to place text in edit mode
+document.addEventListener('DOMContentLoaded',()=>{
+  const ol=document.getElementById('overlay-layer');
+  if(ol){
+    ol.addEventListener('click',function(e){
+      if(editorMode!=='edit')return;
+      if(e.target!==ol)return; // nur klick auf leere Fläche
+      if(currentTab==='add'||currentTab==='edit'){
+        const rect=ol.getBoundingClientRect();
+        addTextBox(e.clientX-rect.left-4, e.clientY-rect.top-4);
+      }
+    });
+  }
+});
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
