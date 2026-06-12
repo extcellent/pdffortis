@@ -1056,33 +1056,66 @@ function switchRTab(tab){
 // ═══════════════════════════════════════
 function addTextBox(x,y){
   if(!pdfDoc){toast('Lade zuerst ein PDF','err');return}
-  setMode('edit');
   const ol=document.getElementById('overlay-layer');
-  const el=document.createElement('div');
-  el.contentEditable='true';
-  el.className='pdf-overlay pdf-text-box';
-  el.style.left=(x||60)+'px';
-  el.style.top=(y||60)+'px';
-  el.style.minWidth='120px';
-  el.style.minHeight='28px';
-  el.style.fontSize=(document.getElementById('font-size')?.value||'14')+'px';
-  el.style.fontFamily=document.getElementById('font-family')?.value||'Arial';
-  el.style.color=document.getElementById('text-color')?.value||'#000000';
-  el.style.background='rgba(255,255,255,0.01)';
-  el.style.border='1.5px dashed #6366f1';
-  el.style.borderRadius='3px';
-  el.style.padding='3px 6px';
-  el.style.outline='none';
-  el.style.lineHeight='1.4';
-  el.style.zIndex='10';
-  el.setAttribute('spellcheck','false');
-  el.textContent='';
-  addDelBtn(el);
-  makeDraggable(el);
-  ol.appendChild(el);
-  setTimeout(()=>el.focus(),50);
-}
 
+  // Wrapper: draggbar, enthält Box + Delete-Button
+  const wrap=document.createElement('div');
+  wrap.className='pdf-overlay';
+  wrap.style.cssText=`position:absolute;left:${x}px;top:${y}px;z-index:10;`;
+
+  // Delete-Button
+  const del=document.createElement('button');
+  del.innerHTML='&times;';
+  del.style.cssText=`
+    position:absolute;top:-10px;right:-10px;
+    width:22px;height:22px;
+    background:#ef4444;color:white;
+    border:2px solid white;border-radius:50%;
+    font-size:14px;font-weight:700;
+    cursor:pointer;display:none;
+    align-items:center;justify-content:center;
+    line-height:1;z-index:20;
+    box-shadow:0 2px 6px rgba(0,0,0,.25);
+  `;
+  del.onclick=e=>{e.stopPropagation();wrap.remove()};
+  wrap.appendChild(del);
+  wrap.addEventListener('mouseenter',()=>del.style.display='flex');
+  wrap.addEventListener('mouseleave',()=>del.style.display='none');
+
+  // Editierbares Textfeld
+  const box=document.createElement('div');
+  box.contentEditable='true';
+  box.className='pdf-text-box';
+  box.style.cssText=`
+    min-width:120px;min-height:28px;
+    font-size:${document.getElementById('font-size')?.value||'14'}px;
+    font-family:${document.getElementById('font-family')?.value||'Arial'};
+    color:${document.getElementById('text-color')?.value||'#000000'};
+    cursor:text;
+  `;
+  box.setAttribute('spellcheck','false');
+  wrap.appendChild(box);
+
+  // Drag nur über Wrapper, NICHT wenn man im Textfeld tippt
+  let sx,sy,il,it,dragging=false;
+  wrap.addEventListener('mousedown',e=>{
+    if(e.target===box||e.target.isContentEditable)return; // Tippen erlauben
+    if(e.target===del)return;
+    dragging=true;
+    sx=e.clientX;sy=e.clientY;
+    il=parseInt(wrap.style.left)||0;it=parseInt(wrap.style.top)||0;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    wrap.style.left=(il+e.clientX-sx)+'px';
+    wrap.style.top=(it+e.clientY-sy)+'px';
+  });
+  document.addEventListener('mouseup',()=>{dragging=false});
+
+  ol.appendChild(wrap);
+  setTimeout(()=>box.focus(),50);
+}
 function addDateBox(){
   if(!pdfDoc){toast('Load a PDF first','err');return}
   setMode('edit');
@@ -1120,19 +1153,52 @@ function addImageOverlay(){
     rd.onload=ev=>{
       const wrap=document.createElement('div');
       wrap.className='pdf-overlay';
-      wrap.style.cssText='position:absolute;left:80px;top:80px;display:inline-block;';
+      wrap.style.cssText='position:absolute;left:80px;top:80px;z-index:10;display:inline-block;';
+
+      const del=document.createElement('button');
+      del.innerHTML='&times;';
+      del.style.cssText=`
+        position:absolute;top:-10px;right:-10px;
+        width:22px;height:22px;
+        background:#ef4444;color:white;
+        border:2px solid white;border-radius:50%;
+        font-size:14px;font-weight:700;
+        cursor:pointer;display:none;
+        align-items:center;justify-content:center;
+        line-height:1;z-index:20;
+        box-shadow:0 2px 6px rgba(0,0,0,.25);
+      `;
+      del.onclick=e=>{e.stopPropagation();wrap.remove()};
+      wrap.appendChild(del);
+      wrap.addEventListener('mouseenter',()=>del.style.display='flex');
+      wrap.addEventListener('mouseleave',()=>del.style.display='none');
+
       const img=document.createElement('img');
       img.src=ev.target.result;
       img.style.cssText='max-width:240px;display:block;border-radius:3px;border:2px dashed #6366f1;pointer-events:none;';
       img.draggable=false;
       wrap.appendChild(img);
-      addDelBtn(wrap);
-      makeDraggable(wrap);
+
+      // Drag
+      let sx,sy,il,it,dragging=false;
+      wrap.addEventListener('mousedown',e=>{
+        if(e.target===del)return;
+        dragging=true;
+        sx=e.clientX;sy=e.clientY;
+        il=parseInt(wrap.style.left)||0;it=parseInt(wrap.style.top)||0;
+        e.preventDefault();
+      });
+      document.addEventListener('mousemove',e=>{
+        if(!dragging)return;
+        wrap.style.left=(il+e.clientX-sx)+'px';
+        wrap.style.top=(it+e.clientY-sy)+'px';
+      });
+      document.addEventListener('mouseup',()=>{dragging=false});
+
       document.getElementById('overlay-layer').appendChild(wrap);
     };rd.readAsDataURL(f);
   };inp.click();
 }
-
 function addDelBtn(el){
   const btn=document.createElement('button');
   btn.className='overlay-delete';
@@ -1553,65 +1619,66 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(!ol)return;
 
 // Klick auf leere Fläche im Add-Modus = neue Textbox
-ol.addEventListener('click',function(e){
-  if(editorMode!=='edit')return;
-  if(currentTab!=='add')return;
-  // Klick auf Text-Layer Items oder bestehende Overlays ignorieren
-  if(e.target.classList.contains('pdf-text-item'))return;
-  if(e.target.classList.contains('pdf-overlay'))return;
-  if(e.target.classList.contains('pdf-text-box'))return;
-  if(e.target.classList.contains('overlay-delete'))return;
-  const rect=ol.getBoundingClientRect();
-  addTextBox(e.clientX-rect.left-4,e.clientY-rect.top-4);
-});
+document.addEventListener('DOMContentLoaded',()=>{
+  const ol=document.getElementById('overlay-layer');
+  if(!ol)return;
 
-  // Klick auf bestehenden PDF-Text im Edit-Modus = direkt bearbeiten
+  // ── ADD TEXT: Klick auf leere Fläche ──
   ol.addEventListener('click',function(e){
     if(editorMode!=='edit')return;
-    if(!e.target.classList.contains('pdf-text-item'))return;
+    if(currentTab!=='add')return;
+    if(e.target!==ol&&!e.target.classList.contains('pdf-text-layer'))return;
+    const rect=ol.getBoundingClientRect();
+    addTextBox(e.clientX-rect.left,e.clientY-rect.top);
+  });
+
+  // ── EDIT TEXT: Klick auf PDF-Text-Span ──
+  ol.addEventListener('click',function(e){
+    if(editorMode!=='edit')return;
     if(currentTab!=='edit')return;
+    if(!e.target.classList.contains('pdf-text-item'))return;
     const span=e.target;
     if(span.classList.contains('editing'))return;
-    // Alle anderen schließen
     document.querySelectorAll('.pdf-text-item.editing').forEach(s=>{
       s.contentEditable='false';
       s.classList.remove('editing');
       s.style.color='transparent';
       s.style.pointerEvents='none';
+      s.style.background='';
     });
-    // Diesen öffnen
     span.contentEditable='true';
     span.classList.add('editing');
     span.style.pointerEvents='all';
-    span.style.transform='none'; // Reset scaleX beim Bearbeiten
+    span.style.transform='none';
     span.style.whiteSpace='pre-wrap';
     span.focus();
-    // Cursor ans Ende
     const range=document.createRange();
     range.selectNodeContents(span);
     range.collapse(false);
     const sel=window.getSelection();
     sel.removeAllRanges();sel.addRange(range);
-    // Enter oder Klick woanders = schließen
     span.addEventListener('blur',function close(){
       span.contentEditable='false';
       span.classList.remove('editing');
       span.style.color='transparent';
       span.style.pointerEvents='none';
+      span.style.background='';
       span.removeEventListener('blur',close);
     });
   });
 
-  // Text-Layer nur im Edit-Modus klickbar
+  // ── modeChange: Text-Layer pointer-events ──
   document.addEventListener('modeChange',function(e){
     const layer=document.querySelector('.pdf-text-layer');
     if(!layer)return;
-    layer.style.pointerEvents=e.detail==='edit'?'all':'none';
+    const active=(e.detail==='edit'&&currentTab==='edit');
+    layer.style.pointerEvents=active?'all':'none';
     document.querySelectorAll('.pdf-text-item').forEach(s=>{
-      s.style.pointerEvents=e.detail==='edit'?'all':'none';
+      s.style.pointerEvents=active?'all':'none';
     });
   });
 });
+   
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
