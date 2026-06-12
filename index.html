@@ -1004,9 +1004,12 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
   form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
   form.append('page',pageNum-1);
   const res=await fetch(`${API}/extract`,{method:'POST',body:form});
-  const {items}=await res.json();
+  const {items, pageWidth, pageHeight}=await res.json();
 
-  const scale=canvasWidth/imgWidth;
+  // imgWidth ist 2x (Matrix(2,2) im Backend) → echte PDF-Breite = imgWidth/2
+  const pdfNativeWidth=imgWidth/2;
+  const scale=canvasWidth/pdfNativeWidth;
+
   const editActive=(editorMode==='edit'&&currentTab==='edit');
 
   const layer=document.createElement('div');
@@ -1025,14 +1028,18 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
     span.dataset.pdfX1=item.x1;
     span.dataset.pdfY1=item.y1;
     span.dataset.pdfFontSize=item.size;
+
+    const left=item.x*scale;
+    const top=item.y*scale;
     const w=(item.x1-item.x)*scale;
     const h=(item.y1-item.y)*scale;
+
     span.style.cssText=`
       position:absolute;
-      left:${item.x*scale}px;
-      top:${item.y*scale}px;
-      width:${w}px;
-      height:${h}px;
+      left:${left}px;
+      top:${top}px;
+      width:${Math.max(w,20)}px;
+      height:${Math.max(h,10)}px;
       font-size:${item.size*scale}px;
       color:transparent;
       white-space:pre;
@@ -1045,6 +1052,7 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
   layer.style.pointerEvents=editActive?'all':'none';
   ol.appendChild(layer);
 }
+   
 async function buildThumbs(){
   const panel=document.getElementById('pages-panel');
   panel.innerHTML='';
