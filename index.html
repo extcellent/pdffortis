@@ -1766,7 +1766,7 @@ async function openInlineEditor(span) {
 // 3. TEXT-EDITOR SCHLIESSEN & INS PDF SPEICHERN
 // ═══════════════════════════════════════════════════════════════════
 async function closeInlineEditor(save = true) {
-  // Absicherung gegen Doppel-Aufruf durch zeitgleiche Events
+  // Absicherung gegen Doppel-Aufruf
   if (!window.activeInlineSpan || !window.activeInlineInput) return;
 
   // Referenzen sichern und globale Variablen SOFORT leeren
@@ -1787,14 +1787,13 @@ async function closeInlineEditor(save = true) {
 
   if (!save) return;
 
-  // Live-Text im Browser sofort ändern (Word-Feeling: Keine Verzögerung sichtbar!)
+  // Live-Text im Browser sofort ändern (Ruckelfreies Word-Feeling)
   span.textContent = newText;
   span.dataset.editedText = newText;
 
   // Wenn der Text gleich geblieben ist oder kein PDF geladen ist, abbrechen
   if (newText === origText || !pdfLibDoc) return;
 
-  // ── Im Hintergrund ins PDF zeichnen & für Download/Supabase sichern ──
   try {
     const pageIndex = parseInt(span.dataset.pageNumber || currentPage, 10) - 1;
     const page = pdfLibDoc.getPages()[pageIndex];
@@ -1823,15 +1822,18 @@ async function closeInlineEditor(save = true) {
       });
     }
 
-    // 3. Die globalen PDF-Bytes aktualisieren (WICHTIG FÜR DOWNLOAD & SUPABASE)
-    pdfBytes = await pdfLibDoc.save();
+    // 3. Neue PDF-Bytes generieren
+    const freshBytes = await pdfLibDoc.save();
+    pdfBytes = freshBytes; // Globale Variable aktualisieren (wichtig für Download/Supabase!)
 
-    // 4. Den pdf.js-Viewer im Hintergrund aktualisieren, damit die Vorschau scharf bleibt
-    const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
+    // 4. WICHTIG: Erst das pdf-lib Dokument neu laden, solange die Bytes unberührt sind
+    pdfLibDoc = await PDFLib.PDFDocument.load(freshBytes);
+
+    // 5. WICHTIG: .slice(0) übergibt eine KOPIE an pdf.js, damit die Originaldaten nicht gelöscht werden!
+    const loadingTask = pdfjsLib.getDocument({ data: freshBytes.slice(0) });
     pdfDoc = await loadingTask.promise;
-    pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
 
-    // 5. Seite neu rendern (Die Text-Layer-Spans werden sauber neu erzeugt)
+    // 6. Seite im Viewer aktualisieren
     if (typeof renderPage === 'function') {
       await renderPage(currentPage);
     }
