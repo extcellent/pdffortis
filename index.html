@@ -1766,74 +1766,66 @@ function openInlineEditor(span){
 async function closeInlineEditor(save=true){
   if(!activeInlineSpan || !activeInlineInput) return;
 
-  // WICHTIGER FIX: Sofort Referenzen sichern und auf null setzen!
-  // Das verhindert, dass das 'blur'-Event die Funktion parallel ein zweites Mal startet.
+  // WICHTIG: Referenzen sofort sichern und Globals leeren, um Abstürze zu verhindern
   const span = activeInlineSpan;
   const ed = activeInlineInput;
   activeInlineSpan = null;
   activeInlineInput = null;
 
   const newText = ed.value;
-  const origText = span.dataset.originalText||'';
+  const origText = span.dataset.originalText || '';
 
   // Span-Highlight entfernen
-  span.style.background='';
-  span.style.outline='';
+  span.style.background = '';
+  span.style.outline = '';
 
-  // Editor entfernen
+  // Eingabefeld SOFORT entfernen (Textfeld verschwindet augenblicklich)
   if(ed.parentNode) ed.remove();
 
   if(!save) return;
 
-  // Geänderten Text merken
-  span.dataset.editedText=newText;
+  // 1. LIVE-UPDATE AUF DEM BILDSCHIRM (Wie in Word)
+  // Wir ändern den Text direkt im HTML-Element. Das geht extrem schnell und ruckelfrei.
+  span.textContent = newText;
+  span.dataset.editedText = newText;
 
-  if(newText===origText||!pdfLibDoc) return;
+  // Wenn sich nichts geändert hat oder kein PDF geladen ist, brechen wir hier ab
+  if(newText === origText || !pdfLibDoc) return;
 
-  // ── Ins PDF schreiben und Live-Vorschau aktualisieren ──
-  try{
-    const pageIndex=parseInt(span.dataset.pageNumber||currentPage,10)-1;
-    const page=pdfLibDoc.getPages()[pageIndex];
-    const pdfX=parseFloat(span.dataset.pdfX)||0;
-    const pdfY=parseFloat(span.dataset.pdfY)||0;
-    const origFontSize=parseFloat(span.dataset.pdfFontSize)||12;
-    const fontSize=Math.max(4,origFontSize);
+  // 2. IM HINTERGRUND INS PDF SCHREIBEN (Für Supabase & Downloads)
+  try {
+    const pageIndex = parseInt(span.dataset.pageNumber || currentPage, 10) - 1;
+    const page = pdfLibDoc.getPages()[pageIndex];
+    const pdfX = parseFloat(span.dataset.pdfX) || 0;
+    const pdfY = parseFloat(span.dataset.pdfY) || 0;
+    const origFontSize = parseFloat(span.dataset.pdfFontSize) || 12;
+    const fontSize = Math.max(4, origFontSize);
 
-    // Alten Text mit weißem Rechteck überschreiben
+    // Alten Text im PDF mit weißem Rechteck überdecken
     page.drawRectangle({
-      x:pdfX-1,
-      y:pdfY-2,
-      width:Math.max(origText.length,newText.length)*fontSize*0.65+12,
-      height:fontSize+6,
-      color:PDFLib.rgb(1,1,1),
-      opacity:1
+      x: pdfX - 1,
+      y: pdfY - 2,
+      width: Math.max(origText.length, newText.length) * fontSize * 0.65 + 12,
+      height: fontSize + 6,
+      color: PDFLib.rgb(1, 1, 1),
+      opacity: 1
     });
 
-    // Neuen Text schreiben
+    // Neuen Text ins PDF eintragen
     if(newText){
-      page.drawText(newText,{
-        x:pdfX,
-        y:pdfY,
-        size:fontSize,
-        color:PDFLib.rgb(0,0,0)
+      page.drawText(newText, {
+        x: pdfX,
+        y: pdfY,
+        size: fontSize,
+        color: PDFLib.rgb(0, 0, 0)
       });
     }
 
-    // 1. Geänderte PDF-Bytes generieren
+    // Die globalen PDF-Bytes für Supabase / Download aktualisieren
     pdfBytes = await pdfLibDoc.save();
 
-    // 2. Den pdf.js-Viewer mit den neuen Bytes füttern
-    const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
-    pdfDoc = await loadingTask.promise;
-
-    // 3. Das pdf-lib Dokument neu laden, damit Folgebearbeitungen darauf aufbauen
-    pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
-
-    // 4. Die aktuelle Seite sofort live im Browser neu zeichnen (wie in Word)
-    await renderPage(currentPage);
-
   } catch(e) {
-    console.error("Fehler beim Live-Update des PDFs:", e);
+    console.error("Fehler beim Speichern im PDF-Hintergrund:", e);
   }
 }
    
