@@ -1618,11 +1618,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   const ol=document.getElementById('overlay-layer');
   if(!ol)return;
 
-// Klick auf leere Fläche im Add-Modus = neue Textbox
-document.addEventListener('DOMContentLoaded',()=>{
-  const ol=document.getElementById('overlay-layer');
-  if(!ol)return;
-
   // ── ADD TEXT: Klick auf leere Fläche ──
   ol.addEventListener('click',function(e){
     if(editorMode!=='edit')return;
