@@ -955,45 +955,16 @@ async function renderPage(n){
   document.querySelectorAll('.thumb-item').forEach((t,i)=>t.classList.toggle('active',i===n-1));
 }
 
-
-async function buildThumbs(){
-  const panel=document.getElementById('pages-panel');
-  panel.innerHTML='';
-  for(let i=1;i<=totalPages;i++){
-    const wrap=document.createElement('div');
-    wrap.className='thumb-item'+(i===1?' active':'');
-    wrap.onclick=(()=>{const pg=i;return()=>{currentPage=pg;renderPage(pg)}})();
-    const tc=document.createElement('canvas');
-    wrap.appendChild(tc);
-    const num=document.createElement('div');
-    num.className='thumb-num';num.textContent=i;
-    wrap.appendChild(num);
-    panel.appendChild(wrap);
-    const page=await pdfDoc.getPage(i);
-    const vp=page.getViewport({scale:.2});
-    tc.width = vp.width;
-    tc.height = vp.height;
-   
-    await page.render({
-      canvasContext: tc.getContext('2d'),
-      viewport: vp
-    }).promise;
-    }
-
-     
-function buildTextLayer(page, vp, container){
+async function buildTextLayer(page, vp, container){
   const textContent=await page.getTextContent();
   const old=container.querySelector('.pdf-text-layer');
   if(old)old.remove();
   const layer=document.createElement('div');
   layer.className='pdf-text-layer';
   layer.style.cssText='position:absolute;inset:0;overflow:hidden;line-height:1;';
+  // Direkt beim Aufbau prüfen ob Edit-Tab aktiv
   const editActive=(editorMode==='edit'&&currentTab==='edit');
   layer.style.pointerEvents=editActive?'all':'none';
-
-  // Viewport scale = wie groß der Canvas im Vergleich zur echten PDF ist
-  const vpScale=vp.scale;
-  const {width:pdfW,height:pdfH}=page.getViewport({scale:1});
 
   const {items,styles}=textContent;
   items.forEach(item=>{
@@ -1002,20 +973,10 @@ function buildTextLayer(page, vp, container){
     const style=styles[item.fontName]||{};
     const span=document.createElement('span');
     span.className='pdf-text-item';
-
-    // Canvas-Koordinaten für visuelle Positionierung
+    span.dataset.originalText=item.str;
+    span.textContent=item.str;
     const angle=Math.atan2(tx[1],tx[0]);
     const fontSize=Math.sqrt(tx[2]*tx[2]+tx[3]*tx[3]);
-
-    // ORIGINALE PDF-Koordinaten speichern (für pdf-lib)
-    // item.transform = [scaleX, skewY, skewX, scaleY, x, y] in PDF-Einheiten
-    span.dataset.originalText=item.str;
-    span.dataset.pdfX=item.transform[4];         // original X in PDF points
-    span.dataset.pdfY=item.transform[5];         // original Y in PDF points (von unten)
-    span.dataset.pageNumber = currentPage;
-    span.dataset.pdfPageH=pdfH;
-
-    span.textContent=item.str;
     span.style.cssText=`
       position:absolute;
       left:${tx[4]}px;
@@ -1032,7 +993,24 @@ function buildTextLayer(page, vp, container){
     layer.appendChild(span);
   });
   container.appendChild(layer);
-}.height=vp.height;
+}
+
+async function buildThumbs(){
+  const panel=document.getElementById('pages-panel');
+  panel.innerHTML='';
+  for(let i=1;i<=totalPages;i++){
+    const wrap=document.createElement('div');
+    wrap.className='thumb-item'+(i===1?' active':'');
+    wrap.onclick=(()=>{const pg=i;return()=>{currentPage=pg;renderPage(pg)}})();
+    const tc=document.createElement('canvas');
+    wrap.appendChild(tc);
+    const num=document.createElement('div');
+    num.className='thumb-num';num.textContent=i;
+    wrap.appendChild(num);
+    panel.appendChild(wrap);
+    const page=await pdfDoc.getPage(i);
+    const vp=page.getViewport({scale:.2});
+    tc.width=vp.width;tc.height=vp.height;
     await page.render({canvasContext:tc.getContext('2d'),viewport:vp}).promise;
   }
 }
@@ -1649,6 +1627,7 @@ function toast(msg,type='info'){
   el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'),3000);
 }
+// Canvas click to place text in edit mode
 document.addEventListener('DOMContentLoaded',()=>{
   const ol=document.getElementById('overlay-layer');
   if(!ol)return;
@@ -1662,128 +1641,40 @@ document.addEventListener('DOMContentLoaded',()=>{
     addTextBox(e.clientX-rect.left,e.clientY-rect.top);
   });
 
-  // ── EDIT TEXT: Klick auf PDF-Text-Span → sauberer Floating Editor ──
+  // ── EDIT TEXT: Klick auf PDF-Text-Span ──
   ol.addEventListener('click',function(e){
     if(editorMode!=='edit')return;
     if(currentTab!=='edit')return;
     if(!e.target.classList.contains('pdf-text-item'))return;
     const span=e.target;
-
-    // Bestehenden Editor schließen
-    const old=document.getElementById('pdf-inline-editor');
-    if(old)old.remove();
+    if(span.classList.contains('editing'))return;
     document.querySelectorAll('.pdf-text-item.editing').forEach(s=>{
+      s.contentEditable='false';
       s.classList.remove('editing');
-      s.style.opacity='1';
+      s.style.color='transparent';
+      s.style.pointerEvents='none';
+      s.style.background='';
     });
-
-    // Span Position relativ zum overlay-layer
-    const olRect=ol.getBoundingClientRect();
-    const spRect=span.getBoundingClientRect();
-    const left=spRect.left-olRect.left;
-    const top=spRect.top-olRect.top;
-    const w=Math.max(spRect.width+40,120);
-    const fs=parseFloat(span.style.fontSize)||14;
-
-    // Span ausblenden während Edit
+    span.contentEditable='true';
     span.classList.add('editing');
-    span.style.opacity='0';
-
-    // Floating Editor — gleiche Schrift, transparenter Hintergrund
-    const ed=document.createElement('div');
-    ed.id='pdf-inline-editor';
-    ed.contentEditable='true';
-    ed.setAttribute('spellcheck','false');
-    ed.style.cssText=`
-      position:absolute;
-      left:${left-4}px;
-      top:${top-4}px;
-      min-width:${w}px;
-      min-height:${fs+10}px;
-      font-size:${fs}px;
-      font-family:${span.style.fontFamily||'Arial'};
-      color:#111111;
-      background:rgba(255,255,255,0.92);
-      border:1.5px solid #6366f1;
-      box-shadow:0 2px 12px rgba(99,102,241,0.18),0 0 0 3px rgba(99,102,241,0.10);
-      border-radius:4px;
-      padding:3px 6px;
-      outline:none;
-      z-index:100;
-      white-space:pre;
-      line-height:1.4;
-      cursor:text;
-    `;
-    ed.textContent=span.dataset.editedText||span.dataset.originalText||span.textContent;
-    ol.appendChild(ed);
-
-    // Cursor ans Ende
-    setTimeout(()=>{
-      ed.focus();
-      const range=document.createRange();
-      range.selectNodeContents(ed);
-      range.collapse(false);
-      const sel=window.getSelection();
-      sel.removeAllRanges();sel.addRange(range);
-    },20);
-
-    // Schließen: Text übernehmen → Span wieder zeigen
-// Schließen: Text übernehmen → Span wieder zeigen
-    async function closeEditor(){
-      if(!ed.parentNode) return; // guard: bereits geschlossen
-      const newText = ed.textContent.trim();
-      const origText = span.dataset.originalText || '';
-
-      span.dataset.editedText = newText;
-      span.textContent = newText;
-      span.style.opacity = '1';
-      span.style.transform = 'none';
-      span.style.whiteSpace = 'pre-wrap';
+    span.style.pointerEvents='all';
+    span.style.transform='none';
+    span.style.whiteSpace='pre-wrap';
+    span.focus();
+    const range=document.createRange();
+    range.selectNodeContents(span);
+    range.collapse(false);
+    const sel=window.getSelection();
+    sel.removeAllRanges();sel.addRange(range);
+    span.addEventListener('blur',function close(){
+      span.contentEditable='false';
       span.classList.remove('editing');
-      ed.remove();
-
-      if(newText === origText || !pdfLibDoc) return;
-
-      try{
-        const pageIndex = parseInt(span.dataset.pageNumber || currentPage, 10) - 1;
-        const page = pdfLibDoc.getPages()[pageIndex];
-        const pdfX = parseFloat(span.dataset.pdfX) || 0;
-        const pdfY = parseFloat(span.dataset.pdfY) || 0;
-        const origFontSize = parseFloat(span.dataset.pdfFontSize) || 12;
-        const fontSize = Math.max(4, origFontSize);
-
-        page.drawRectangle({
-          x: pdfX - 1,
-          y: pdfY - 2,
-          width: Math.max(origText.length, newText.length) * fontSize * 0.65 + 12,
-          height: fontSize + 6,
-          color: PDFLib.rgb(1,1,1),
-          opacity: 1
-        });
-
-        if(newText){
-          page.drawText(newText,{
-            x: pdfX,
-            y: pdfY,
-            size: fontSize,
-            color: PDFLib.rgb(0,0,0)
-          });
-        }
-
-        pdfBytes = await pdfLibDoc.save();
-        toast('✓ Text updated','ok');
-      } catch(err){
-        console.error(err);
-        toast('Error writing to PDF: ' + err.message, 'err');
-      }
-    }
-
-    // Editor schließen bei Blur oder Enter/Escape
-    ed.addEventListener('blur', () => setTimeout(closeEditor, 80));
-    ed.addEventListener('keydown', e => {
-      if(e.key === 'Escape'){ e.preventDefault(); closeEditor(); }
-      if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); closeEditor(); }
+      span.style.color='transparent';
+      span.style.pointerEvents='none';
+      span.style.background='';
+      span.removeEventListener('blur',close);
     });
+  });
 
   // ── modeChange: Text-Layer pointer-events ──
   document.addEventListener('modeChange',function(e){
@@ -1791,9 +1682,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!layer)return;
     const active=(e.detail==='edit'&&currentTab==='edit');
     layer.style.pointerEvents=active?'all':'none';
-    layer.querySelectorAll('.pdf-text-item').forEach(s=>{
-      if(!s.classList.contains('editing'))
-        s.style.pointerEvents=active?'all':'none';
+    document.querySelectorAll('.pdf-text-item').forEach(s=>{
+      s.style.pointerEvents=active?'all':'none';
     });
   });
 });
