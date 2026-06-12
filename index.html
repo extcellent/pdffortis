@@ -1853,9 +1853,9 @@ const bgColor = getBackgroundColorAt(pdfX, pdfY);
 page.drawRectangle({
   x: pdfX - 1,
   y: pdfY - 2,
-  width: ...,
-  height: ...,
-  color: PDFLib.rgb(bgColor.r, bgColor.g, bgColor.b), // Hier ist der Trick!
+  width: textWidth,
+  height: fontSize + 6,
+  color: PDFLib.rgb(bgColor.r, bgColor.g, bgColor.b), // Der Chamäleon-Trick!
   opacity: 1
 });
    
