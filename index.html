@@ -1761,9 +1761,10 @@ async function openInlineEditor(span) {
 // 3. TEXT-EDITOR SCHLIESSEN & INS PDF SPEICHERN
 // ═══════════════════════════════════════════════════════════════════
 async function closeInlineEditor(save = true) {
-  // Absicherung
+  // Absicherung gegen Doppel-Aufruf
   if (!window.activeInlineSpan || !window.activeInlineInput) return;
 
+  // Referenzen sichern und globale Variablen SOFORT leeren
   const span = window.activeInlineSpan;
   const ed = window.activeInlineInput;
   window.activeInlineSpan = null;
@@ -1775,13 +1776,17 @@ async function closeInlineEditor(save = true) {
   // UI aufräumen
   span.style.background = '';
   span.style.outline = '';
-  if (ed.parentNode) ed.parentNode.removeChild(ed);
+  if (ed.parentNode) {
+    ed.parentNode.removeChild(ed);
+  }
 
   if (!save) return;
 
+  // Live-Text im Browser sofort ändern (Ruckelfreies Word-Feeling)
   span.textContent = newText;
   span.dataset.editedText = newText;
 
+  // Wenn der Text gleich geblieben ist oder kein PDF geladen ist, abbrechen
   if (newText === origText || !pdfLibDoc) return;
 
   try {
@@ -1792,22 +1797,17 @@ async function closeInlineEditor(save = true) {
     const origFontSize = parseFloat(span.dataset.pdfFontSize) || 12;
     const fontSize = Math.max(4, origFontSize);
 
-    // --- HIER IST DER CHAMÄLEON-TRICK INTEGRIERT ---
-    const canvas = document.querySelector('canvas');
-    const bgColor = getBackgroundColorAt(pdfX, pdfY, canvas); 
-    const textWidth = Math.max(origText.length, newText.length) * fontSize * 0.65 + 15;
-
-    // 1. Alten Text im PDF mit der gemessenen Hintergrundfarbe überdecken
+    // 1. Alten Text im PDF mit weißem Rechteck überdecken
     page.drawRectangle({
       x: pdfX - 1,
       y: pdfY - 2,
-      width: textWidth,
+      width: Math.max(origText.length, newText.length) * fontSize * 0.65 + 15,
       height: fontSize + 6,
-      color: PDFLib.rgb(bgColor.r, bgColor.g, bgColor.b), 
+      color: PDFLib.rgb(1, 1, 1),
       opacity: 1
     });
 
-    // 2. Neuen Text schreiben
+    // 2. Neuen Text an exakt dieselbe Stelle schreiben
     if (newText) {
       page.drawText(newText, {
         x: pdfX,
@@ -1817,27 +1817,25 @@ async function closeInlineEditor(save = true) {
       });
     }
 
-    // 3. Speichern und Update-Logik
+    // 3. Neue PDF-Bytes generieren
     const freshBytes = await pdfLibDoc.save();
-    pdfBytes = freshBytes;
+    pdfBytes = freshBytes; // Globale Variable aktualisieren (wichtig für Download/Supabase!)
+
+    // 4. WICHTIG: Erst das pdf-lib Dokument neu laden, solange die Bytes unberührt sind
     pdfLibDoc = await PDFLib.PDFDocument.load(freshBytes);
+
+    // 5. WICHTIG: .slice(0) übergibt eine KOPIE an pdf.js, damit die Originaldaten nicht gelöscht werden!
     const loadingTask = pdfjsLib.getDocument({ data: freshBytes.slice(0) });
     pdfDoc = await loadingTask.promise;
 
-    if (typeof renderPage === 'function') await renderPage(currentPage);
+    // 6. Seite im Viewer aktualisieren
+    if (typeof renderPage === 'function') {
+      await renderPage(currentPage);
+    }
 
   } catch (e) {
-    console.error("Fehler beim Speichern:", e);
+    console.error("Fehler beim Speichern im PDF-Hintergrund:", e);
   }
-}
-
-// Diese Funktion steht weiterhin separat außerhalb
-function getBackgroundColorAt(pdfX, pdfY, canvas) {
-  if (!canvas) return { r: 1, g: 1, b: 1 };
-  const ctx = canvas.getContext('2d');
-  // Wir lesen den Pixel an der Position aus
-  const pixel = ctx.getImageData(pdfX, canvas.height - pdfY, 1, 1).data;
-  return { r: pixel[0] / 255, g: pixel[1] / 255, b: pixel[2] / 255 };
 }
    
 // ═══════════════════════════════════════
