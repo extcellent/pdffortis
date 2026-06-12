@@ -1706,8 +1706,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     },20);
 
     // Schließen: Text übernehmen → Span wieder zeigen
-    function closeEditor(){
+async function closeEditor(){
       const newText=ed.textContent;
+      const origText=span.dataset.originalText||'';
       span.dataset.editedText=newText;
       span.textContent=newText;
       span.style.opacity='1';
@@ -1715,8 +1716,55 @@ document.addEventListener('DOMContentLoaded',()=>{
       span.style.whiteSpace='pre-wrap';
       span.classList.remove('editing');
       ed.remove();
+
+      // Text in echtes PDF schreiben via pdf-lib
+      if(newText!==origText && pdfLibDoc){
+        try{
+          const page=pdfLibDoc.getPages()[currentPage-1];
+          const {width,height}=page.getSize();
+          // Position aus dem Span berechnen (overlay coords → PDF coords)
+          const ol=document.getElementById('overlay-layer');
+          const olW=ol.offsetWidth||width;
+          const olH=ol.offsetHeight||height;
+          const scaleX=width/olW;
+          const scaleY=height/olH;
+          const spanLeft=parseFloat(span.style.left)||0;
+          const spanTop=parseFloat(span.style.top)||0;
+          const fs=parseFloat(span.style.fontSize)||12;
+          const pdfX=spanLeft*scaleX;
+          // PDF koordinaten: Y von unten, nicht von oben
+          const pdfY=height-(spanTop*scaleY)-(fs*scaleY);
+          const fontSize=Math.max(6,fs*scaleX);
+
+          // Alten Text mit weißem Rechteck überdecken
+          page.drawRectangle({
+            x:pdfX-2,
+            y:pdfY-2,
+            width:Math.max(origText.length*fontSize*0.65,newText.length*fontSize*0.65)+8,
+            height:fontSize+6,
+            color:PDFLib.rgb(1,1,1),
+          });
+
+          // Neuen Text draufschreiben
+          if(newText.trim()){
+            page.drawText(newText,{
+              x:pdfX,
+              y:pdfY,
+              size:fontSize,
+              color:PDFLib.rgb(0,0,0),
+            });
+          }
+
+          // pdfBytes aktualisieren (ohne re-render damit Overlays bleiben)
+          pdfBytes=await pdfLibDoc.save();
+          toast('✓','ok');
+        }catch(err){
+          console.error('PDF write error:',err);
+          toast('Text saved visually — PDF update failed','warn');
+        }
+      }
     }
-    ed.addEventListener('blur',closeEditor);
+    ed.addEventListener('blur',()=>closeEditor());
     ed.addEventListener('keydown',function(e){
       if(e.key==='Escape'){
         span.style.opacity='1';
