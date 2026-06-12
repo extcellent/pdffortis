@@ -1837,6 +1837,27 @@ async function closeInlineEditor(save = true) {
     console.error("Fehler beim Speichern im PDF-Hintergrund:", e);
   }
 }
+
+// Diese Funktion liest die Farbe an den PDF-Koordinaten aus
+function getBackgroundColorAt(x, y) {
+  const canvas = document.querySelector('canvas'); // Dein PDF-Viewer-Canvas
+  const ctx = canvas.getContext('2d');
+  const pixel = ctx.getImageData(x, y, 1, 1).data;
+  // Rückgabe als RGB-String für pdf-lib
+  return { r: pixel[0] / 255, g: pixel[1] / 255, b: pixel[2] / 255 };
+}
+
+// In deiner closeInlineEditor-Funktion ersetzt du das weiße Rechteck durch:
+const bgColor = getBackgroundColorAt(pdfX, pdfY); 
+
+page.drawRectangle({
+  x: pdfX - 1,
+  y: pdfY - 2,
+  width: ...,
+  height: ...,
+  color: PDFLib.rgb(bgColor.r, bgColor.g, bgColor.b), // Hier ist der Trick!
+  opacity: 1
+});
    
 // ═══════════════════════════════════════
 // INIT
