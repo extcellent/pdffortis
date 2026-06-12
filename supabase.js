@@ -6,8 +6,8 @@
 // STEP 3: Save and deploy
 // ============================================
 
-const SUPABASE_URL = 'https://DEIN-PROJEKT.supabase.co';  // ← hier eintragen
-const SUPABASE_ANON_KEY = 'eyJ...DEIN_ANON_KEY...';       // ← hier eintragen
+const SUPABASE_URL = 'https://zzcjyfhhaithlhkcxzra.supabase.co';  // ← hier eintragen
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6Y2p5ZmhoYWl0aGxoa2N4enJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNDE1NTYsImV4cCI6MjA5NjgxNzU1Nn0.3lQ-9vyOtx13iAZHIwrW6P_gN2bpDOOMnJ1jkU_yilA';       // ← hier eintragen
 
 // ── Shared headers ──────────────────────────────────────────
 const SB_HEADERS = {
