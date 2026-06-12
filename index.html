@@ -971,7 +971,17 @@ async function buildThumbs(){
     panel.appendChild(wrap);
     const page=await pdfDoc.getPage(i);
     const vp=page.getViewport({scale:.2});
-    tc.width=vp.width;tcasync function buildTextLayer(page, vp, container){
+    tc.width = vp.width;
+    tc.height = vp.height;
+   
+    await page.render({
+      canvasContext: tc.getContext('2d'),
+      viewport: vp
+    }).promise;
+    }
+
+     
+function buildTextLayer(page, vp, container){
   const textContent=await page.getTextContent();
   const old=container.querySelector('.pdf-text-layer');
   if(old)old.remove();
@@ -1002,7 +1012,7 @@ async function buildThumbs(){
     span.dataset.originalText=item.str;
     span.dataset.pdfX=item.transform[4];         // original X in PDF points
     span.dataset.pdfY=item.transform[5];         // original Y in PDF points (von unten)
-    span.dataset.pdfFontSize=Math.abs(item.transform[3]); // original font size
+    span.dataset.pageNumber = currentPage;
     span.dataset.pdfPageH=pdfH;
 
     span.textContent=item.str;
@@ -1719,64 +1729,78 @@ document.addEventListener('DOMContentLoaded',()=>{
 
     // Schließen: Text übernehmen → Span wieder zeigen
 async function closeEditor(){
-  const newText=ed.textContent.trim();
-  const origText=span.dataset.originalText||'';
-  span.dataset.editedText=newText;
-  span.textContent=newText;
-  span.style.opacity='1';
-  span.style.transform='none';
-  span.style.whiteSpace='pre-wrap';
+
+  const newText = ed.textContent.trim();
+  const origText = span.dataset.originalText || '';
+
+  span.dataset.editedText = newText;
+  span.textContent = newText;
+
+  span.style.opacity = '1';
+  span.style.transform = 'none';
+  span.style.whiteSpace = 'pre-wrap';
   span.classList.remove('editing');
+
   ed.remove();
 
-  if(newText===origText||!pdfLibDoc)return;
+  if(newText === origText || !pdfLibDoc){
+    return;
+  }
 
   try{
-    const page=pdfLibDoc.getPages()[currentPage-1];
-    const {width,height}=page.getSize();
 
-    // Originale PDF-Koordinaten aus dataset lesen
-    const pdfX=parseFloat(span.dataset.pdfX)||0;
-    const pdfY=parseFloat(span.dataset.pdfY)||0;
-    const origFontSize=parseFloat(span.dataset.pdfFontSize)||12;
-    const fontSize=Math.max(4,origFontSize);
+    const pageIndex =
+      parseInt(span.dataset.pageNumber || currentPage,10) - 1;
 
-    // Weißes Rechteck über alten Text (großzügig)
+    const page = pdfLibDoc.getPages()[pageIndex];
+
+    const pdfX = parseFloat(span.dataset.pdfX) || 0;
+    const pdfY = parseFloat(span.dataset.pdfY) || 0;
+
+    const origFontSize =
+      parseFloat(span.dataset.pdfFontSize) || 12;
+
+    const fontSize = Math.max(4, origFontSize);
+
     page.drawRectangle({
-      x: pdfX-1,
-      y: pdfY-2,
-      width: Math.max(origText.length,newText.length)*fontSize*0.65+12,
-      height: fontSize+6,
+      x: pdfX - 1,
+      y: pdfY - 2,
+      width:
+        Math.max(
+          origText.length,
+          newText.length
+        ) * fontSize * 0.65 + 12,
+      height: fontSize + 6,
       color: PDFLib.rgb(1,1,1),
-      opacity: 1,
+      opacity: 1
     });
 
-    // Neuen Text schreiben
     if(newText){
-      // pdf-lib braucht ein eingebettetes Font oder Helvetica
+
       page.drawText(newText,{
         x: pdfX,
         y: pdfY,
         size: fontSize,
-        color: PDFLib.rgb(0,0,0),
+        color: PDFLib.rgb(0,0,0)
       });
+
     }
 
-    pdfBytes=await pdfLibDoc.save();
-
-    // Canvas neu rendern um Änderung zu zeigen (Overlays bleiben)
-    const userOverlays=Array.from(document.getElementById('overlay-layer').querySelectorAll('.pdf-overlay'));
-    pdfDoc=await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
-    await renderPage(currentPage);
-    // User-Overlays wiederherstellen
-    const ol=document.getElementById('overlay-layer');
-    userOverlays.forEach(el=>ol.appendChild(el));
+    pdfBytes = await pdfLibDoc.save();
 
     toast('✓ Text updated','ok');
+
   }catch(err){
-    console.error('PDF write error:',err);
-    toast('Error writing to PDF: '+err.message,'err');
+
+    console.error(err);
+
+    toast(
+      'Error writing to PDF: ' + err.message,
+      'err'
+    );
+
   }
+
 }
 
   // ── modeChange: Text-Layer pointer-events ──
