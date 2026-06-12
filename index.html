@@ -1778,19 +1778,6 @@ async function closeEditor(){
     toast('Error writing to PDF: '+err.message,'err');
   }
 }
-    ed.addEventListener('blur',()=>closeEditor());
-    ed.addEventListener('keydown',function(e){
-      if(e.key==='Escape'){
-        span.style.opacity='1';
-        span.classList.remove('editing');
-        ed.remove();
-      }
-      if(e.key==='Enter'&&!e.shiftKey){
-        e.preventDefault();
-        closeEditor();
-      }
-    });
-  });
 
   // ── modeChange: Text-Layer pointer-events ──
   document.addEventListener('modeChange',function(e){
