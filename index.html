@@ -955,45 +955,6 @@ async function renderPage(n){
   document.querySelectorAll('.thumb-item').forEach((t,i)=>t.classList.toggle('active',i===n-1));
 }
 
-async function buildTextLayer(page, vp, container){
-  const textContent=await page.getTextContent();
-  const old=container.querySelector('.pdf-text-layer');
-  if(old)old.remove();
-  const layer=document.createElement('div');
-  layer.className='pdf-text-layer';
-  layer.style.cssText='position:absolute;inset:0;overflow:hidden;line-height:1;';
-  // Direkt beim Aufbau prüfen ob Edit-Tab aktiv
-  const editActive=(editorMode==='edit'&&currentTab==='edit');
-  layer.style.pointerEvents=editActive?'all':'none';
-
-  const {items,styles}=textContent;
-  items.forEach(item=>{
-    if(!item.str||!item.str.trim())return;
-    const tx=pdfjsLib.Util.transform(vp.transform,item.transform);
-    const style=styles[item.fontName]||{};
-    const span=document.createElement('span');
-    span.className='pdf-text-item';
-    span.dataset.originalText=item.str;
-    span.textContent=item.str;
-    const angle=Math.atan2(tx[1],tx[0]);
-    const fontSize=Math.sqrt(tx[2]*tx[2]+tx[3]*tx[3]);
-    span.style.cssText=`
-      position:absolute;
-      left:${tx[4]}px;
-      top:${tx[5]-fontSize}px;
-      font-size:${fontSize}px;
-      font-family:${style.fontFamily||'Arial'};
-      white-space:pre;
-      transform-origin:left bottom;
-      transform:rotate(${angle}rad) scaleX(${item.width/(item.str.length*fontSize*0.6)||1});
-      color:transparent;
-      cursor:text;
-      pointer-events:${editActive?'all':'none'};
-    `;
-    layer.appendChild(span);
-  });
-  container.appendChild(layer);
-}
 
 async function buildThumbs(){
   const panel=document.getElementById('pages-panel');
@@ -1010,7 +971,58 @@ async function buildThumbs(){
     panel.appendChild(wrap);
     const page=await pdfDoc.getPage(i);
     const vp=page.getViewport({scale:.2});
-    tc.width=vp.width;tc.height=vp.height;
+    tc.width=vp.width;tcasync function buildTextLayer(page, vp, container){
+  const textContent=await page.getTextContent();
+  const old=container.querySelector('.pdf-text-layer');
+  if(old)old.remove();
+  const layer=document.createElement('div');
+  layer.className='pdf-text-layer';
+  layer.style.cssText='position:absolute;inset:0;overflow:hidden;line-height:1;';
+  const editActive=(editorMode==='edit'&&currentTab==='edit');
+  layer.style.pointerEvents=editActive?'all':'none';
+
+  // Viewport scale = wie groß der Canvas im Vergleich zur echten PDF ist
+  const vpScale=vp.scale;
+  const {width:pdfW,height:pdfH}=page.getViewport({scale:1});
+
+  const {items,styles}=textContent;
+  items.forEach(item=>{
+    if(!item.str||!item.str.trim())return;
+    const tx=pdfjsLib.Util.transform(vp.transform,item.transform);
+    const style=styles[item.fontName]||{};
+    const span=document.createElement('span');
+    span.className='pdf-text-item';
+
+    // Canvas-Koordinaten für visuelle Positionierung
+    const angle=Math.atan2(tx[1],tx[0]);
+    const fontSize=Math.sqrt(tx[2]*tx[2]+tx[3]*tx[3]);
+
+    // ORIGINALE PDF-Koordinaten speichern (für pdf-lib)
+    // item.transform = [scaleX, skewY, skewX, scaleY, x, y] in PDF-Einheiten
+    span.dataset.originalText=item.str;
+    span.dataset.pdfX=item.transform[4];         // original X in PDF points
+    span.dataset.pdfY=item.transform[5];         // original Y in PDF points (von unten)
+    span.dataset.pdfFontSize=Math.abs(item.transform[3]); // original font size
+    span.dataset.pdfPageH=pdfH;
+
+    span.textContent=item.str;
+    span.style.cssText=`
+      position:absolute;
+      left:${tx[4]}px;
+      top:${tx[5]-fontSize}px;
+      font-size:${fontSize}px;
+      font-family:${style.fontFamily||'Arial'};
+      white-space:pre;
+      transform-origin:left bottom;
+      transform:rotate(${angle}rad) scaleX(${item.width/(item.str.length*fontSize*0.6)||1});
+      color:transparent;
+      cursor:text;
+      pointer-events:${editActive?'all':'none'};
+    `;
+    layer.appendChild(span);
+  });
+  container.appendChild(layer);
+}.height=vp.height;
     await page.render({canvasContext:tc.getContext('2d'),viewport:vp}).promise;
   }
 }
@@ -1707,63 +1719,65 @@ document.addEventListener('DOMContentLoaded',()=>{
 
     // Schließen: Text übernehmen → Span wieder zeigen
 async function closeEditor(){
-      const newText=ed.textContent;
-      const origText=span.dataset.originalText||'';
-      span.dataset.editedText=newText;
-      span.textContent=newText;
-      span.style.opacity='1';
-      span.style.transform='none';
-      span.style.whiteSpace='pre-wrap';
-      span.classList.remove('editing');
-      ed.remove();
+  const newText=ed.textContent.trim();
+  const origText=span.dataset.originalText||'';
+  span.dataset.editedText=newText;
+  span.textContent=newText;
+  span.style.opacity='1';
+  span.style.transform='none';
+  span.style.whiteSpace='pre-wrap';
+  span.classList.remove('editing');
+  ed.remove();
 
-      // Text in echtes PDF schreiben via pdf-lib
-      if(newText!==origText && pdfLibDoc){
-        try{
-          const page=pdfLibDoc.getPages()[currentPage-1];
-          const {width,height}=page.getSize();
-          // Position aus dem Span berechnen (overlay coords → PDF coords)
-          const ol=document.getElementById('overlay-layer');
-          const olW=ol.offsetWidth||width;
-          const olH=ol.offsetHeight||height;
-          const scaleX=width/olW;
-          const scaleY=height/olH;
-          const spanLeft=parseFloat(span.style.left)||0;
-          const spanTop=parseFloat(span.style.top)||0;
-          const fs=parseFloat(span.style.fontSize)||12;
-          const pdfX=spanLeft*scaleX;
-          // PDF koordinaten: Y von unten, nicht von oben
-          const pdfY=height-(spanTop*scaleY)-(fs*scaleY);
-          const fontSize=Math.max(6,fs*scaleX);
+  if(newText===origText||!pdfLibDoc)return;
 
-          // Alten Text mit weißem Rechteck überdecken
-          page.drawRectangle({
-            x:pdfX-2,
-            y:pdfY-2,
-            width:Math.max(origText.length*fontSize*0.65,newText.length*fontSize*0.65)+8,
-            height:fontSize+6,
-            color:PDFLib.rgb(1,1,1),
-          });
+  try{
+    const page=pdfLibDoc.getPages()[currentPage-1];
+    const {width,height}=page.getSize();
 
-          // Neuen Text draufschreiben
-          if(newText.trim()){
-            page.drawText(newText,{
-              x:pdfX,
-              y:pdfY,
-              size:fontSize,
-              color:PDFLib.rgb(0,0,0),
-            });
-          }
+    // Originale PDF-Koordinaten aus dataset lesen
+    const pdfX=parseFloat(span.dataset.pdfX)||0;
+    const pdfY=parseFloat(span.dataset.pdfY)||0;
+    const origFontSize=parseFloat(span.dataset.pdfFontSize)||12;
+    const fontSize=Math.max(4,origFontSize);
 
-          // pdfBytes aktualisieren (ohne re-render damit Overlays bleiben)
-          pdfBytes=await pdfLibDoc.save();
-          toast('✓','ok');
-        }catch(err){
-          console.error('PDF write error:',err);
-          toast('Text saved visually — PDF update failed','warn');
-        }
-      }
+    // Weißes Rechteck über alten Text (großzügig)
+    page.drawRectangle({
+      x: pdfX-1,
+      y: pdfY-2,
+      width: Math.max(origText.length,newText.length)*fontSize*0.65+12,
+      height: fontSize+6,
+      color: PDFLib.rgb(1,1,1),
+      opacity: 1,
+    });
+
+    // Neuen Text schreiben
+    if(newText){
+      // pdf-lib braucht ein eingebettetes Font oder Helvetica
+      page.drawText(newText,{
+        x: pdfX,
+        y: pdfY,
+        size: fontSize,
+        color: PDFLib.rgb(0,0,0),
+      });
     }
+
+    pdfBytes=await pdfLibDoc.save();
+
+    // Canvas neu rendern um Änderung zu zeigen (Overlays bleiben)
+    const userOverlays=Array.from(document.getElementById('overlay-layer').querySelectorAll('.pdf-overlay'));
+    pdfDoc=await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
+    await renderPage(currentPage);
+    // User-Overlays wiederherstellen
+    const ol=document.getElementById('overlay-layer');
+    userOverlays.forEach(el=>ol.appendChild(el));
+
+    toast('✓ Text updated','ok');
+  }catch(err){
+    console.error('PDF write error:',err);
+    toast('Error writing to PDF: '+err.message,'err');
+  }
+}
     ed.addEventListener('blur',()=>closeEditor());
     ed.addEventListener('keydown',function(e){
       if(e.key==='Escape'){
