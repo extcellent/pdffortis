@@ -376,6 +376,15 @@ input,select,textarea{font-family:var(--font)}
   cursor:text;
   border-radius:3px;
 }
+/* Das sorgt dafür, dass der Text beim Klicken nicht "springt" */
+.text-element {
+  outline: none;
+  cursor: pointer;
+}
+.text-element:focus {
+  outline: none;
+  background-color: #ffffff; /* Weißer Hintergrund beim Tippen */
+}
 /* Buttons */
 .btn{padding:9px 18px;border-radius:7px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all .15s}
 .btn-primary{background:var(--gray-900);color:white}.btn-primary:hover{background:var(--gray-700)}
@@ -1766,80 +1775,68 @@ async function openInlineEditor(span) {
 // 3. TEXT-EDITOR SCHLIESSEN & INS PDF SPEICHERN
 // ═══════════════════════════════════════════════════════════════════
 async function closeInlineEditor(save = true) {
-  // Absicherung gegen Doppel-Aufruf
-  if (!window.activeInlineSpan || !window.activeInlineInput) return;
+  // 1. Absicherung: Prüfen, ob überhaupt ein Element aktiv ist
+  if (!window.activeInlineSpan) return;
 
-  // Referenzen sichern und globale Variablen SOFORT leeren
   const span = window.activeInlineSpan;
-  const ed = window.activeInlineInput;
   window.activeInlineSpan = null;
-  window.activeInlineInput = null;
 
-  const newText = ed.value.trim();
-  const origText = span.dataset.originalText || span.textContent || '';
-
-  // UI aufräumen
+  // 2. UI-Cleanup: Rahmen und Editier-Modus entfernen
+  span.contentEditable = "false";
   span.style.background = '';
   span.style.outline = '';
-  if (ed.parentNode) {
-    ed.parentNode.removeChild(ed);
+  span.style.cursor = 'pointer';
+
+  // Wenn nicht gespeichert werden soll (Escape), Text zurücksetzen
+  if (!save) {
+    span.textContent = span.dataset.originalText || '';
+    return;
   }
 
-  if (!save) return;
+  const newText = span.textContent.trim();
+  const origText = span.dataset.originalText || '';
 
-  // Live-Text im Browser sofort ändern (Ruckelfreies Word-Feeling)
-  span.textContent = newText;
-  span.dataset.editedText = newText;
-
-  // Wenn der Text gleich geblieben ist oder kein PDF geladen ist, abbrechen
+  // Wenn keine Änderung oder kein PDF da ist -> Abbruch
   if (newText === origText || !pdfLibDoc) return;
 
+  // 3. PDF-Bearbeitung
   try {
     const pageIndex = parseInt(span.dataset.pageNumber || currentPage, 10) - 1;
     const page = pdfLibDoc.getPages()[pageIndex];
     const pdfX = parseFloat(span.dataset.pdfX) || 0;
     const pdfY = parseFloat(span.dataset.pdfY) || 0;
-    const origFontSize = parseFloat(span.dataset.pdfFontSize) || 12;
-    const fontSize = Math.max(4, origFontSize);
+    const fontSize = parseFloat(span.dataset.pdfFontSize) || 12;
 
-    // 1. Alten Text im PDF mit weißem Rechteck überdecken
+    // Wir überdecken den alten Text mit einem weißen Rechteck
+    // Das ist der sicherste Weg, der das PDF nicht zerschießt.
     page.drawRectangle({
       x: pdfX - 1,
       y: pdfY - 2,
-      width: Math.max(origText.length, newText.length) * fontSize * 0.65 + 15,
-      height: fontSize + 6,
+      width: (origText.length * fontSize * 0.7) + 10,
+      height: fontSize + 4,
       color: PDFLib.rgb(1, 1, 1),
       opacity: 1
     });
 
-    // 2. Neuen Text an exakt dieselbe Stelle schreiben
-    if (newText) {
-      page.drawText(newText, {
-        x: pdfX,
-        y: pdfY,
-        size: fontSize,
-        color: PDFLib.rgb(0, 0, 0)
-      });
-    }
+    // Neuen Text an die gleiche Stelle schreiben
+    page.drawText(newText, {
+      x: pdfX,
+      y: pdfY,
+      size: fontSize,
+      color: PDFLib.rgb(0, 0, 0)
+    });
 
-    // 3. Neue PDF-Bytes generieren
+    // 4. PDF speichern und Viewer aktualisieren
     const freshBytes = await pdfLibDoc.save();
-    pdfBytes = freshBytes; // Globale Variable aktualisieren (wichtig für Download/Supabase!)
-
-    // 4. WICHTIG: Erst das pdf-lib Dokument neu laden, solange die Bytes unberührt sind
     pdfLibDoc = await PDFLib.PDFDocument.load(freshBytes);
-
-    // 5. WICHTIG: .slice(0) übergibt eine KOPIE an pdf.js, damit die Originaldaten nicht gelöscht werden!
+    
+    // Viewer neu laden
     const loadingTask = pdfjsLib.getDocument({ data: freshBytes.slice(0) });
     pdfDoc = await loadingTask.promise;
-
-    // 6. Seite im Viewer aktualisieren
-    if (typeof renderPage === 'function') {
-      await renderPage(currentPage);
-    }
+    await renderPage(currentPage);
 
   } catch (e) {
-    console.error("Fehler beim Speichern im PDF-Hintergrund:", e);
+    console.error("Fehler beim Editieren:", e);
   }
 }
    
