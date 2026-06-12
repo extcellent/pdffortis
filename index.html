@@ -1707,59 +1707,54 @@ window.activeInlineInput = window.activeInlineInput || null;
 // 2. TEXT-EDITOR ÖFFNEN
 // ═══════════════════════════════════════════════════════════════════
 async function openInlineEditor(span) {
-  // Falls schon ein Editor offen ist, erst speichern und schließen
   if (window.activeInlineSpan) {
+    if (window.activeInlineSpan === span) return;
     await closeInlineEditor(true);
   }
 
   window.activeInlineSpan = span;
 
-  // Position des angeklickten Texts ermitteln
-  const rect = span.getBoundingClientRect();
-  const viewerContainer = document.getElementById('viewerContainer') || document.body;
-  const containerRect = viewerContainer.getBoundingClientRect();
+  // Originalzustand sichern
+  span.dataset.origBg = span.style.background || '';
+  span.dataset.origOutline = span.style.outline || '';
+  if (!span.dataset.originalText) {
+    span.dataset.originalText = span.textContent;
+  }
 
-  // Input-Feld dynamisch erzeugen
-  const ed = document.createElement('input');
-  window.activeInlineInput = ed;
-
-  ed.type = 'text';
-  ed.value = span.textContent.trim();
+  // ── DAS ULTIMATIVE WORD-FEELING ──
+  span.contentEditable = "plaintext-only"; // Erlaubt nur reinen Text, keine HTML-Formatierungen
   
-  // Styling exakt über den Originaltext legen
-  ed.style.position = 'absolute';
-  ed.style.left = (rect.left - containerRect.left + viewerContainer.scrollLeft) + 'px';
-  ed.style.top = (rect.top - containerRect.top + viewerContainer.scrollTop) + 'px';
-  ed.style.width = Math.max(90, rect.width + 20) + 'px';
-  ed.style.height = (rect.height + 4) + 'px';
-  ed.style.fontSize = window.getComputedStyle(span).fontSize;
-  ed.style.fontFamily = window.getComputedStyle(span).fontFamily;
-  ed.style.fontWeight = window.getComputedStyle(span).fontWeight;
-  ed.style.zIndex = '10000';
-  ed.style.boxSizing = 'border-box';
-  ed.style.outline = '2px solid #4f46e5'; // Schöner violetter Pro-Rahmen
-  ed.style.border = 'none';
-  ed.style.background = '#ffffff';
-  ed.style.borderRadius = '2px';
+  // Wir machen den Hintergrund exakt passend zur Seite (hier Standard-Weiß, 
+  // später können wir das automatisieren, falls dein PDF z.B. gelb ist)
+  span.style.background = "#ffffff"; 
+  
+  // KEIN RAHMEN, KEINE BOX! Es sieht aus wie ganz normaler Text.
+  span.style.outline = "none";
+  span.style.border = "none";
+  span.style.cursor = "text";
+  span.style.zIndex = "10000";
 
-  viewerContainer.appendChild(ed);
-  ed.focus();
-  ed.select();
+  span.focus();
 
-  // EVENT LISTENERS FÜR AUTOMATISCHES SCHLIESSEN & SPEICHERN
-  ed.addEventListener('blur', () => {
-    closeInlineEditor(true);
-  });
+  // Cursor elegant ans Ende setzen
+  const range = document.createRange();
+  range.selectNodeContents(span);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
 
-  ed.addEventListener('keydown', (e) => {
+  span.onblur = () => closeInlineEditor(true);
+  span.onkeydown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      closeInlineEditor(true);
+      span.blur(); 
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      closeInlineEditor(false);
+      span.textContent = span.dataset.originalText; 
+      closeInlineEditor(false); 
     }
-  });
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════
