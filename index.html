@@ -1728,80 +1728,62 @@ document.addEventListener('DOMContentLoaded',()=>{
     },20);
 
     // Schließen: Text übernehmen → Span wieder zeigen
-async function closeEditor(){
+// Schließen: Text übernehmen → Span wieder zeigen
+    async function closeEditor(){
+      if(!ed.parentNode) return; // guard: bereits geschlossen
+      const newText = ed.textContent.trim();
+      const origText = span.dataset.originalText || '';
 
-  const newText = ed.textContent.trim();
-  const origText = span.dataset.originalText || '';
+      span.dataset.editedText = newText;
+      span.textContent = newText;
+      span.style.opacity = '1';
+      span.style.transform = 'none';
+      span.style.whiteSpace = 'pre-wrap';
+      span.classList.remove('editing');
+      ed.remove();
 
-  span.dataset.editedText = newText;
-  span.textContent = newText;
+      if(newText === origText || !pdfLibDoc) return;
 
-  span.style.opacity = '1';
-  span.style.transform = 'none';
-  span.style.whiteSpace = 'pre-wrap';
-  span.classList.remove('editing');
+      try{
+        const pageIndex = parseInt(span.dataset.pageNumber || currentPage, 10) - 1;
+        const page = pdfLibDoc.getPages()[pageIndex];
+        const pdfX = parseFloat(span.dataset.pdfX) || 0;
+        const pdfY = parseFloat(span.dataset.pdfY) || 0;
+        const origFontSize = parseFloat(span.dataset.pdfFontSize) || 12;
+        const fontSize = Math.max(4, origFontSize);
 
-  ed.remove();
+        page.drawRectangle({
+          x: pdfX - 1,
+          y: pdfY - 2,
+          width: Math.max(origText.length, newText.length) * fontSize * 0.65 + 12,
+          height: fontSize + 6,
+          color: PDFLib.rgb(1,1,1),
+          opacity: 1
+        });
 
-  if(newText === origText || !pdfLibDoc){
-    return;
-  }
+        if(newText){
+          page.drawText(newText,{
+            x: pdfX,
+            y: pdfY,
+            size: fontSize,
+            color: PDFLib.rgb(0,0,0)
+          });
+        }
 
-  try{
-
-    const pageIndex =
-      parseInt(span.dataset.pageNumber || currentPage,10) - 1;
-
-    const page = pdfLibDoc.getPages()[pageIndex];
-
-    const pdfX = parseFloat(span.dataset.pdfX) || 0;
-    const pdfY = parseFloat(span.dataset.pdfY) || 0;
-
-    const origFontSize =
-      parseFloat(span.dataset.pdfFontSize) || 12;
-
-    const fontSize = Math.max(4, origFontSize);
-
-    page.drawRectangle({
-      x: pdfX - 1,
-      y: pdfY - 2,
-      width:
-        Math.max(
-          origText.length,
-          newText.length
-        ) * fontSize * 0.65 + 12,
-      height: fontSize + 6,
-      color: PDFLib.rgb(1,1,1),
-      opacity: 1
-    });
-
-    if(newText){
-
-      page.drawText(newText,{
-        x: pdfX,
-        y: pdfY,
-        size: fontSize,
-        color: PDFLib.rgb(0,0,0)
-      });
-
+        pdfBytes = await pdfLibDoc.save();
+        toast('✓ Text updated','ok');
+      } catch(err){
+        console.error(err);
+        toast('Error writing to PDF: ' + err.message, 'err');
+      }
     }
 
-    pdfBytes = await pdfLibDoc.save();
-
-    toast('✓ Text updated','ok');
-
-  }catch(err){
-
-    console.error(err);
-
-    toast(
-      'Error writing to PDF: ' + err.message,
-      'err'
-    );
-
-  }
-
-}
+    // Editor schließen bei Blur oder Enter/Escape
+    ed.addEventListener('blur', () => setTimeout(closeEditor, 80));
+    ed.addEventListener('keydown', e => {
+      if(e.key === 'Escape'){ e.preventDefault(); closeEditor(); }
+      if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); closeEditor(); }
+    });
 
   // ── modeChange: Text-Layer pointer-events ──
   document.addEventListener('modeChange',function(e){
