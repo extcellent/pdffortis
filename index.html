@@ -957,22 +957,19 @@ async function renderPage(n){
 
 async function buildTextLayer(page, vp, container){
   const textContent=await page.getTextContent();
-  // Alten text layer entfernen
   const old=container.querySelector('.pdf-text-layer');
   if(old)old.remove();
   const layer=document.createElement('div');
   layer.className='pdf-text-layer';
-  layer.style.cssText=`
-    position:absolute;inset:0;
-    pointer-events:none;
-    overflow:hidden;
-    line-height:1;
-    user-select:none;
-  `;
+  layer.style.cssText='position:absolute;inset:0;overflow:hidden;line-height:1;';
+  // Direkt beim Aufbau prüfen ob Edit-Tab aktiv
+  const editActive=(editorMode==='edit'&&currentTab==='edit');
+  layer.style.pointerEvents=editActive?'all':'none';
+
   const {items,styles}=textContent;
   items.forEach(item=>{
     if(!item.str||!item.str.trim())return;
-    const tx=pdfjsLib.Util.transform(vp.transform, item.transform);
+    const tx=pdfjsLib.Util.transform(vp.transform,item.transform);
     const style=styles[item.fontName]||{};
     const span=document.createElement('span');
     span.className='pdf-text-item';
@@ -991,6 +988,7 @@ async function buildTextLayer(page, vp, container){
       transform:rotate(${angle}rad) scaleX(${item.width/(item.str.length*fontSize*0.6)||1});
       color:transparent;
       cursor:text;
+      pointer-events:${editActive?'all':'none'};
     `;
     layer.appendChild(span);
   });
@@ -1030,25 +1028,41 @@ function setMode(m){
   ca.className='canvas-area '+(m==='look'?'look-mode':'edit-mode');
   const ol=document.getElementById('overlay-layer');
   ol.style.pointerEvents=m==='edit'?'all':'none';
-  // Text layer klickbar machen
-  document.dispatchEvent(new CustomEvent('modeChange',{detail:m}));
+  // Text-layer direkt updaten ohne Event
+  const editActive=(m==='edit'&&currentTab==='edit');
+  const layer=document.querySelector('.pdf-text-layer');
+  if(layer){
+    layer.style.pointerEvents=editActive?'all':'none';
+    layer.querySelectorAll('.pdf-text-item').forEach(s=>{
+      if(!s.classList.contains('editing')){
+        s.style.pointerEvents=editActive?'all':'none';
+      }
+    });
+  }
 }
 
 // ═══════════════════════════════════════
 // RIBBON TABS
 // ═══════════════════════════════════════
 function switchRTab(tab){
-  // Bei Navigate-Tab: Edit-Mode ausschalten
   if(tab==='nav'){setMode('look')}
   currentTab=tab;
   document.querySelectorAll('.rtab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
   document.querySelectorAll('.ribbon-panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+tab));
   if(tab==='sign'&&!currentUser&&!currentToken){showSignLock();return}
-  // Text-layer nur bei 'edit' tab klickbar, bei 'add' tab NICHT
+  // Text-layer und Spans sofort auf korrekten State setzen
+  const editActive=(tab==='edit'&&editorMode==='edit');
   const layer=document.querySelector('.pdf-text-layer');
   if(layer){
-    layer.style.pointerEvents=(tab==='edit'&&editorMode==='edit')?'all':'none';
+    layer.style.pointerEvents=editActive?'all':'none';
+    layer.querySelectorAll('.pdf-text-item').forEach(s=>{
+      if(!s.classList.contains('editing')){
+        s.style.pointerEvents=editActive?'all':'none';
+      }
+    });
   }
+  // Edit-Mode automatisch aktivieren wenn Edit-Tab gewählt
+  if(tab==='edit'&&editorMode!=='edit'){setMode('edit')}
 }
 
 // ═══════════════════════════════════════
