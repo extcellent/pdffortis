@@ -867,6 +867,7 @@ const SB_H = {'Content-Type':'application/json','apikey':SB_KEY,'Authorization':
 // STATE
 // ═══════════════════════════════════════
 let pdfDoc=null, pdfLibDoc=null, pdfBytes=null;
+const API = 'https://pdffortis-api.onrender.com';
 let currentPage=1, totalPages=0, fileName='';
 let editorMode='look', currentTab='edit', compressQ='medium';
 let sigDrawing=false, sigLX=0, sigLY=0;
@@ -944,11 +945,16 @@ async function loadPDF(file){
   document.getElementById('editor-filename').textContent=fileName;
   const buf=await file.arrayBuffer();
   pdfBytes=new Uint8Array(buf);
-  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  pdfDoc=await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
-  totalPages=pdfDoc.numPages;
-  currentPage=1;
+  // Seitenanzahl via Backend holen
+  const form=new FormData();
+  form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
+  form.append('page',0);
+  const res=await fetch(`${API}/extract`,{method:'POST',body:form});
+  const data=await res.json();
+  // Seitenanzahl: pdf-lib nur für totalPages
   pdfLibDoc=await PDFLib.PDFDocument.load(pdfBytes);
+  totalPages=pdfLibDoc.getPageCount();
+  currentPage=1;
   const kb=Math.round(pdfBytes.length/1024);
   document.getElementById('file-size-txt').textContent=kb>1024?`${(kb/1024).toFixed(1)} MB`:`${kb} KB`;
   await buildThumbs();
@@ -958,81 +964,87 @@ async function loadPDF(file){
 }
 
 async function renderPage(n){
-  if(!pdfDoc)return;
-  const page=await pdfDoc.getPage(n);
-  const vw=document.getElementById('canvas-area').clientWidth-48;
-  const scale=Math.min(1.6,vw/page.getViewport({scale:1}).width);
-  const vp=page.getViewport({scale});
+  if(!pdfBytes)return;
   const canvas=document.getElementById('pdf-canvas');
-  const ctx=canvas.getContext('2d');
-  canvas.width=vp.width;canvas.height=vp.height;
   const ol=document.getElementById('overlay-layer');
-  ol.style.width=vp.width+'px';ol.style.height=vp.height+'px';
-  // Behalte bestehende User-Overlays (Textboxen, Signaturen)
   const userEls=Array.from(ol.querySelectorAll('.pdf-overlay'));
-  ol.innerHTML='';
-  userEls.forEach(el=>ol.appendChild(el));
-  // PDF rendern
-  await page.render({canvasContext:ctx,viewport:vp}).promise;
-  // Text-Layer aufbauen
-  await buildTextLayer(page, vp, ol);
+
+  const form=new FormData();
+  form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
+  form.append('page',n-1);
+  const res=await fetch(`${API}/render`,{method:'POST',body:form});
+  const png=await res.blob();
+  const url=URL.createObjectURL(png);
+
+  const img=new Image();
+  img.onload=()=>{
+    const vw=document.getElementById('canvas-area').clientWidth-48;
+    const scale=Math.min(1,vw/img.width);
+    canvas.width=img.width*scale;
+    canvas.height=img.height*scale;
+    ol.style.width=canvas.width+'px';
+    ol.style.height=canvas.height+'px';
+    ol.innerHTML='';
+    userEls.forEach(el=>ol.appendChild(el));
+    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+    URL.revokeObjectURL(url);
+    loadTextItems(n,img.width,canvas.width);
+  };
+  img.src=url;
+
   document.getElementById('page-info-txt').textContent=`${n} / ${totalPages}`;
   document.querySelectorAll('.thumb-item').forEach((t,i)=>t.classList.toggle('active',i===n-1));
 }
 
-async function buildTextLayer(page, vp, container){
-  const textContent=await page.getTextContent();
-  const old=container.querySelector('.pdf-text-layer');
-  if(old)old.remove();
+async function loadTextItems(pageNum, imgWidth, canvasWidth){
+  const ol=document.getElementById('overlay-layer');
+  ol.querySelector('.pdf-text-layer')?.remove();
+
+  const form=new FormData();
+  form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
+  form.append('page',pageNum-1);
+  const res=await fetch(`${API}/extract`,{method:'POST',body:form});
+  const {items}=await res.json();
+
+  const scale=canvasWidth/imgWidth;
+  const editActive=(editorMode==='edit'&&currentTab==='edit');
+
   const layer=document.createElement('div');
   layer.className='pdf-text-layer';
   layer.style.cssText='position:absolute;inset:0;overflow:hidden;pointer-events:none;';
-  const editActive=(editorMode==='edit'&&currentTab==='edit');
 
-  // PDF-Koordinaten-Konversion: screen→PDF
-  const pageHeight=page.getViewport({scale:1}).height;
-  const scale=vp.scale;
-
-  const {items,styles}=textContent;
   items.forEach(item=>{
-    if(!item.str||!item.str.trim())return;
-    const tx=pdfjsLib.Util.transform(vp.transform,item.transform);
-    const style=styles[item.fontName]||{};
-    const angle=Math.atan2(tx[1],tx[0]);
-    const fontSize=Math.sqrt(tx[2]*tx[2]+tx[3]*tx[3]);
-
     const span=document.createElement('span');
     span.className='pdf-text-item';
-    span.dataset.originalText=item.str;
-    span.dataset.editedText=item.str;
-    span.dataset.pageNumber=currentPage;
-    // PDF-Koordinaten für Zurückschreiben
-    span.dataset.pdfX=String(item.transform[4]);
-    span.dataset.pdfY=String(item.transform[5]);
-    span.dataset.pdfFontSize=String(Math.sqrt(item.transform[2]*item.transform[2]+item.transform[3]*item.transform[3]));
-    span.dataset.fontFamily=style.fontFamily||'Arial';
-    span.textContent=item.str;
-
-    // Span dient nur als Hit-Target (transparent, präzise positioniert)
+    span.textContent=item.text;
+    span.dataset.originalText=item.text;
+    span.dataset.editedText=item.text;
+    span.dataset.pageNumber=pageNum;
+    span.dataset.pdfX=item.x;
+    span.dataset.pdfY=item.y;
+    span.dataset.pdfX1=item.x1;
+    span.dataset.pdfY1=item.y1;
+    span.dataset.pdfFontSize=item.size;
+    const w=(item.x1-item.x)*scale;
+    const h=(item.y1-item.y)*scale;
     span.style.cssText=`
       position:absolute;
-      left:${tx[4]}px;
-      top:${tx[5]-fontSize}px;
-      font-size:${fontSize}px;
-      font-family:${style.fontFamily||'Arial'};
-      white-space:pre;
-      transform-origin:left bottom;
-      transform:rotate(${angle}rad) scaleX(${item.width/(item.str.length*fontSize*0.6)||1});
+      left:${item.x*scale}px;
+      top:${item.y*scale}px;
+      width:${w}px;
+      height:${h}px;
+      font-size:${item.size*scale}px;
       color:transparent;
+      white-space:pre;
       cursor:text;
       pointer-events:${editActive?'all':'none'};
     `;
     layer.appendChild(span);
   });
-  layer.style.pointerEvents=editActive?'all':'none';
-  container.appendChild(layer);
-}
 
+  layer.style.pointerEvents=editActive?'all':'none';
+  ol.appendChild(layer);
+}
 async function buildThumbs(){
   const panel=document.getElementById('pages-panel');
   panel.innerHTML='';
@@ -1046,10 +1058,20 @@ async function buildThumbs(){
     num.className='thumb-num';num.textContent=i;
     wrap.appendChild(num);
     panel.appendChild(wrap);
-    const page=await pdfDoc.getPage(i);
-    const vp=page.getViewport({scale:.2});
-    tc.width=vp.width;tc.height=vp.height;
-    await page.render({canvasContext:tc.getContext('2d'),viewport:vp}).promise;
+
+    const form=new FormData();
+    form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
+    form.append('page',i-1);
+    const res=await fetch(`${API}/render`,{method:'POST',body:form});
+    const png=await res.blob();
+    const url=URL.createObjectURL(png);
+    const img=new Image();
+    img.onload=()=>{
+      tc.width=80;tc.height=80*(img.height/img.width);
+      tc.getContext('2d').drawImage(img,0,0,tc.width,tc.height);
+      URL.revokeObjectURL(url);
+    };
+    img.src=url;
   }
 }
 
@@ -1706,140 +1728,87 @@ window.activeInlineInput = window.activeInlineInput || null;
 // ═══════════════════════════════════════════════════════════════════
 // 2. TEXT-EDITOR ÖFFNEN
 // ═══════════════════════════════════════════════════════════════════
-async function openInlineEditor(span) {
-  // Falls schon ein Editor offen ist, erst speichern und schließen
-  if (window.activeInlineSpan) {
+async function openInlineEditor(span){
+  if(window.activeInlineSpan){
     await closeInlineEditor(true);
   }
 
-  window.activeInlineSpan = span;
+  window.activeInlineSpan=span;
 
-  // Position des angeklickten Texts ermitteln
-  const rect = span.getBoundingClientRect();
-  const viewerContainer = document.getElementById('viewerContainer') || document.body;
-  const containerRect = viewerContainer.getBoundingClientRect();
+  if(!span.dataset.originalText){
+    span.dataset.originalText=span.textContent;
+  }
 
-  // Input-Feld dynamisch erzeugen
-  const ed = document.createElement('input');
-  window.activeInlineInput = ed;
+  // Span sichtbar + editierbar machen
+  span.style.color='black';
+  span.style.background='rgba(255,255,255,0.85)';
+  span.style.outline='none';
+  span.style.caretColor='#4f46e5';
+  span.classList.add('editing');
+  span.contentEditable='true';
+  span.spellcheck=false;
 
-  ed.type = 'text';
-  ed.value = span.textContent.trim();
-  
-  // Styling exakt über den Originaltext legen
-  ed.style.position = 'absolute';
-  ed.style.left = (rect.left - containerRect.left + viewerContainer.scrollLeft) + 'px';
-  ed.style.top = (rect.top - containerRect.top + viewerContainer.scrollTop) + 'px';
-  ed.style.width = Math.max(90, rect.width + 20) + 'px';
-  ed.style.height = (rect.height + 4) + 'px';
-  ed.style.fontSize = window.getComputedStyle(span).fontSize;
-  ed.style.fontFamily = window.getComputedStyle(span).fontFamily;
-  ed.style.fontWeight = window.getComputedStyle(span).fontWeight;
-  ed.style.zIndex = '10000';
-  ed.style.boxSizing = 'border-box';
-  ed.style.outline = '2px solid #4f46e5'; // Schöner violetter Pro-Rahmen
-  ed.style.border = 'none';
-  ed.style.background = '#ffffff';
-  ed.style.borderRadius = '2px';
+  // Cursor ans Ende
+  span.focus();
+  const range=document.createRange();
+  range.selectNodeContents(span);
+  range.collapse(false);
+  const sel=window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
 
-  viewerContainer.appendChild(ed);
-  ed.focus();
-  ed.select();
-
-  // EVENT LISTENERS FÜR AUTOMATISCHES SCHLIESSEN & SPEICHERN
-  ed.addEventListener('blur', () => {
-    closeInlineEditor(true);
-  });
-
-  ed.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      closeInlineEditor(true);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      closeInlineEditor(false);
-    }
-  });
+  span.addEventListener('keydown',_inlineKeyHandler);
 }
 
+function _inlineKeyHandler(e){
+  if(e.key==='Enter'){
+    e.preventDefault();
+    closeInlineEditor(true);
+  }else if(e.key==='Escape'){
+    e.preventDefault();
+    closeInlineEditor(false);
+  }
+}
 // ═══════════════════════════════════════════════════════════════════
 // 3. TEXT-EDITOR SCHLIESSEN & INS PDF SPEICHERN
 // ═══════════════════════════════════════════════════════════════════
-async function closeInlineEditor(save = true) {
-  // Absicherung gegen Doppel-Aufruf
-  if (!window.activeInlineSpan || !window.activeInlineInput) return;
+async function closeInlineEditor(save=true){
+  if(!window.activeInlineSpan)return;
+  const span=window.activeInlineSpan;
+  window.activeInlineSpan=null;
+  span.removeEventListener('keydown',_inlineKeyHandler);
+  const newText=span.textContent.trim();
+  const origText=span.dataset.originalText||'';
+  span.contentEditable='false';
+  span.classList.remove('editing');
+  span.style.color='transparent';
 
-  // Referenzen sichern und globale Variablen SOFORT leeren
-  const span = window.activeInlineSpan;
-  const ed = window.activeInlineInput;
-  window.activeInlineSpan = null;
-  window.activeInlineInput = null;
+  if(!save){span.textContent=origText;return;}
 
-  const newText = ed.value.trim();
-  const origText = span.dataset.originalText || span.textContent || '';
+  span.dataset.editedText=newText;
+  if(newText===origText||!pdfBytes)return;
 
-  // UI aufräumen
-  span.style.background = '';
-  span.style.outline = '';
-  if (ed.parentNode) {
-    ed.parentNode.removeChild(ed);
-  }
+  try{
+    const form=new FormData();
+    form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
+    form.append('page',parseInt(span.dataset.pageNumber||currentPage,10)-1);
+    form.append('x',span.dataset.pdfX);
+    form.append('y',span.dataset.pdfY);
+    form.append('x1',span.dataset.pdfX1);
+    form.append('y1',span.dataset.pdfY1);
+    form.append('old_text',origText);
+    form.append('new_text',newText);
+    form.append('font_size',span.dataset.pdfFontSize||12);
 
-  if (!save) return;
+    const res=await fetch(`${API}/edit`,{method:'POST',body:form});
+    const buf=await res.arrayBuffer();
+    pdfBytes=new Uint8Array(buf);
+    pdfLibDoc=await PDFLib.PDFDocument.load(pdfBytes);
 
-  // Live-Text im Browser sofort ändern (Ruckelfreies Word-Feeling)
-  span.textContent = newText;
-  span.dataset.editedText = newText;
-
-  // Wenn der Text gleich geblieben ist oder kein PDF geladen ist, abbrechen
-  if (newText === origText || !pdfLibDoc) return;
-
-  try {
-    const pageIndex = parseInt(span.dataset.pageNumber || currentPage, 10) - 1;
-    const page = pdfLibDoc.getPages()[pageIndex];
-    const pdfX = parseFloat(span.dataset.pdfX) || 0;
-    const pdfY = parseFloat(span.dataset.pdfY) || 0;
-    const origFontSize = parseFloat(span.dataset.pdfFontSize) || 12;
-    const fontSize = Math.max(4, origFontSize);
-
-    // 1. Alten Text im PDF mit weißem Rechteck überdecken
-    page.drawRectangle({
-      x: pdfX - 1,
-      y: pdfY - 2,
-      width: Math.max(origText.length, newText.length) * fontSize * 0.65 + 15,
-      height: fontSize + 6,
-      color: PDFLib.rgb(1, 1, 1),
-      opacity: 1
-    });
-
-    // 2. Neuen Text an exakt dieselbe Stelle schreiben
-    if (newText) {
-      page.drawText(newText, {
-        x: pdfX,
-        y: pdfY,
-        size: fontSize,
-        color: PDFLib.rgb(0, 0, 0)
-      });
-    }
-
-    // 3. Neue PDF-Bytes generieren
-    const freshBytes = await pdfLibDoc.save();
-    pdfBytes = freshBytes; // Globale Variable aktualisieren (wichtig für Download/Supabase!)
-
-    // 4. WICHTIG: Erst das pdf-lib Dokument neu laden, solange die Bytes unberührt sind
-    pdfLibDoc = await PDFLib.PDFDocument.load(freshBytes);
-
-    // 5. WICHTIG: .slice(0) übergibt eine KOPIE an pdf.js, damit die Originaldaten nicht gelöscht werden!
-    const loadingTask = pdfjsLib.getDocument({ data: freshBytes.slice(0) });
-    pdfDoc = await loadingTask.promise;
-
-    // 6. Seite im Viewer aktualisieren
-    if (typeof renderPage === 'function') {
-      await renderPage(currentPage);
-    }
-
-  } catch (e) {
-    console.error("Fehler beim Speichern im PDF-Hintergrund:", e);
+    await renderPage(currentPage);
+  }catch(e){
+    console.error('Edit fehlgeschlagen:',e);
+    toast('Fehler beim Speichern','err');
   }
 }
    
