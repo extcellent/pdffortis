@@ -1699,100 +1699,102 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 });
 
-let _activeEditorSpan=null;
-let _activeEditorEl=null;
+// 1. SICHERSTELLEN, DASS DIE VARIABLEN GLOBAL EXISTIEREN
+window.activeInlineSpan = window.activeInlineSpan || null;
+window.activeInlineInput = window.activeInlineInput || null;
 
-function openInlineEditor(span){
-  // Vorherigen Editor sauber schließen
-  closeInlineEditor(false);
+// ═══════════════════════════════════════════════════════════════════
+// 2. TEXT-EDITOR ÖFFNEN
+// ═══════════════════════════════════════════════════════════════════
+async function openInlineEditor(span) {
+  // Falls schon ein Editor offen ist, erst speichern und schließen
+  if (window.activeInlineSpan) {
+    await closeInlineEditor(true);
+  }
 
-  const ol=document.getElementById('overlay-layer');
-  const olRect=ol.getBoundingClientRect();
-  const spRect=span.getBoundingClientRect();
+  window.activeInlineSpan = span;
 
-  const left=spRect.left-olRect.left-4;
-  const top=spRect.top-olRect.top-4;
-  const fs=parseFloat(span.style.fontSize)||14;
-  const w=Math.max(spRect.width+32, 80);
+  // Position des angeklickten Texts ermitteln
+  const rect = span.getBoundingClientRect();
+  const viewerContainer = document.getElementById('viewerContainer') || document.body;
+  const containerRect = viewerContainer.getBoundingClientRect();
 
-  // Floating Editor erstellen
-  const ed=document.createElement('div');
-  ed.id='pdf-inline-editor';
-  ed.contentEditable='true';
-  ed.setAttribute('spellcheck','false');
-  ed.style.cssText=`
-    left:${left}px;
-    top:${top}px;
-    min-width:${w}px;
-    font-size:${fs}px;
-    font-family:${span.dataset.fontFamily||span.style.fontFamily||'Arial'};
-    line-height:${fs*1.3}px;
-  `;
-  ed.textContent=span.dataset.editedText||span.dataset.originalText||span.textContent;
+  // Input-Feld dynamisch erzeugen
+  const ed = document.createElement('input');
+  window.activeInlineInput = ed;
 
-  ol.appendChild(ed);
-  _activeEditorSpan=span;
-  _activeEditorEl=ed;
+  ed.type = 'text';
+  ed.value = span.textContent.trim();
+  
+  // Styling exakt über den Originaltext legen
+  ed.style.position = 'absolute';
+  ed.style.left = (rect.left - containerRect.left + viewerContainer.scrollLeft) + 'px';
+  ed.style.top = (rect.top - containerRect.top + viewerContainer.scrollTop) + 'px';
+  ed.style.width = Math.max(90, rect.width + 20) + 'px';
+  ed.style.height = (rect.height + 4) + 'px';
+  ed.style.fontSize = window.getComputedStyle(span).fontSize;
+  ed.style.fontFamily = window.getComputedStyle(span).fontFamily;
+  ed.style.fontWeight = window.getComputedStyle(span).fontWeight;
+  ed.style.zIndex = '10000';
+  ed.style.boxSizing = 'border-box';
+  ed.style.outline = '2px solid #4f46e5'; // Schöner violetter Pro-Rahmen
+  ed.style.border = 'none';
+  ed.style.background = '#ffffff';
+  ed.style.borderRadius = '2px';
 
-  // Span markieren (leichte Highlight-Box)
-  span.style.background='rgba(99,102,241,0.10)';
-  span.style.outline='1.5px solid rgba(99,102,241,0.4)';
+  viewerContainer.appendChild(ed);
+  ed.focus();
+  ed.select();
 
-  // Cursor ans Ende
-  requestAnimationFrame(()=>{
-    ed.focus();
-    const range=document.createRange();
-    range.selectNodeContents(ed);
-    range.collapse(false);
-    const sel=window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
+  // EVENT LISTENERS FÜR AUTOMATISCHES SCHLIESSEN & SPEICHERN
+  ed.addEventListener('blur', () => {
+    closeInlineEditor(true);
   });
 
-  // Escape → Abbrechen, Enter → Speichern
-  ed.addEventListener('keydown',function(e){
-    if(e.key==='Escape'){e.preventDefault();closeInlineEditor(false);}
-    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();closeInlineEditor(true);}
-  });
-
-  // Blur → Speichern (mit kurzem Delay damit click-Events zuerst feuern)
-  ed.addEventListener('blur',function(){
-    setTimeout(()=>{
-      if(document.activeElement!==ed) closeInlineEditor(true);
-    },120);
+  ed.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      closeInlineEditor(true);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeInlineEditor(false);
+    }
   });
 }
 
-async function closeInlineEditor(save=true){
-  if(!activeInlineSpan || !activeInlineInput) return;
+// ═══════════════════════════════════════════════════════════════════
+// 3. TEXT-EDITOR SCHLIESSEN & INS PDF SPEICHERN
+// ═══════════════════════════════════════════════════════════════════
+async function closeInlineEditor(save = true) {
+  // Absicherung gegen Doppel-Aufruf durch zeitgleiche Events
+  if (!window.activeInlineSpan || !window.activeInlineInput) return;
 
-  // WICHTIG: Referenzen sofort sichern und Globals leeren, um Abstürze zu verhindern
-  const span = activeInlineSpan;
-  const ed = activeInlineInput;
-  activeInlineSpan = null;
-  activeInlineInput = null;
+  // Referenzen sichern und globale Variablen SOFORT leeren
+  const span = window.activeInlineSpan;
+  const ed = window.activeInlineInput;
+  window.activeInlineSpan = null;
+  window.activeInlineInput = null;
 
-  const newText = ed.value;
-  const origText = span.dataset.originalText || '';
+  const newText = ed.value.trim();
+  const origText = span.dataset.originalText || span.textContent || '';
 
-  // Span-Highlight entfernen
+  // UI aufräumen
   span.style.background = '';
   span.style.outline = '';
+  if (ed.parentNode) {
+    ed.parentNode.removeChild(ed);
+  }
 
-  // Eingabefeld SOFORT entfernen (Textfeld verschwindet augenblicklich)
-  if(ed.parentNode) ed.remove();
+  if (!save) return;
 
-  if(!save) return;
-
-  // 1. LIVE-UPDATE AUF DEM BILDSCHIRM (Wie in Word)
-  // Wir ändern den Text direkt im HTML-Element. Das geht extrem schnell und ruckelfrei.
+  // Live-Text im Browser sofort ändern (Word-Feeling: Keine Verzögerung sichtbar!)
   span.textContent = newText;
   span.dataset.editedText = newText;
 
-  // Wenn sich nichts geändert hat oder kein PDF geladen ist, brechen wir hier ab
-  if(newText === origText || !pdfLibDoc) return;
+  // Wenn der Text gleich geblieben ist oder kein PDF geladen ist, abbrechen
+  if (newText === origText || !pdfLibDoc) return;
 
-  // 2. IM HINTERGRUND INS PDF SCHREIBEN (Für Supabase & Downloads)
+  // ── Im Hintergrund ins PDF zeichnen & für Download/Supabase sichern ──
   try {
     const pageIndex = parseInt(span.dataset.pageNumber || currentPage, 10) - 1;
     const page = pdfLibDoc.getPages()[pageIndex];
@@ -1801,18 +1803,18 @@ async function closeInlineEditor(save=true){
     const origFontSize = parseFloat(span.dataset.pdfFontSize) || 12;
     const fontSize = Math.max(4, origFontSize);
 
-    // Alten Text im PDF mit weißem Rechteck überdecken
+    // 1. Alten Text im PDF mit weißem Rechteck überdecken
     page.drawRectangle({
       x: pdfX - 1,
       y: pdfY - 2,
-      width: Math.max(origText.length, newText.length) * fontSize * 0.65 + 12,
+      width: Math.max(origText.length, newText.length) * fontSize * 0.65 + 15,
       height: fontSize + 6,
       color: PDFLib.rgb(1, 1, 1),
       opacity: 1
     });
 
-    // Neuen Text ins PDF eintragen
-    if(newText){
+    // 2. Neuen Text an exakt dieselbe Stelle schreiben
+    if (newText) {
       page.drawText(newText, {
         x: pdfX,
         y: pdfY,
@@ -1821,10 +1823,20 @@ async function closeInlineEditor(save=true){
       });
     }
 
-    // Die globalen PDF-Bytes für Supabase / Download aktualisieren
+    // 3. Die globalen PDF-Bytes aktualisieren (WICHTIG FÜR DOWNLOAD & SUPABASE)
     pdfBytes = await pdfLibDoc.save();
 
-  } catch(e) {
+    // 4. Den pdf.js-Viewer im Hintergrund aktualisieren, damit die Vorschau scharf bleibt
+    const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
+    pdfDoc = await loadingTask.promise;
+    pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
+
+    // 5. Seite neu rendern (Die Text-Layer-Spans werden sauber neu erzeugt)
+    if (typeof renderPage === 'function') {
+      await renderPage(currentPage);
+    }
+
+  } catch (e) {
     console.error("Fehler beim Speichern im PDF-Hintergrund:", e);
   }
 }
