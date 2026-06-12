@@ -1627,7 +1627,6 @@ function toast(msg,type='info'){
   el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'),3000);
 }
-// Canvas click to place text in edit mode
 document.addEventListener('DOMContentLoaded',()=>{
   const ol=document.getElementById('overlay-layer');
   if(!ol)return;
@@ -1641,98 +1640,95 @@ document.addEventListener('DOMContentLoaded',()=>{
     addTextBox(e.clientX-rect.left,e.clientY-rect.top);
   });
 
-  // ── EDIT TEXT: Klick auf PDF-Text-Span ──
-// ── EDIT TEXT: Klick auf PDF-Text-Span ──
-ol.addEventListener('click',function(e){
-  if(editorMode!=='edit')return;
-  if(currentTab!=='edit')return;
-  if(!e.target.classList.contains('pdf-text-item'))return;
-  const span=e.target;
-  if(span.classList.contains('editing'))return;
+  // ── EDIT TEXT: Klick auf PDF-Text-Span → sauberer Floating Editor ──
+  ol.addEventListener('click',function(e){
+    if(editorMode!=='edit')return;
+    if(currentTab!=='edit')return;
+    if(!e.target.classList.contains('pdf-text-item'))return;
+    const span=e.target;
 
-  // Alle anderen schließen
-  document.querySelectorAll('.pdf-text-item.editing').forEach(s=>{
-    s.classList.remove('editing');
-    s.style.cssText=s.dataset.origStyle||'';
-    s.style.color='transparent';
-    s.style.pointerEvents='all';
-    if(s.dataset.edited){
-      s.textContent=s.dataset.editedText||s.dataset.originalText;
-    }
-  });
+    // Bestehenden Editor schließen
+    const old=document.getElementById('pdf-inline-editor');
+    if(old)old.remove();
+    document.querySelectorAll('.pdf-text-item.editing').forEach(s=>{
+      s.classList.remove('editing');
+      s.style.opacity='1';
+    });
 
-  // Original-Style sichern
-  span.dataset.origStyle=span.style.cssText;
+    // Span Position relativ zum overlay-layer
+    const olRect=ol.getBoundingClientRect();
+    const spRect=span.getBoundingClientRect();
+    const left=spRect.left-olRect.left;
+    const top=spRect.top-olRect.top;
+    const w=Math.max(spRect.width+40,120);
+    const fs=parseFloat(span.style.fontSize)||14;
 
-  // Inline-Editor ÜBER dem Span erstellen statt Span selbst editieren
-  const existingEditor=document.getElementById('inline-text-editor');
-  if(existingEditor)existingEditor.remove();
+    // Span ausblenden während Edit
+    span.classList.add('editing');
+    span.style.opacity='0';
 
-  const rect=span.getBoundingClientRect();
-  const olRect=ol.getBoundingClientRect();
+    // Floating Editor — gleiche Schrift, transparenter Hintergrund
+    const ed=document.createElement('div');
+    ed.id='pdf-inline-editor';
+    ed.contentEditable='true';
+    ed.setAttribute('spellcheck','false');
+    ed.style.cssText=`
+      position:absolute;
+      left:${left-4}px;
+      top:${top-4}px;
+      min-width:${w}px;
+      min-height:${fs+10}px;
+      font-size:${fs}px;
+      font-family:${span.style.fontFamily||'Arial'};
+      color:#111111;
+      background:rgba(255,255,255,0.92);
+      border:1.5px solid #6366f1;
+      box-shadow:0 2px 12px rgba(99,102,241,0.18),0 0 0 3px rgba(99,102,241,0.10);
+      border-radius:4px;
+      padding:3px 6px;
+      outline:none;
+      z-index:100;
+      white-space:pre;
+      line-height:1.4;
+      cursor:text;
+    `;
+    ed.textContent=span.dataset.editedText||span.dataset.originalText||span.textContent;
+    ol.appendChild(ed);
 
-  const editor=document.createElement('div');
-  editor.id='inline-text-editor';
-  editor.contentEditable='true';
-  editor.setAttribute('spellcheck','false');
-  editor.style.cssText=`
-    position:absolute;
-    left:${rect.left-olRect.left}px;
-    top:${rect.top-olRect.top}px;
-    min-width:${Math.max(rect.width,60)}px;
-    min-height:${rect.height}px;
-    font-size:${span.style.fontSize};
-    font-family:${span.style.fontFamily};
-    color:#000000;
-    background:rgba(255,255,255,0.95);
-    border:1.5px solid #6366f1;
-    box-shadow:0 0 0 3px rgba(99,102,241,0.15);
-    border-radius:3px;
-    padding:2px 4px;
-    outline:none;
-    z-index:50;
-    white-space:pre-wrap;
-    line-height:1.4;
-    cursor:text;
-  `;
-  editor.textContent=span.dataset.editedText||span.dataset.originalText||span.textContent;
+    // Cursor ans Ende
+    setTimeout(()=>{
+      ed.focus();
+      const range=document.createRange();
+      range.selectNodeContents(ed);
+      range.collapse(false);
+      const sel=window.getSelection();
+      sel.removeAllRanges();sel.addRange(range);
+    },20);
 
-  // Span verstecken während Edit
-  span.style.color='transparent';
-  span.classList.add('editing');
-
-  ol.appendChild(editor);
-
-  // Cursor ans Ende
-  setTimeout(()=>{
-    editor.focus();
-    const range=document.createRange();
-    range.selectNodeContents(editor);
-    range.collapse(false);
-    const sel=window.getSelection();
-    sel.removeAllRanges();sel.addRange(range);
-  },20);
-
-  // Schließen bei Blur
-  editor.addEventListener('blur',function(){
-    span.dataset.editedText=editor.textContent;
-    span.dataset.edited='true';
-    span.textContent=editor.textContent;
-    span.style.color='transparent';
-    span.style.transform='none';
-    span.style.whiteSpace='pre-wrap';
-    span.classList.remove('editing');
-    editor.remove();
-  });
-
-  // Escape = abbrechen
-  editor.addEventListener('keydown',function(e){
-    if(e.key==='Escape'){
+    // Schließen: Text übernehmen → Span wieder zeigen
+    function closeEditor(){
+      const newText=ed.textContent;
+      span.dataset.editedText=newText;
+      span.textContent=newText;
+      span.style.opacity='1';
+      span.style.transform='none';
+      span.style.whiteSpace='pre-wrap';
       span.classList.remove('editing');
-      editor.remove();
+      ed.remove();
     }
+    ed.addEventListener('blur',closeEditor);
+    ed.addEventListener('keydown',function(e){
+      if(e.key==='Escape'){
+        span.style.opacity='1';
+        span.classList.remove('editing');
+        ed.remove();
+      }
+      if(e.key==='Enter'&&!e.shiftKey){
+        e.preventDefault();
+        closeEditor();
+      }
+    });
   });
-});
 
   // ── modeChange: Text-Layer pointer-events ──
   document.addEventListener('modeChange',function(e){
@@ -1740,8 +1736,9 @@ ol.addEventListener('click',function(e){
     if(!layer)return;
     const active=(e.detail==='edit'&&currentTab==='edit');
     layer.style.pointerEvents=active?'all':'none';
-    document.querySelectorAll('.pdf-text-item').forEach(s=>{
-      s.style.pointerEvents=active?'all':'none';
+    layer.querySelectorAll('.pdf-text-item').forEach(s=>{
+      if(!s.classList.contains('editing'))
+        s.style.pointerEvents=active?'all':'none';
     });
   });
 });
