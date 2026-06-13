@@ -1799,16 +1799,41 @@ async function openInlineEditor(span){
     span.dataset.originalText=span.textContent;
   }
 
-  // Span sichtbar machen zum Editieren
+  const pageNum=parseInt(span.dataset.pageNumber||currentPage,10);
+  const canvas=document.getElementById('pdf-canvas');
+  const img=pageImages[pageNum];
+
+  // SOFORT: Canvas-Text an dieser Stelle mit PNG-Hintergrund übermalen
+  // → alter Text verschwindet, kein Doppeltext beim Tippen
+  if(img){
+    const spanLeft=parseFloat(span.style.left);
+    const spanTop=parseFloat(span.style.top);
+    const spanW=span.offsetWidth||50;
+    const spanH=span.offsetHeight||20;
+    const pdfNativeWidth=img.width/2;
+    const scaleX=canvas.width/pdfNativeWidth;
+    const pdfNativeHeight=img.height/2;
+    const scaleY=canvas.height/pdfNativeHeight;
+    const x=parseFloat(span.dataset.pdfX);
+    const y=parseFloat(span.dataset.pdfY);
+    const x1=parseFloat(span.dataset.pdfX1);
+    const y1=parseFloat(span.dataset.pdfY1);
+    // Originalbereich aus PNG auf Canvas malen → löscht den Text visuell
+    const ctx=canvas.getContext('2d');
+    ctx.drawImage(img, x*2, y*2, (x1-x)*2, (y1-y)*2,
+                       x*scaleX, y*scaleY, (x1-x)*scaleX, (y1-y)*scaleY);
+  }
+
+  // Span über der nun leeren Stelle editierbar machen
   span.classList.remove('is-edited');
   span.classList.add('editing');
   span.style.color='black';
-  span.style.background='white';
+  span.style.background='transparent';
+  span.style.caretColor='#4f46e5';
   span.style.minWidth='20px';
   span.contentEditable='true';
   span.spellcheck=false;
 
-  // Cursor ans Ende
   span.focus();
   const range=document.createRange();
   range.selectNodeContents(span);
@@ -1840,51 +1865,37 @@ async function closeInlineEditor(save=true){
 
   const newText = span.textContent.trim();
   const origText = span.dataset.originalText || '';
+  const pageNum = parseInt(span.dataset.pageNumber || currentPage, 10);
 
   span.contentEditable = 'false';
   span.classList.remove('editing');
 
+  const canvas = document.getElementById('pdf-canvas');
+  const img = pageImages[pageNum];
+
   if(!save){
+    // Abbruch: Canvas zurücksetzen, Span transparent
     span.textContent = origText;
     span.style.color = 'transparent';
     span.style.background = 'transparent';
     span.classList.remove('is-edited');
+    if(img) canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
     return;
   }
 
   if(newText === origText){
+    // Keine Änderung: Canvas zurücksetzen, Span transparent
     span.style.color = 'transparent';
     span.style.background = 'transparent';
+    if(img) canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
     return;
   }
 
-  // pageNum ZUERST definieren
-  const pageNum = parseInt(span.dataset.pageNumber || currentPage, 10);
-
+  // Text geändert: neuen Text im Span anzeigen
   span.textContent = newText;
   span.dataset.editedText = newText;
-
-  // Canvas auf Original zurücksetzen
-  const canvas = document.getElementById('pdf-canvas');
-  const img = pageImages[pageNum];
-  if(img){
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-  }
-
-  // Hintergrund unter Span aus Canvas ausschneiden → nahtlos auf jedem Hintergrund
-  const spanLeft = parseFloat(span.style.left);
-  const spanTop = parseFloat(span.style.top);
-  const spanW = span.offsetWidth || (parseFloat(span.style.width) || 50);
-  const spanH = span.offsetHeight || (parseFloat(span.style.height) || 20);
-
-  const tmpCanvas = document.createElement('canvas');
-  tmpCanvas.width = spanW;
-  tmpCanvas.height = spanH;
-  tmpCanvas.getContext('2d').drawImage(canvas, spanLeft, spanTop, spanW, spanH, 0, 0, spanW, spanH);
-  const bgUrl = tmpCanvas.toDataURL();
-
-  span.style.background = `url(${bgUrl}) 0 0 / ${spanW}px ${spanH}px no-repeat`;
   span.style.color = 'black';
+  span.style.background = 'transparent';
   span.classList.add('is-edited');
 
   // Für Download speichern
@@ -1894,8 +1905,8 @@ async function closeInlineEditor(save=true){
   const y1 = parseFloat(span.dataset.pdfY1);
   const size = parseFloat(span.dataset.pdfFontSize) || 12;
 
-  const idx = pendingEdits.findIndex(e => e.page === pageNum && e.x === x && e.y === y);
-  const edit = {page: pageNum, x, y, x1, y1, size, newText, spanOrigText: origText};
+  const idx = pendingEdits.findIndex(e => e.page===pageNum && e.x===x && e.y===y);
+  const edit = {page:pageNum, x, y, x1, y1, size, newText, spanOrigText:origText};
   if(idx > -1) pendingEdits[idx] = edit;
   else pendingEdits.push(edit);
 }
