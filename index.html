@@ -1859,55 +1859,55 @@ function _inlineKeyHandler(e){
 // ═══════════════════════════════════════════════════════════════════
 async function closeInlineEditor(save=true){
   if(!window.activeInlineSpan) return;
-  const span = window.activeInlineSpan;
-  window.activeInlineSpan = null;
-  span.removeEventListener('keydown', _inlineKeyHandler);
+  const span=window.activeInlineSpan;
+  window.activeInlineSpan=null;
+  span.removeEventListener('keydown',_inlineKeyHandler);
 
-  const newText = span.textContent.trim();
-  const origText = span.dataset.originalText || '';
-  const pageNum = parseInt(span.dataset.pageNumber || currentPage, 10);
+  const newText=span.textContent.trim();
+  const origText=span.dataset.originalText||'';
+  const pageNum=parseInt(span.dataset.pageNumber||currentPage,10);
 
-  span.contentEditable = 'false';
+  span.contentEditable='false';
   span.classList.remove('editing');
 
-  const canvas = document.getElementById('pdf-canvas');
-  const img = pageImages[pageNum];
+  const canvas=document.getElementById('pdf-canvas');
+  const img=pageImages[pageNum];
 
   if(!save){
-    // Abbruch: Canvas zurücksetzen, Span transparent
-    span.textContent = origText;
-    span.style.color = 'transparent';
-    span.style.background = 'transparent';
+    // Abbruch: Canvas-Original wiederherstellen, Span transparent
+    span.textContent=origText;
+    span.style.color='transparent';
+    span.style.background='transparent';
     span.classList.remove('is-edited');
     if(img) canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
     return;
   }
 
-  if(newText === origText){
-    // Keine Änderung: Canvas zurücksetzen, Span transparent
-    span.style.color = 'transparent';
-    span.style.background = 'transparent';
+  if(newText===origText){
+    // Keine Änderung: Canvas-Original wiederherstellen
+    span.style.color='transparent';
+    span.style.background='transparent';
     if(img) canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
     return;
   }
 
-  // Text geändert: neuen Text im Span anzeigen
-  span.textContent = newText;
-  span.dataset.editedText = newText;
-  span.style.color = 'black';
-  span.style.background = 'transparent';
+  // Geändert: Span bleibt sichtbar über dem leeren Canvas-Bereich
+  span.textContent=newText;
+  span.dataset.editedText=newText;
+  span.style.color='black';
+  span.style.background='transparent';
   span.classList.add('is-edited');
 
   // Für Download speichern
-  const x = parseFloat(span.dataset.pdfX);
-  const y = parseFloat(span.dataset.pdfY);
-  const x1 = parseFloat(span.dataset.pdfX1);
-  const y1 = parseFloat(span.dataset.pdfY1);
-  const size = parseFloat(span.dataset.pdfFontSize) || 12;
+  const x=parseFloat(span.dataset.pdfX);
+  const y=parseFloat(span.dataset.pdfY);
+  const x1=parseFloat(span.dataset.pdfX1);
+  const y1=parseFloat(span.dataset.pdfY1);
+  const size=parseFloat(span.dataset.pdfFontSize)||12;
 
-  const idx = pendingEdits.findIndex(e => e.page===pageNum && e.x===x && e.y===y);
-  const edit = {page:pageNum, x, y, x1, y1, size, newText, spanOrigText:origText};
-  if(idx > -1) pendingEdits[idx] = edit;
+  const idx=pendingEdits.findIndex(e=>e.page===pageNum&&e.x===x&&e.y===y);
+  const edit={page:pageNum,x,y,x1,y1,size,newText,spanOrigText:origText};
+  if(idx>-1) pendingEdits[idx]=edit;
   else pendingEdits.push(edit);
 }
    
