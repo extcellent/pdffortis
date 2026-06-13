@@ -41,25 +41,67 @@ function showAuthGate() {
 }
 
 async function initDashboard() {
-  await cleanupExpired();
   await loadUserProfile();
 
   document.getElementById('auth-gate').style.display = 'none';
   document.getElementById('app').classList.add('visible');
 
-  await loadTeam();        // braucht das Profil + company_token
-  await loadDocuments();   // braucht teamMembers für IN-Filter
+  // 🔒 GATE: kein Firmen-Token → freundlicher Hinweis statt Crash-Cascade
+  if (!currentUser.company_token) {
+    showNoTokenScreen();
+    return;
+  }
+
+  await loadTeam();
+  await loadDocuments();
   renderOverviewActivity();
   await renderUsageStats();
   await renderMessages(await fetchMessages());
 
-  // Live-Polls
-  chatPollInterval  = setInterval(pollChat, 5000);
-  teamPollInterval  = setInterval(pollTeam, 15000);
-  heartbeatInterval = setInterval(() => sbHeartbeat(currentUser.id, currentUser.access_token), 30000);
-  sbHeartbeat(currentUser.id, currentUser.access_token); // sofort einmal
+  chatPollInterval     = setInterval(pollChat, 5000);
+  teamPollInterval     = setInterval(pollTeam, 15000);
+  heartbeatInterval    = setInterval(() => sbHeartbeat(currentUser.id, currentUser.access_token), 30000);
+  sbHeartbeat(currentUser.id, currentUser.access_token);
 }
 
+function showNoTokenScreen() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:40px;">
+      <div style="max-width:480px;text-align:center;background:#fff;padding:48px 32px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.08)">
+        <div style="font-size:48px;margin-bottom:16px">🏢</div>
+        <h2 style="margin:0 0 12px;color:#111">Kein Firmen-Workspace aktiv</h2>
+        <p style="color:#555;line-height:1.6;margin:0 0 24px">
+          Dein Konto ist nicht mit einer Firma verknüpft.<br>
+          Gib einen <b>Firmen-Token</b> ein, den du von deinem Admin bekommen hast.
+        </p>
+        <input id="late-token" placeholder="z. B. ACME-2026-XYZ"
+               style="width:100%;padding:14px;border:1px solid #ddd;border-radius:10px;font-size:15px;margin-bottom:12px;text-transform:uppercase">
+        <button onclick="attachTokenLate()"
+                style="width:100%;padding:14px;background:#6366f1;color:#fff;border:0;border-radius:10px;font-weight:600;cursor:pointer">
+          Token verknüpfen
+        </button>
+        <button onclick="doLogout()"
+                style="margin-top:12px;background:none;border:0;color:#888;cursor:pointer">
+          Abmelden
+        </button>
+        <div id="late-token-err" style="color:#dc2626;margin-top:12px;display:none"></div>
+      </div>
+    </div>`;
+}
+
+async function attachTokenLate() {
+  const t  = document.getElementById('late-token').value.trim().toUpperCase();
+  const er = document.getElementById('late-token-err');
+  er.style.display = 'none';
+  if (!t) { er.textContent='Bitte Token eingeben'; er.style.display='block'; return; }
+
+  const tk = await sbValidateToken(t);
+  if (!tk) { er.textContent='Ungültiger Token'; er.style.display='block'; return; }
+
+  await sbUpsertProfile(currentUser.id, { company_token: t }, currentUser.access_token);
+  window.location.reload();
+}
 // ════════════════════════════════════
 // AUTH UI
 // ════════════════════════════════════
