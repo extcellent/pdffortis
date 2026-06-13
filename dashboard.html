@@ -1,6 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+  // Anti-Flicker: vor dem Rendern entscheiden, ob Auth-Gate oder App
+  (function(){
+    try{
+      var raw = localStorage.getItem('pf_session');
+      var ok  = false;
+      if(raw){
+        var s = JSON.parse(raw);
+        ok = s && s.user && (!s.expires_at || s.expires_at > Date.now());
+      }
+      document.documentElement.classList.add(ok ? 'pf-authed' : 'pf-anon');
+    }catch(e){ document.documentElement.classList.add('pf-anon'); }
+  })();
+</script>
+<style>
+  /* Anti-Flicker default states */
+  html.pf-authed #auth-gate { display: none !important; }
+  html.pf-anon   #app       { visibility: hidden; }
+  html.pf-anon   #auth-gate { display: flex   !important; }
+</style>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>PDFortis — Company Dashboard</title>
