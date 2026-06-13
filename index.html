@@ -1487,22 +1487,33 @@ async function triggerDownload(){
 }
 
 async function performDownload(){
-  if(pendingEdits.length===0){
-    // Keine Textänderungen — direkt downloaden
-    const bytes=await pdfLibDoc.save();
-    _doDownload(bytes);
+  if(pendingEdits.length === 0){
+    const bytes = await pdfLibDoc.save();
+    const blob = new Blob([bytes],{type:'application/pdf'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download=fileName||'pdffortis.pdf'; a.click();
+    URL.revokeObjectURL(url);
+    toast(lang==='de'?'PDF gespeichert!':'PDF saved!','ok');
     return;
   }
+
   toast(lang==='de'?'PDF wird gespeichert...':'Saving PDF...','info');
   try{
-    const form=new FormData();
-    form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
-    form.append('edits',JSON.stringify(pendingEdits));
-    const res=await fetch(`${API}/edit-batch`,{method:'POST',body:form});
-    const buf=await res.arrayBuffer();
-    pendingEdits=[];
-    pageImages={};
-    _doDownload(new Uint8Array(buf));
+    const form = new FormData();
+    form.append('pdf', new Blob([pdfBytes],{type:'application/pdf'}), 'doc.pdf');
+    form.append('edits', JSON.stringify(pendingEdits));
+    const res = await fetch(`${API}/edit-batch`, {method:'POST', body:form});
+    const buf = await res.arrayBuffer();
+    pendingEdits = [];
+    pageImages = {};
+    const blob = new Blob([new Uint8Array(buf)],{type:'application/pdf'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download=fileName||'pdffortis.pdf'; a.click();
+    URL.revokeObjectURL(url);
+    trackDownload();
+    toast(lang==='de'?'PDF gespeichert!':'PDF saved!','ok');
   }catch(e){
     console.error('Download fehlgeschlagen:',e);
     toast('Fehler beim Speichern','err');
@@ -1847,20 +1858,20 @@ async function closeInlineEditor(save=true){
     return;
   }
 
+  // pageNum ZUERST definieren
+  const pageNum = parseInt(span.dataset.pageNumber || currentPage, 10);
+
   span.textContent = newText;
   span.dataset.editedText = newText;
 
   // Canvas auf Original zurücksetzen
   const canvas = document.getElementById('pdf-canvas');
   const img = pageImages[pageNum];
-  const pageNum = parseInt(span.dataset.pageNumber || currentPage, 10);
   if(img){
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
   }
 
-  // Hintergrund exakt unter dem Span aus Canvas ausschneiden
-  // → funktioniert auf JEDEM Hintergrund: weiß, farbig, Bild, Muster
+  // Hintergrund unter Span aus Canvas ausschneiden → nahtlos auf jedem Hintergrund
   const spanLeft = parseFloat(span.style.left);
   const spanTop = parseFloat(span.style.top);
   const spanW = span.offsetWidth || (parseFloat(span.style.width) || 50);
