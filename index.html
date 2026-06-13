@@ -1571,19 +1571,19 @@ async function getFingerprint(){
 }
 async function sbGetDLCount(fp){
   const since=new Date(Date.now()-LIMIT_MS).toISOString();
-  const r=await fetch(`${SB_URL}/rest/v1/download_logs?ip_hash=eq.${fp}&downloaded_at=gte.${since}&select=id`,{headers:SB_H});
+  const r=await fetch(`${SUPABASE_URL}/rest/v1/download_logs?ip_hash=eq.${fp}&downloaded_at=gte.${since}&select=id`,{headers:SB_HEADERS});
   const d=await r.json();return Array.isArray(d)?d.length:0;
 }
 async function sbLogDL(fp){
-  await fetch(`${SB_URL}/rest/v1/download_logs`,{method:'POST',headers:SB_H,body:JSON.stringify({ip_hash:fp})});
+  await fetch(`${SUPABASE_URL}/rest/v1/download_logs`,{method:'POST',headers:SB_HEADERS,body:JSON.stringify({ip_hash:fp})});
 }
 async function sbValidateToken(tok){
-  const r=await fetch(`${SB_URL}/rest/v1/company_tokens?token=eq.${encodeURIComponent(tok)}&select=*`,{headers:SB_H});
+  const r=await fetch(`${SUPABASE_URL}/rest/v1/company_tokens?token=eq.${encodeURIComponent(tok)}&select=*`,{headers:SB_HEADERS});
   const d=await r.json();return d.length>0?d[0]:null;
 }
 async function logTokenUsage(action){
   if(!currentToken)return;
-  await fetch(`${SB_URL}/rest/v1/token_usage`,{method:'POST',headers:SB_H,body:JSON.stringify({token:currentToken.token,action})});
+  await fetch(`${SUPABASE_URL}/rest/v1/token_usage`,{method:'POST',headers:SB_HEADERS,body:JSON.stringify({token:currentToken.token,action})});
 }
 
 // ═══════════════════════════════════════
@@ -1645,7 +1645,7 @@ async function doLogin(){
   err.classList.add('hidden');
   if(!email||!pw){err.textContent=lang==='de'?'Bitte alle Felder ausfüllen':'Please fill all fields';err.classList.remove('hidden');return}
   try{
-    const r=await fetch(`${SB_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY},body:JSON.stringify({email,password:pw})});
+    const r=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY},body:JSON.stringify({email,password:pw})});
     const d=await r.json();
     if(d.error){err.textContent=d.error_description||d.error;err.classList.remove('hidden');return}
     currentUser={email,name:d.user?.user_metadata?.name||email.split('@')[0],token:d.access_token};
@@ -1662,7 +1662,7 @@ async function doSignup(){
   if(!name||!email||!pw){err.textContent=lang==='de'?'Bitte alle Felder ausfüllen':'Please fill all fields';err.classList.remove('hidden');return}
   if(pw.length<8){err.textContent=lang==='de'?'Passwort min. 8 Zeichen':'Password min. 8 characters';err.classList.remove('hidden');return}
   try{
-    const r=await fetch(`${SB_URL}/auth/v1/signup`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY},body:JSON.stringify({email,password:pw,data:{name}})});
+    const r=await fetch(`${SUPABASE_URL}/auth/v1/signup`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY},body:JSON.stringify({email,password:pw,data:{name}})});
     const d=await r.json();
     if(d.error){err.textContent=d.error_description||d.error;err.classList.remove('hidden');return}
     currentUser={email,name,token:d.access_token};
