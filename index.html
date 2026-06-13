@@ -868,6 +868,8 @@ const SB_H = {'Content-Type':'application/json','apikey':SB_KEY,'Authorization':
 // ═══════════════════════════════════════
 let pdfDoc=null, pdfLibDoc=null, pdfBytes=null;
 const API = 'https://pdffortis-api.onrender.com';
+let pendingEdits=[];
+let pageImages={};
 let currentPage=1, totalPages=0, fileName='';
 let editorMode='look', currentTab='edit', compressQ='medium';
 let sigDrawing=false, sigLX=0, sigLY=0;
@@ -1469,10 +1471,33 @@ async function triggerDownload(){
 }
 
 async function performDownload(){
-  const bytes=await pdfLibDoc.save();
+  if(pendingEdits.length===0){
+    // Keine Textänderungen — direkt downloaden
+    const bytes=await pdfLibDoc.save();
+    _doDownload(bytes);
+    return;
+  }
+  toast(lang==='de'?'PDF wird gespeichert...':'Saving PDF...','info');
+  try{
+    const form=new FormData();
+    form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
+    form.append('edits',JSON.stringify(pendingEdits));
+    const res=await fetch(`${API}/edit-batch`,{method:'POST',body:form});
+    const buf=await res.arrayBuffer();
+    pendingEdits=[];
+    pageImages={};
+    _doDownload(new Uint8Array(buf));
+  }catch(e){
+    console.error('Download fehlgeschlagen:',e);
+    toast('Fehler beim Speichern','err');
+  }
+}
+
+function _doDownload(bytes){
   const blob=new Blob([bytes],{type:'application/pdf'});
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=fileName||'pdffortis.pdf';a.click();
+  const a=document.createElement('a');
+  a.href=url;a.download=fileName||'pdffortis.pdf';a.click();
   URL.revokeObjectURL(url);
   toast(lang==='de'?'PDF gespeichert!':'PDF saved!','ok');
 }
@@ -1785,39 +1810,56 @@ async function closeInlineEditor(save=true){
   const span=window.activeInlineSpan;
   window.activeInlineSpan=null;
   span.removeEventListener('keydown',_inlineKeyHandler);
+
   const newText=span.textContent.trim();
   const origText=span.dataset.originalText||'';
+
   span.contentEditable='false';
   span.classList.remove('editing');
   span.style.color='transparent';
+  span.style.background='transparent';
 
   if(!save){span.textContent=origText;return;}
+  if(newText===origText)return;
+
+  const pageNum=parseInt(span.dataset.pageNumber||currentPage,10);
+  const img=pageImages[pageNum];
+  if(!img)return;
+
+  const canvas=document.getElementById('pdf-canvas');
+  const pdfNativeWidth=img.width/2;
+  const finalScale=canvas.width/pdfNativeWidth;
+
+  const x=parseFloat(span.dataset.pdfX);
+  const y=parseFloat(span.dataset.pdfY);
+  const x1=parseFloat(span.dataset.pdfX1);
+  const y1=parseFloat(span.dataset.pdfY1);
+  const size=parseFloat(span.dataset.pdfFontSize)||12;
+
+  // Edit speichern (alten ersetzen falls gleiche Position)
+  const idx=pendingEdits.findIndex(e=>e.page===pageNum&&e.x===x&&e.y===y);
+  const edit={page:pageNum,x,y,x1,y1,size,newText,spanOrigText:origText};
+  if(idx>-1) pendingEdits[idx]=edit;
+  else pendingEdits.push(edit);
 
   span.dataset.editedText=newText;
-  if(newText===origText||!pdfBytes)return;
+  span.textContent=newText;
 
-  try{
-    const form=new FormData();
-    form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
-    form.append('page',parseInt(span.dataset.pageNumber||currentPage,10)-1);
-    form.append('x',span.dataset.pdfX);
-    form.append('y',span.dataset.pdfY);
-    form.append('x1',span.dataset.pdfX1);
-    form.append('y1',span.dataset.pdfY1);
-    form.append('old_text',origText);
-    form.append('new_text',newText);
-    form.append('font_size',span.dataset.pdfFontSize||12);
-
-    const res=await fetch(`${API}/edit`,{method:'POST',body:form});
-    const buf=await res.arrayBuffer();
-    pdfBytes=new Uint8Array(buf);
-    pdfLibDoc=await PDFLib.PDFDocument.load(pdfBytes);
-
-    await renderPage(currentPage);
-  }catch(e){
-    console.error('Edit fehlgeschlagen:',e);
-    toast('Fehler beim Speichern','err');
-  }
+  // Canvas neu zeichnen: Original PNG + alle Edits dieser Seite
+  const ctx=canvas.getContext('2d');
+  ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  pendingEdits.filter(e=>e.page===pageNum).forEach(e=>{
+    ctx.drawImage(
+      img,
+      e.x*2, e.y*2,
+      (e.x1-e.x)*2, (e.y1-e.y)*2,
+      e.x*finalScale, e.y*finalScale,
+      (e.x1-e.x)*finalScale, (e.y1-e.y)*finalScale
+    );
+    ctx.font=`${e.size*finalScale}px Arial`;
+    ctx.fillStyle='black';
+    ctx.fillText(e.newText, e.x*finalScale, e.y1*finalScale-(e.y1-e.y)*finalScale*0.15);
+  });
 }
    
 // ═══════════════════════════════════════
