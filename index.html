@@ -872,6 +872,7 @@ const SB_H = {'Content-Type':'application/json','apikey':SB_KEY,'Authorization':
 let pdfDoc=null, pdfLibDoc=null, pdfBytes=null;
 const API = 'https://pdffortis-api.onrender.com';
 let pendingEdits=[];
+let pageMasks={}; // {pageNum: [{x,y,w,h,bg}, ...]} – Vorschau-Masken pro Seite
 let pageImages={};
 let currentPage=1, totalPages=0, fileName='';
 let editorMode='look', currentTab='edit', compressQ='medium';
@@ -997,7 +998,13 @@ async function renderPage(n){
   ol.style.height=canvas.height+'px';
   ol.innerHTML='';
   userEls.forEach(el=>ol.appendChild(el));
-  canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+  const _ctx=canvas.getContext('2d');
+  _ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  // Editier-Masken (übermalte Originaltext-Bereiche) erneut auftragen
+  (pageMasks[n]||[]).forEach(m=>{
+    _ctx.fillStyle=m.bg;
+    _ctx.fillRect(m.x,m.y,m.w,m.h);
+  });
   loadTextItems(n,img.width,canvas.width);
 
   document.getElementById('page-info-txt').textContent=`${n} / ${totalPages}`;
@@ -1801,30 +1808,56 @@ async function openInlineEditor(span){
 
   const pageNum=parseInt(span.dataset.pageNumber||currentPage,10);
   const canvas=document.getElementById('pdf-canvas');
+  const ctx=canvas.getContext('2d');
   const img=pageImages[pageNum];
 
-  // SOFORT: Canvas-Text an dieser Stelle mit PNG-Hintergrund übermalen
-  // → alter Text verschwindet, kein Doppeltext beim Tippen
+  // === Originaltext WIRKLICH vom Canvas entfernen ===
   if(img){
-    const spanLeft=parseFloat(span.style.left);
-    const spanTop=parseFloat(span.style.top);
-    const spanW=span.offsetWidth||50;
-    const spanH=span.offsetHeight||20;
     const pdfNativeWidth=img.width/2;
-    const scaleX=canvas.width/pdfNativeWidth;
     const pdfNativeHeight=img.height/2;
+    const scaleX=canvas.width/pdfNativeWidth;
     const scaleY=canvas.height/pdfNativeHeight;
-    const x=parseFloat(span.dataset.pdfX);
-    const y=parseFloat(span.dataset.pdfY);
+
+    const x =parseFloat(span.dataset.pdfX);
+    const y =parseFloat(span.dataset.pdfY);
     const x1=parseFloat(span.dataset.pdfX1);
     const y1=parseFloat(span.dataset.pdfY1);
-    // Originalbereich aus PNG auf Canvas malen → löscht den Text visuell
-    const ctx=canvas.getContext('2d');
-    ctx.drawImage(img, x*2, y*2, (x1-x)*2, (y1-y)*2,
-                       x*scaleX, y*scaleY, (x1-x)*scaleX, (y1-y)*scaleY);
+
+    const cx=x*scaleX;
+    const cy=y*scaleY;
+    const cw=(x1-x)*scaleX;
+    const ch=(y1-y)*scaleY;
+
+    // Hintergrundfarbe sampeln – knapp ÜBER der Textzeile (da ist meist nichts drauf)
+    let bg='rgb(255,255,255)';
+    try{
+      const sx=Math.max(0,Math.min(canvas.width-1,Math.floor(cx+cw/2)));
+      const sy=Math.max(0,Math.floor(cy-Math.max(3,ch*0.4)));
+      const px=ctx.getImageData(sx,sy,1,1).data;
+      bg=`rgb(${px[0]},${px[1]},${px[2]})`;
+    }catch(e){}
+
+    // Etwas Padding für Ober-/Unterlängen
+    const padY=Math.max(2,ch*0.20);
+    const padX=2;
+    const maskRect={
+      x: cx-padX,
+      y: cy-padY,
+      w: cw+padX*2,
+      h: ch+padY*2,
+      bg
+    };
+
+    // Maske SOFORT zeichnen → Originaltext verschwindet
+    ctx.fillStyle=bg;
+    ctx.fillRect(maskRect.x,maskRect.y,maskRect.w,maskRect.h);
+
+    // Maske am Span merken – wird beim Speichern in pageMasks übernommen
+    span.dataset.maskInfo=JSON.stringify(maskRect);
+    span.dataset.maskPage=pageNum;
   }
 
-  // Span über der nun leeren Stelle editierbar machen
+  // Span editierbar machen – sichtbarer schwarzer Text statt transparent
   span.classList.remove('is-edited');
   span.classList.add('editing');
   span.style.color='black';
@@ -1857,57 +1890,186 @@ function _inlineKeyHandler(e){
 // ═══════════════════════════════════════════════════════════════════
 // 3. TEXT-EDITOR SCHLIESSEN & INS PDF SPEICHERN
 // ═══════════════════════════════════════════════════════════════════
-async function closeInlineEditor(save=true){
-  if(!window.activeInlineSpan) return;
-  const span=window.activeInlineSpan;
-  window.activeInlineSpan=null;
-  span.removeEventListener('keydown',_inlineKeyHandler);
 
-  const newText=span.textContent.trim();
-  const origText=span.dataset.originalText||'';
+🔧 FIX 1 — pendingEdits erweitern (Zeile ~874)
+Finden:
+
+let pendingEdits=[];
+Ersetzen mit:
+
+let pendingEdits=[];
+let pageMasks={}; // {pageNum: [{x,y,w,h,bg}, ...]} – Vorschau-Masken pro Seite
+🔧 FIX 2 — renderPage: Masken nach dem Zeichnen wiederherstellen (Zeile ~1000)
+Finden:
+
+  canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+  loadTextItems(n,img.width,canvas.width);
+Ersetzen mit:
+
+  const _ctx=canvas.getContext('2d');
+  _ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  // Editier-Masken (übermalte Originaltext-Bereiche) erneut auftragen
+  (pageMasks[n]||[]).forEach(m=>{
+    _ctx.fillStyle=m.bg;
+    _ctx.fillRect(m.x,m.y,m.w,m.h);
+  });
+  loadTextItems(n,img.width,canvas.width);
+🔧 FIX 3 — openInlineEditor komplett ersetzen (Zeile ~1791 – 1846)
+Finden (komplette Funktion async function openInlineEditor(span){ ... }) und ersetzen mit:
+
+async function openInlineEditor(span){
+  if(window.activeInlineSpan){
+    await closeInlineEditor(true);
+  }
+
+  window.activeInlineSpan=span;
+
+  if(!span.dataset.originalText){
+    span.dataset.originalText=span.textContent;
+  }
+
   const pageNum=parseInt(span.dataset.pageNumber||currentPage,10);
-
-  span.contentEditable='false';
-  span.classList.remove('editing');
-
   const canvas=document.getElementById('pdf-canvas');
+  const ctx=canvas.getContext('2d');
   const img=pageImages[pageNum];
 
-  if(!save){
-    // Abbruch: Canvas-Original wiederherstellen, Span transparent
-    span.textContent=origText;
-    span.style.color='transparent';
-    span.style.background='transparent';
-    span.classList.remove('is-edited');
-    if(img) canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-    return;
+  // === Originaltext WIRKLICH vom Canvas entfernen ===
+  if(img){
+    const pdfNativeWidth=img.width/2;
+    const pdfNativeHeight=img.height/2;
+    const scaleX=canvas.width/pdfNativeWidth;
+    const scaleY=canvas.height/pdfNativeHeight;
+
+    const x =parseFloat(span.dataset.pdfX);
+    const y =parseFloat(span.dataset.pdfY);
+    const x1=parseFloat(span.dataset.pdfX1);
+    const y1=parseFloat(span.dataset.pdfY1);
+
+    const cx=x*scaleX;
+    const cy=y*scaleY;
+    const cw=(x1-x)*scaleX;
+    const ch=(y1-y)*scaleY;
+
+    // Hintergrundfarbe sampeln – knapp ÜBER der Textzeile (da ist meist nichts drauf)
+    let bg='rgb(255,255,255)';
+    try{
+      const sx=Math.max(0,Math.min(canvas.width-1,Math.floor(cx+cw/2)));
+      const sy=Math.max(0,Math.floor(cy-Math.max(3,ch*0.4)));
+      const px=ctx.getImageData(sx,sy,1,1).data;
+      bg=`rgb(${px[0]},${px[1]},${px[2]})`;
+    }catch(e){}
+
+    // Etwas Padding für Ober-/Unterlängen
+    const padY=Math.max(2,ch*0.20);
+    const padX=2;
+    const maskRect={
+      x: cx-padX,
+      y: cy-padY,
+      w: cw+padX*2,
+      h: ch+padY*2,
+      bg
+    };
+
+    // Maske SOFORT zeichnen → Originaltext verschwindet
+    ctx.fillStyle=bg;
+    ctx.fillRect(maskRect.x,maskRect.y,maskRect.w,maskRect.h);
+
+    // Maske am Span merken – wird beim Speichern in pageMasks übernommen
+    span.dataset.maskInfo=JSON.stringify(maskRect);
+    span.dataset.maskPage=pageNum;
   }
 
-  if(newText===origText){
-    // Keine Änderung: Canvas-Original wiederherstellen
-    span.style.color='transparent';
-    span.style.background='transparent';
-    if(img) canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-    return;
-  }
-
-  // Geändert: Span bleibt sichtbar über dem leeren Canvas-Bereich
-  span.textContent=newText;
-  span.dataset.editedText=newText;
+  // Span editierbar machen – sichtbarer schwarzer Text statt transparent
+  span.classList.remove('is-edited');
+  span.classList.add('editing');
   span.style.color='black';
   span.style.background='transparent';
+  span.style.caretColor='#4f46e5';
+  span.style.minWidth='20px';
+  span.contentEditable='true';
+  span.spellcheck=false;
+
+  span.focus();
+  const range=document.createRange();
+  range.selectNodeContents(span);
+  range.collapse(false);
+  const sel=window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  span.addEventListener('keydown',_inlineKeyHandler);
+}
+🔧 FIX 4 — closeInlineEditor komplett ersetzen (Zeile ~1860 – 1912)
+Finden (komplette Funktion async function closeInlineEditor(save=true){ ... }) und ersetzen mit:
+
+async function closeInlineEditor(save=true){
+  if(!window.activeInlineSpan) return;
+  const span = window.activeInlineSpan;
+  window.activeInlineSpan = null;
+  span.removeEventListener('keydown', _inlineKeyHandler);
+
+  const newText  = span.textContent.trim();
+  const origText = span.dataset.originalText || '';
+  const pageNum  = parseInt(span.dataset.pageNumber || currentPage, 10);
+
+  span.contentEditable = 'false';
+  span.classList.remove('editing');
+
+  const canvas = document.getElementById('pdf-canvas');
+  const ctx    = canvas.getContext('2d');
+  const img    = pageImages[pageNum];
+
+  const restorePage = () => {
+    if(!img) return;
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    // Bereits zuvor gespeicherte Masken (andere Edits) wieder auftragen
+    (pageMasks[pageNum]||[]).forEach(m=>{
+      ctx.fillStyle=m.bg;
+      ctx.fillRect(m.x,m.y,m.w,m.h);
+    });
+  };
+
+  // Abbruch ODER keine Änderung → Originaltext wiederherstellen
+  if(!save || newText === origText){
+    span.textContent     = origText;
+    span.style.color     = 'transparent';
+    span.style.background= 'transparent';
+    span.classList.remove('is-edited');
+    delete span.dataset.maskInfo;
+    delete span.dataset.maskPage;
+    restorePage();
+    return;
+  }
+
+  // === Text wurde geändert ===
+  // 1) Maske dauerhaft in pageMasks übernehmen → bleibt nach Re-Render erhalten
+  if(span.dataset.maskInfo){
+    try{
+      const m=JSON.parse(span.dataset.maskInfo);
+      if(!pageMasks[pageNum]) pageMasks[pageNum]=[];
+      pageMasks[pageNum].push(m);
+    }catch(e){}
+    delete span.dataset.maskInfo;
+    delete span.dataset.maskPage;
+  }
+
+  // 2) Neuen Text im Span sichtbar lassen
+  span.textContent       = newText;
+  span.dataset.editedText= newText;
+  span.style.color       = 'black';
+  span.style.background  = 'transparent';
   span.classList.add('is-edited');
 
-  // Für Download speichern
-  const x=parseFloat(span.dataset.pdfX);
-  const y=parseFloat(span.dataset.pdfY);
-  const x1=parseFloat(span.dataset.pdfX1);
-  const y1=parseFloat(span.dataset.pdfY1);
-  const size=parseFloat(span.dataset.pdfFontSize)||12;
+  // 3) Für Download an Backend merken
+  const x  = parseFloat(span.dataset.pdfX);
+  const y  = parseFloat(span.dataset.pdfY);
+  const x1 = parseFloat(span.dataset.pdfX1);
+  const y1 = parseFloat(span.dataset.pdfY1);
+  const size = parseFloat(span.dataset.pdfFontSize) || 12;
 
-  const idx=pendingEdits.findIndex(e=>e.page===pageNum&&e.x===x&&e.y===y);
-  const edit={page:pageNum,x,y,x1,y1,size,newText,spanOrigText:origText};
-  if(idx>-1) pendingEdits[idx]=edit;
+  const idx = pendingEdits.findIndex(e => e.page===pageNum && e.x===x && e.y===y);
+  const edit = {page:pageNum, x, y, x1, y1, size, newText, spanOrigText:origText};
+  if(idx > -1) pendingEdits[idx] = edit;
   else pendingEdits.push(edit);
 }
    
