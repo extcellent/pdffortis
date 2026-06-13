@@ -1536,7 +1536,7 @@ async function performDownload(){
     console.error('Download fehlgeschlagen:',e);
     toast(lang==='de'?'Fehler beim Speichern':'Save failed','err');
   }
-
+}
 function _doDownload(bytes){
   const blob=new Blob([bytes],{type:'application/pdf'});
   const url=URL.createObjectURL(blob);
