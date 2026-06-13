@@ -971,33 +971,36 @@ async function renderPage(n){
   const ol=document.getElementById('overlay-layer');
   const userEls=Array.from(ol.querySelectorAll('.pdf-overlay'));
 
-  const form=new FormData();
-  form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
-  form.append('page',n-1);
-  const res=await fetch(`${API}/render`,{method:'POST',body:form});
-  const png=await res.blob();
-  const url=URL.createObjectURL(png);
+  if(!pageImages[n]){
+    const form=new FormData();
+    form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
+    form.append('page',n-1);
+    const res=await fetch(`${API}/render`,{method:'POST',body:form});
+    const png=await res.blob();
+    const url=URL.createObjectURL(png);
+    await new Promise(resolve=>{
+      const img=new Image();
+      img.onload=()=>{pageImages[n]=img;URL.revokeObjectURL(url);resolve()};
+      img.src=url;
+    });
+  }
 
-  const img=new Image();
-  img.onload=()=>{
-    const vw=document.getElementById('canvas-area').clientWidth-48;
-    const scale=Math.min(1,vw/img.width);
-    canvas.width=img.width*scale;
-    canvas.height=img.height*scale;
-    ol.style.width=canvas.width+'px';
-    ol.style.height=canvas.height+'px';
-    ol.innerHTML='';
-    userEls.forEach(el=>ol.appendChild(el));
-    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-    URL.revokeObjectURL(url);
-    loadTextItems(n,img.width,canvas.width);
-  };
-  img.src=url;
+  const img=pageImages[n];
+  const vw=document.getElementById('canvas-area').clientWidth-48;
+  const scale=Math.min(1,vw/img.width);
+  canvas.width=img.width*scale;
+  canvas.height=img.height*scale;
+  ol.style.width=canvas.width+'px';
+  ol.style.height=canvas.height+'px';
+  ol.innerHTML='';
+  userEls.forEach(el=>ol.appendChild(el));
+  canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+  loadTextItems(n,img.width,canvas.width);
 
   document.getElementById('page-info-txt').textContent=`${n} / ${totalPages}`;
   document.querySelectorAll('.thumb-item').forEach((t,i)=>t.classList.toggle('active',i===n-1));
 }
-
+   
 async function loadTextItems(pageNum, imgWidth, canvasWidth){
   const ol=document.getElementById('overlay-layer');
   ol.querySelector('.pdf-text-layer')?.remove();
@@ -1772,9 +1775,9 @@ async function openInlineEditor(span){
     span.dataset.originalText=span.textContent;
   }
 
-  // Span sichtbar + editierbar machen
-  span.style.color='black';
-  span.style.background='rgba(255,255,255,0.85)';
+  // Span transparent lassen — kein Doppeltext
+  span.style.color='transparent';
+  span.style.background='transparent';
   span.style.outline='none';
   span.style.caretColor='#4f46e5';
   span.classList.add('editing');
