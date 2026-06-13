@@ -980,7 +980,7 @@ async function renderPage(n){
   ol.style.height=canvas.height+'px';
   ol.innerHTML='';
   userEls.forEach(el=>ol.appendChild(el));
-  const _ctx=canvas.getContext('2d');
+  const _ctx=canvas.getContext('2d',{willReadFrequently:true});
   _ctx.drawImage(img,0,0,canvas.width,canvas.height);
   // Editier-Masken (übermalte Originaltext-Bereiche) erneut auftragen
   (pageMasks[n]||[]).forEach(m=>{
@@ -1525,18 +1525,17 @@ async function performDownload(){
     const buf = await res.arrayBuffer();
     pendingEdits = [];
     pageImages = {};
+    pageMasks = {};
     const blob = new Blob([new Uint8Array(buf)],{type:'application/pdf'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href=url; a.download=fileName||'pdffortis.pdf'; a.click();
     URL.revokeObjectURL(url);
-    trackDownload();
     toast(lang==='de'?'PDF gespeichert!':'PDF saved!','ok');
   }catch(e){
     console.error('Download fehlgeschlagen:',e);
-    toast('Fehler beim Speichern','err');
+    toast(lang==='de'?'Fehler beim Speichern':'Save failed','err');
   }
-}
 
 function _doDownload(bytes){
   const blob=new Blob([bytes],{type:'application/pdf'});
@@ -1819,7 +1818,7 @@ async function openInlineEditor(span){
 
   const pageNum=parseInt(span.dataset.pageNumber||currentPage,10);
   const canvas=document.getElementById('pdf-canvas');
-  const ctx=canvas.getContext('2d');
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
   const img=pageImages[pageNum];
 
   // === Originaltext WIRKLICH vom Canvas entfernen ===
@@ -2043,7 +2042,7 @@ async function closeInlineEditor(save=true){
   span.style.padding   = '0';
 
   const canvas = document.getElementById('pdf-canvas');
-  const ctx    = canvas.getContext('2d');
+  const ctx    = canvas.getContext('2d',{willReadFrequently:true});
   const img    = pageImages[pageNum];
 
   const restorePage = () => {
