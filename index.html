@@ -1,6 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+  (function(){
+    try{
+      var raw = localStorage.getItem('pf_session');
+      if(raw){
+        var s = JSON.parse(raw);
+        if(s && s.user && (!s.expires_at || s.expires_at > Date.now())){
+          document.documentElement.classList.add('pf-authed');
+        }
+      }
+    }catch(e){}
+  })();
+</script>
+<style>
+  /* Vor JS-Init schon richtigen Nav-Zustand zeigen */
+  html.pf-authed #landing-auth-btns,
+  html.pf-authed #upload-auth-btns      { display: none !important; }
+  html.pf-authed #landing-user-area,
+  html.pf-authed #upload-user-area      { display: inline-flex !important; }
+  html.pf-authed #landing-logout-btn    { display: inline-flex !important; }
+</style>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>PDFortis — Free PDF Editor</title>
