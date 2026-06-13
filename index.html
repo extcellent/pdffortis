@@ -1881,52 +1881,6 @@ async function openInlineEditor(span){
     }
     const bg=`rgb(${bgR},${bgG},${bgB})`;
 
-Nur eine kleine Stelle ändern:
-
-🔧 Patch — in openInlineEditor Padding minimieren + Auto-Clip
-Finden:
-
-    // Bereich: leichtes Padding für Antialiasing
-    const padX=2;
-    const padY=Math.max(2, ch*0.25);
-    const mx0=Math.max(0, Math.floor(cx-padX));
-    const my0=Math.max(0, Math.floor(cy-padY));
-    const mw =Math.min(canvas.width -mx0, Math.ceil(cw+padX*2));
-    const mh =Math.min(canvas.height-my0, Math.ceil(ch+padY*2));
-
-    // === PER-PIXEL: ALLES was nicht BG-Farbe ist → ersetzen ===
-    // Reine Farbabstand-Prüfung, KEINE Helligkeits-Annahme
-    // → funktioniert auch bei hellem Text auf dunklem BG (z.B. gelb auf schwarz)
-    let savedData=null;
-    try{
-      const imgData=ctx.getImageData(mx0,my0,mw,mh);
-      const d=imgData.data;
-      const TH2=18*18;          // harter Threshold²: Pixel weiter weg = nicht BG
-      const SOFT2=42*42;        // ab hier vollständig ersetzen
-      for(let i=0;i<d.length;i+=4){
-        const dr=d[i]-bgR, dg=d[i+1]-bgG, db=d[i+2]-bgB;
-        const dist2=dr*dr+dg*dg+db*db;
-        if(dist2 > SOFT2){
-          // Klar Text/Fremdfarbe → 100% BG
-          d[i  ]=bgR; d[i+1]=bgG; d[i+2]=bgB;
-        } else if(dist2 > TH2){
-          // Antialiasing-Übergang → glatt mischen
-          const t=(Math.sqrt(dist2)-18)/(42-18);
-          d[i  ]=Math.round(d[i  ]+(bgR-d[i  ])*t);
-          d[i+1]=Math.round(d[i+1]+(bgG-d[i+1])*t);
-          d[i+2]=Math.round(d[i+2]+(bgB-d[i+2])*t);
-        }
-      }
-      ctx.putImageData(imgData,mx0,my0);
-      savedData=imgData;
-    }catch(e){
-      ctx.fillStyle=bg;
-      ctx.fillRect(mx0,my0,mw,mh);
-    }
-
-    const maskRect={ x:mx0, y:my0, w:mw, h:mh, bg, data:savedData };
-Ersetzen mit:
-
     // Bereich: MINIMALES Padding — nur 1px für AA-Kanten
     const padX=1;
     const padY=1;
