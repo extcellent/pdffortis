@@ -1837,35 +1837,48 @@ async function openInlineEditor(span){
     const cx=x*scaleX, cy=y*scaleY;
     const cw=(x1-x)*scaleX, ch=(y1-y)*scaleY;
    
-    // === BG-Farbe per CLUSTER-MODE bestimmen (robust für jede Farbe) ===
+    // === BG-Farbe per CLUSTER-MODE — eng am Text sampeln (1-4px) ===
+    // Zu weites Sampling trifft Nachbar-Zeilen (dunkel) oder verlässt
+    // farbige Balken (Seite=weiß). Direkt um die Bbox ist immer Balken-BG.
     const samples=[];
-    const pick=(sx,sy)=>{
+    const pick=(sx,sy,weight)=>{
       if(sx<0||sy<0||sx>=canvas.width||sy>=canvas.height) return;
       try{
         const px=ctx.getImageData(sx|0,sy|0,1,1).data;
-        samples.push([px[0],px[1],px[2]]);   // KEIN Helligkeits-Filter!
+        const w=weight||1;
+        for(let k=0;k<w;k++) samples.push([px[0],px[1],px[2]]);
       }catch(e){}
     };
     const midY=cy+ch/2;
-    for(let i=4;i<=20;i+=2){
-      pick(cx-i,    midY);              // links neben Text
-      pick(cx+cw+i, midY);              // rechts neben Text
+    // SEITLICH: 1-4 px neben Bbox, jede Höhe samplen (gewichtet 2x weil sicherer)
+    for(let i=1;i<=4;i++){
+      for(let f=0.15;f<=0.85;f+=0.20){
+        pick(cx-i,        cy+ch*f, 2);
+        pick(cx+cw-1+i,   cy+ch*f, 2);
+      }
     }
-    for(let i=4;i<=10;i+=2){
-      pick(cx+cw*0.20, cy-i);           // oberhalb
-      pick(cx+cw*0.50, cy-i);
-      pick(cx+cw*0.80, cy-i);
-      pick(cx+cw*0.20, cy+ch+i);        // unterhalb
-      pick(cx+cw*0.50, cy+ch+i);
-      pick(cx+cw*0.80, cy+ch+i);
+    // OBEN/UNTEN: nur 1-2 px (mehr trifft Nachbarzeilen!)
+    for(let i=1;i<=2;i++){
+      for(let f=0.10;f<=0.90;f+=0.10){
+        pick(cx+cw*f, cy-i,     1);
+        pick(cx+cw*f, cy+ch-1+i,1);
+      }
+    }
+    // ECKEN: 1-2 px diagonal (sehr verlässlich)
+    for(let i=1;i<=2;i++){
+      pick(cx-i,      cy-i,      2);
+      pick(cx+cw-1+i, cy-i,      2);
+      pick(cx-i,      cy+ch-1+i, 2);
+      pick(cx+cw-1+i, cy+ch-1+i, 2);
     }
 
-    // Dominanten Cluster finden (Quantisierung auf 16er-Raster)
+    // Dominanten Cluster finden – gröberes Raster (>>5 = 8 Stufen/Kanal)
+    // → leichte BG-Variationen (Antialiasing/Kompression) landen im gleichen Bucket
     let bgR=255,bgG=255,bgB=255;
     if(samples.length){
       const buckets={};
       samples.forEach(s=>{
-        const k=(s[0]>>4)+','+(s[1]>>4)+','+(s[2]>>4);
+        const k=(s[0]>>5)+','+(s[1]>>5)+','+(s[2]>>5);
         if(!buckets[k]) buckets[k]={n:0,r:0,g:0,b:0};
         buckets[k].n++; buckets[k].r+=s[0]; buckets[k].g+=s[1]; buckets[k].b+=s[2];
       });
@@ -1881,8 +1894,8 @@ async function openInlineEditor(span){
     }
     const bg=`rgb(${bgR},${bgG},${bgB})`;
 
-    // Bereich: MINIMALES Padding — nur 1px für AA-Kanten
-    const padX=1;
+    // Bereich: 0 horizontal, 1 vertikal — Pass1/2 croppt eh auf echte Text-Pixel
+    const padX=0;
     const padY=1;
     const mx0=Math.max(0, Math.floor(cx-padX));
     const my0=Math.max(0, Math.floor(cy-padY));
