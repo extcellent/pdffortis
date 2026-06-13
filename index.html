@@ -262,27 +262,30 @@ input,select,textarea{font-family:var(--font)}
 
 /* PDF Text Inline Editor */
 .pdf-text-item{
+  position:absolute;
   cursor:text;
-  border-radius:2px;
-  transition:background .1s;
+  white-space:pre;
+  transform-origin:top left;
+  background:transparent;
+  outline:none;
+  border:none;
+  z-index:10;
 }
 .pdf-text-item:hover{
-  background:rgba(99,102,241,0.12)!important;
   outline:1px solid rgba(99,102,241,0.35);
 }
-#pdf-inline-editor{
-  position:absolute;
-  background:rgba(255,255,255,0.97);
-  border:2px solid #6366f1;
-  border-radius:4px;
-  padding:2px 5px;
-  outline:none;
-  z-index:200;
-  white-space:pre;
-  line-height:1.3;
-  cursor:text;
-  box-shadow:0 2px 16px rgba(99,102,241,0.18),0 0 0 3px rgba(99,102,241,0.10);
-  min-width:40px;
+/* Span wurde editiert → bleibt sichtbar als Maske über altem Canvas-Text */
+.pdf-text-item.is-edited{
+  color:black !important;
+  background:white;
+  box-shadow:0 0 0 1px white;
+}
+/* Span wird gerade editiert */
+.pdf-text-item.editing{
+  color:black !important;
+  background:white;
+  outline:1px solid rgba(99,102,241,0.5);
+  z-index:20;
 }
 
 /* ═══════════════════════════════════════
@@ -1785,12 +1788,12 @@ async function openInlineEditor(span){
     span.dataset.originalText=span.textContent;
   }
 
-  // Span transparent lassen — kein Doppeltext
-  span.style.color='transparent';
-  span.style.background='transparent';
-  span.style.outline='none';
-  span.style.caretColor='#4f46e5';
+  // Span sichtbar machen zum Editieren
+  span.classList.remove('is-edited');
   span.classList.add('editing');
+  span.style.color='black';
+  span.style.background='white';
+  span.style.minWidth='20px';
   span.contentEditable='true';
   span.spellcheck=false;
 
@@ -1829,68 +1832,48 @@ async function closeInlineEditor(save=true){
 
   span.contentEditable='false';
   span.classList.remove('editing');
-  span.style.color='transparent';
-  span.style.background='transparent';
 
-  if(!save){span.textContent=origText;return;}
-  if(newText===origText)return;
+  if(!save){
+    // Abbruch: Originaltext + unsichtbar
+    span.textContent=origText;
+    span.style.color='transparent';
+    span.style.background='transparent';
+    span.classList.remove('is-edited');
+    return;
+  }
 
+  if(newText===origText){
+    // Keine Änderung: unsichtbar lassen
+    span.style.color='transparent';
+    span.style.background='transparent';
+    return;
+  }
+
+  // Text geändert → Span bleibt sichtbar als Maske über altem Canvas-Text
+  span.textContent=newText;
+  span.dataset.editedText=newText;
+  span.classList.add('is-edited');
+  // Kein color/background inline setzen — CSS Klasse übernimmt das
+
+  // Canvas auf Original zurücksetzen (kein fillText mehr!)
   const pageNum=parseInt(span.dataset.pageNumber||currentPage,10);
   const img=pageImages[pageNum];
-  if(!img)return;
+  if(img){
+    const canvas=document.getElementById('pdf-canvas');
+    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+  }
 
-  const canvas=document.getElementById('pdf-canvas');
-  // img ist 2x PNG → native PDF Dimensionen
-  const pdfNativeWidth=img.width/2;
-  const pdfNativeHeight=img.height/2;
-  const scaleX=canvas.width/pdfNativeWidth;
-  const scaleY=canvas.height/pdfNativeHeight;
-
+  // Für Download speichern
   const x=parseFloat(span.dataset.pdfX);
   const y=parseFloat(span.dataset.pdfY);
   const x1=parseFloat(span.dataset.pdfX1);
   const y1=parseFloat(span.dataset.pdfY1);
   const size=parseFloat(span.dataset.pdfFontSize)||12;
 
-  // Edit speichern — alten überschreiben falls gleiche Position
   const idx=pendingEdits.findIndex(e=>e.page===pageNum&&e.x===x&&e.y===y);
   const edit={page:pageNum,x,y,x1,y1,size,newText,spanOrigText:origText};
   if(idx>-1) pendingEdits[idx]=edit;
   else pendingEdits.push(edit);
-
-  span.dataset.editedText=newText;
-  span.textContent=newText;
-
-  // Canvas neu zeichnen
-  const ctx=canvas.getContext('2d');
-
-  // Schritt 1: Original PNG komplett wiederherstellen
-  ctx.drawImage(img,0,0,canvas.width,canvas.height);
-
-  // Schritt 2: Jeden Edit draufmalen
-  // PyMuPDF Y ist von OBEN — kein Flip nötig
-  pendingEdits.filter(e=>e.page===pageNum).forEach(e=>{
-    const srcX=e.x*2;           // PNG ist 2x → *2
-    const srcY=e.y*2;
-    const srcW=(e.x1-e.x)*2;
-    const srcH=(e.y1-e.y)*2;
-
-    const dstX=e.x*scaleX;
-    const dstY=e.y*scaleY;
-    const dstW=(e.x1-e.x)*scaleX;
-    const dstH=(e.y1-e.y)*scaleY;
-
-    // Originalbereich aus PNG wiederherstellen → überschreibt alten Text auf Canvas
-    ctx.drawImage(img, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH);
-
-    // Neuen Text an Baseline zeichnen
-    ctx.save();
-    ctx.font=`${size*scaleY}px Arial`;
-    ctx.fillStyle='black';
-    ctx.textBaseline='alphabetic';
-    ctx.fillText(e.newText, dstX, dstY+dstH*0.85);
-    ctx.restore();
-  });
 }
    
 // ═══════════════════════════════════════
