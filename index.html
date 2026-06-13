@@ -1836,43 +1836,52 @@ async function openInlineEditor(span){
 
     const cx=x*scaleX, cy=y*scaleY;
     const cw=(x1-x)*scaleX, ch=(y1-y)*scaleY;
-
-    // Hintergrundfarbe ROBUST sampeln: mehrere Punkte AUSSERHALB der Textbox
-    // → Median pro Kanal ignoriert Text-/Antialiasing-Pixel
+   
+    // === BG-Farbe per CLUSTER-MODE bestimmen (robust für jede Farbe) ===
     const samples=[];
     const pick=(sx,sy)=>{
       if(sx<0||sy<0||sx>=canvas.width||sy>=canvas.height) return;
       try{
         const px=ctx.getImageData(sx|0,sy|0,1,1).data;
-        // Ignoriere fast-schwarze Pixel (sehr wahrscheinlich Text)
-        if(px[0]<40 && px[1]<40 && px[2]<40) return;
-        samples.push([px[0],px[1],px[2]]);
+        samples.push([px[0],px[1],px[2]]);   // KEIN Helligkeits-Filter!
       }catch(e){}
     };
     const midY=cy+ch/2;
-    for(let i=3;i<=14;i+=2){
-      pick(cx-i,   midY);            // links neben Text
-      pick(cx+cw+i,midY);            // rechts neben Text
+    for(let i=4;i<=20;i+=2){
+      pick(cx-i,    midY);              // links neben Text
+      pick(cx+cw+i, midY);              // rechts neben Text
     }
-    for(let i=3;i<=8;i+=2){
-      pick(cx+cw*0.25, cy-i);        // oberhalb
-      pick(cx+cw*0.75, cy-i);
-      pick(cx+cw*0.25, cy+ch+i);     // unterhalb
-      pick(cx+cw*0.75, cy+ch+i);
+    for(let i=4;i<=10;i+=2){
+      pick(cx+cw*0.20, cy-i);           // oberhalb
+      pick(cx+cw*0.50, cy-i);
+      pick(cx+cw*0.80, cy-i);
+      pick(cx+cw*0.20, cy+ch+i);        // unterhalb
+      pick(cx+cw*0.50, cy+ch+i);
+      pick(cx+cw*0.80, cy+ch+i);
     }
 
+    // Dominanten Cluster finden (Quantisierung auf 16er-Raster)
     let bgR=255,bgG=255,bgB=255;
     if(samples.length){
-      const med=c=>{
-        const a=samples.map(s=>s[c]).sort((p,q)=>p-q);
-        return a[Math.floor(a.length/2)];
-      };
-      bgR=med(0); bgG=med(1); bgB=med(2);
+      const buckets={};
+      samples.forEach(s=>{
+        const k=(s[0]>>4)+','+(s[1]>>4)+','+(s[2]>>4);
+        if(!buckets[k]) buckets[k]={n:0,r:0,g:0,b:0};
+        buckets[k].n++; buckets[k].r+=s[0]; buckets[k].g+=s[1]; buckets[k].b+=s[2];
+      });
+      let best=null;
+      for(const k in buckets){
+        if(!best||buckets[k].n>best.n) best=buckets[k];
+      }
+      if(best){
+        bgR=Math.round(best.r/best.n);
+        bgG=Math.round(best.g/best.n);
+        bgB=Math.round(best.b/best.n);
+      }
     }
     const bg=`rgb(${bgR},${bgG},${bgB})`;
-    const bgLum=(bgR+bgG+bgB)/3;
 
-    // Bereich klein halten – nur leichtes Padding für Antialiasing & Unterlängen
+    // Bereich: leichtes Padding für Antialiasing
     const padX=2;
     const padY=Math.max(2, ch*0.25);
     const mx0=Math.max(0, Math.floor(cx-padX));
@@ -1880,39 +1889,39 @@ async function openInlineEditor(span){
     const mw =Math.min(canvas.width -mx0, Math.ceil(cw+padX*2));
     const mh =Math.min(canvas.height-my0, Math.ceil(ch+padY*2));
 
-    // PER-PIXEL Maske: nur Text-Pixel (dunkler als Hintergrund) ersetzen
-    // → farbige Balken/Hintergründe bleiben pixelgenau erhalten
+    // === PER-PIXEL: ALLES was nicht BG-Farbe ist → ersetzen ===
+    // Reine Farbabstand-Prüfung, KEINE Helligkeits-Annahme
+    // → funktioniert auch bei hellem Text auf dunklem BG (z.B. gelb auf schwarz)
     let savedData=null;
     try{
       const imgData=ctx.getImageData(mx0,my0,mw,mh);
       const d=imgData.data;
+      const TH2=18*18;          // harter Threshold²: Pixel weiter weg = nicht BG
+      const SOFT2=42*42;        // ab hier vollständig ersetzen
       for(let i=0;i<d.length;i+=4){
-        const r=d[i], g=d[i+1], b=d[i+2];
-        const lum=(r+g+b)/3;
-        const dr=r-bgR, dg=g-bgG, db=b-bgB;
-        const dist=Math.sqrt(dr*dr+dg*dg+db*db);
-        // Pixel ist „Text", wenn:
-        //   a) deutlich anders als BG  UND
-        //   b) dunkler als BG (Antialiasing-Übergänge zählen mit)
-        if(dist>35 && lum < bgLum-10){
-          // Stärke der Übermalung: wie nah am BG (für weiche AA-Kanten)
-          const t=Math.min(1,(bgLum-lum)/120);
-          d[i  ]=r+(bgR-r)*Math.max(t,0.55);
-          d[i+1]=g+(bgG-g)*Math.max(t,0.55);
-          d[i+2]=b+(bgB-b)*Math.max(t,0.55);
+        const dr=d[i]-bgR, dg=d[i+1]-bgG, db=d[i+2]-bgB;
+        const dist2=dr*dr+dg*dg+db*db;
+        if(dist2 > SOFT2){
+          // Klar Text/Fremdfarbe → 100% BG
+          d[i  ]=bgR; d[i+1]=bgG; d[i+2]=bgB;
+        } else if(dist2 > TH2){
+          // Antialiasing-Übergang → glatt mischen
+          const t=(Math.sqrt(dist2)-18)/(42-18);
+          d[i  ]=Math.round(d[i  ]+(bgR-d[i  ])*t);
+          d[i+1]=Math.round(d[i+1]+(bgG-d[i+1])*t);
+          d[i+2]=Math.round(d[i+2]+(bgB-d[i+2])*t);
         }
       }
       ctx.putImageData(imgData,mx0,my0);
       savedData=imgData;
     }catch(e){
-      // Fallback: einfacher Rechteck-Fill
       ctx.fillStyle=bg;
       ctx.fillRect(mx0,my0,mw,mh);
     }
 
     const maskRect={ x:mx0, y:my0, w:mw, h:mh, bg, data:savedData };
-    span.dataset.maskInfo='1'; // nur Marker – maskRect liegt unten in pageMasks
-    span._maskRect=maskRect;   // direkter Ref für closeInlineEditor
+    span.dataset.maskInfo='1';
+    span._maskRect=maskRect;
     span.dataset.maskPage=pageNum;
   }
 
