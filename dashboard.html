@@ -1,1 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PDFortis — Company Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --white:#ffffff;
+  --gray-50:#f9fafb;
+  --gray-100:#f3f4f6;
+  --gray-200:#e5e7eb;
+  --gray-300:#d1d5db;
+  --gray-400:#9ca3af;
+  --gray-500:#6b7280;
+  --gray-600:#4b5563;
+  --gray-700:#374151;
+  --gray-900:#111827;
+  --blue:#2563eb;
+  --blue-l:#eff6ff;
+  --green:#16a34a;
+  --green-l:#f0fdf4;
+  --amber:#d97706;
+  --amber-l:#fffbeb;
+  --red:#dc2626;
+  --red-l:#fef2f2;
+  --rb1:#6366f1;--rb2:#8b5cf6;--rb3:#ec4899;--rb4:#f59e0b;--rb5:#10b981;--rb6:#3b82f6;
+  --radius:8px;
+  --shadow:0 1px 4px rgba(0,0,0,.07);
+  --shadow-md:0 4px 16px rgba(0,0,0,.09);
+  --shadow-lg:0 20px 60px rgba(0,0,0,.12);
+  --font:'Inter',system-ui,sans-serif;
+  --sidebar:220px;
+  --topbar:52px;
+}
+html,body{height:100%;font-family:var(--font);background:var(--gray-50);color:var(--gray-900);overflow:hidden}
+button,input,select,textarea{font-family:var(--font)}
+.hidden{display:none!important}
 
+/* ── RAINBOW ── */
+.rb-text{background:linear-gradient(135deg,var(--rb1),var(--rb2),var(--rb3),var(--rb4),var(--rb5),var(--rb6));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;background-size:300% 300%;animation:rbShift 5s ease infinite}
+@keyframes rbShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+.rb-dot{width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--rb1),var(--rb3));flex-shrink:0}
+
+/* ── AUTH GATE ── */
+#auth-gate{position:fixed;inset:0;background:white;display:flex;align-items:center;justify-content:center;z-index:1000}
+.auth-card{width:400px;padding:40px;border:1px solid var(--gray-200);border-radius:16px;box-shadow:var(--shadow-lg)}
+.auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:28px;justify-content:center}
+.auth-logo-icon{width:32px;height:32px}
+.auth-logo-text{font-size:18px;font-weight:800;letter-spacing:-.4px}
+.auth-card h2{font-size:20px;font-weight:700;margin-bottom:6px;text-align:center}
+.auth-card p{font-size:13px;color:var(--gray-500);text-align:center;margin-bottom:24px}
+.auth-tabs{display:flex;background:var(--gray-100);border-radius:8px;padding:3px;margin-bottom:20px}
+.auth-tab{flex:1;padding:7px;font-size:12px;font-weight:600;background:none;border:none;border-radius:6px;cursor:pointer;color:var(--gray-500);transition:all .15s}
+.auth-tab.active{background:white;color:var(--gray-900);box-shadow:var(--shadow)}
+.form-field{margin-bottom:14px}
+.form-field label{display:block;font-size:11px;font-weight:600;color:var(--gray-600);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.form-input{width:100%;padding:10px 12px;border:1px solid var(--gray-300);border-radius:7px;font-size:13px;outline:none;transition:border-color .12s}
+.form-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+.form-submit{width:100%;padding:11px;background:var(--gray-900);color:white;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s}
+.form-submit:hover{background:var(--gray-700)}
+.form-error{font-size:12px;color:var(--red);margin-bottom:10px;padding:8px 10px;background:var(--red-l);border-radius:6px;display:none}
+.form-note{font-size:11px;color:var(--gray-400);text-align:center;margin-top:12px}
+.token-field-wrap{position:relative}
+.token-field-wrap input{font-family:monospace;letter-spacing:1px;text-align:center}
+
+/* ── APP SHELL ── */
+#app{display:none;height:100vh;flex-direction:column}
+#app.visible{display:flex}
+
+/* ── TOP BAR ── */
+.topbar{height:var(--topbar);background:white;border-bottom:1px solid var(--gray-200);display:flex;align-items:center;padding:0 20px;gap:16px;flex-shrink:0;box-shadow:var(--shadow);position:relative;z-index:100}
+.topbar-logo{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0}
+.topbar-logo span{font-size:14px;font-weight:800;color:var(--gray-900);letter-spacing:-.3px}
+.topbar-logo span em{font-style:normal;background:linear-gradient(135deg,var(--rb1),var(--rb3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.topbar-company{flex:1;text-align:center}
+.topbar-company-name{font-size:16px;font-weight:700;letter-spacing:-.3px}
+.topbar-company-sub{font-size:11px;color:var(--gray-400);margin-top:1px}
+.topbar-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.topbar-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--rb1),var(--rb3));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0}
+.topbar-name{font-size:12px;font-weight:600;color:var(--gray-700)}
+.topbar-btn{padding:5px 12px;font-size:11px;font-weight:600;border:1px solid var(--gray-200);border-radius:99px;background:white;color:var(--gray-600);cursor:pointer;transition:all .15s}
+.topbar-btn:hover{background:var(--gray-50);color:var(--gray-900)}
+.new-pdf-btn{background:var(--gray-900);color:white;border-color:var(--gray-900);display:flex;align-items:center;gap:6px}
+.new-pdf-btn:hover{background:var(--gray-700)}
+
+/* ── LAYOUT ── */
+.app-body{flex:1;display:flex;overflow:hidden;min-height:0}
+
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sidebar);background:white;border-right:1px solid var(--gray-200);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.sidebar-nav{padding:12px 8px;flex:1}
+.sidebar-section-label{font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:1px;padding:8px 10px 4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;color:var(--gray-600);transition:all .15s;border:none;background:none;width:100%;text-align:left;position:relative}
+.nav-item:hover{background:var(--gray-50);color:var(--gray-900)}
+.nav-item.active{background:var(--blue-l);color:var(--blue);font-weight:600}
+.nav-item svg{flex-shrink:0;opacity:.7}
+.nav-item.active svg{opacity:1}
+.nav-badge{margin-left:auto;background:var(--red);color:white;font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px;min-width:18px;text-align:center}
+.nav-badge.green{background:var(--green)}
+
+.sidebar-savings{margin:12px 8px;padding:12px;background:linear-gradient(135deg,#f0fdf4,#eff6ff);border:1px solid var(--gray-200);border-radius:10px}
+.savings-title{font-size:11px;font-weight:700;color:var(--gray-700);margin-bottom:4px}
+.savings-amount{font-size:20px;font-weight:800;letter-spacing:-.5px}
+.savings-sub{font-size:10px;color:var(--gray-500);margin-top:2px}
+
+/* ── MAIN CONTENT ── */
+.main{flex:1;overflow-y:auto;padding:24px}
+
+/* ── TABS ── */
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ── CARDS ── */
+.card{background:white;border:1px solid var(--gray-200);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+.card-title{font-size:13px;font-weight:700;color:var(--gray-900);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.card-title span{display:flex;align-items:center;gap:7px}
+
+/* ── STAT CARDS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:white;border:1px solid var(--gray-200);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+.stat-val{font-size:28px;font-weight:800;letter-spacing:-.8px;line-height:1}
+.stat-label{font-size:11px;color:var(--gray-500);margin-top:4px}
+.stat-delta{font-size:11px;font-weight:600;margin-top:6px}
+.stat-delta.up{color:var(--green)}
+.stat-delta.neutral{color:var(--gray-400)}
+
+/* ── ACTIVITY FEED ── */
+.activity-list{display:flex;flex-direction:column;gap:2px}
+.activity-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;transition:background .12s;cursor:pointer}
+.activity-item:hover{background:var(--gray-50)}
+.activity-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:white;flex-shrink:0}
+.activity-info{flex:1;min-width:0}
+.activity-name{font-size:12px;font-weight:600;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.activity-meta{font-size:11px;color:var(--gray-400);margin-top:1px}
+.activity-badge{padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;flex-shrink:0}
+.badge-edit{background:#eff6ff;color:var(--blue)}
+.badge-sign{background:#f0fdf4;color:var(--green)}
+.badge-compress{background:#fffbeb;color:var(--amber)}
+.badge-merge{background:#faf5ff;color:#7c3aed}
+.activity-time{font-size:10px;color:var(--gray-400);flex-shrink:0;min-width:40px;text-align:right}
+
+/* ── DEADLINE BADGE ── */
+.deadline-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700}
+.deadline-urgent{background:var(--red-l);color:var(--red)}
+.deadline-soon{background:var(--amber-l);color:var(--amber)}
+.deadline-ok{background:var(--green-l);color:var(--green)}
+
+/* ── TEAM GRID ── */
+.team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.member-card{background:white;border:1px solid var(--gray-200);border-radius:12px;padding:18px;cursor:pointer;transition:all .2s;box-shadow:var(--shadow)}
+.member-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:var(--gray-300)}
+.member-card.selected{border-color:var(--blue);background:var(--blue-l)}
+.member-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:white;margin-bottom:10px}
+.member-name{font-size:13px;font-weight:700;color:var(--gray-900);margin-bottom:2px}
+.member-email{font-size:11px;color:var(--gray-400);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.member-status{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--gray-500)}
+.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.status-dot.online{background:#22c55e}
+.status-dot.away{background:var(--amber)}
+.status-dot.offline{background:var(--gray-300)}
+.member-docs{margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-100)}
+.member-doc-item{display:flex;align-items:center;gap:7px;padding:5px 0;font-size:11px;color:var(--gray-600);cursor:pointer;transition:color .12s}
+.member-doc-item:hover{color:var(--blue)}
+.member-doc-item svg{flex-shrink:0;color:var(--gray-400)}
+.member-doc-expired{opacity:.4;cursor:not-allowed}
+
+/* ── DOCUMENTS TABLE ── */
+.doc-filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.filter-btn{padding:5px 12px;font-size:11px;font-weight:600;border:1px solid var(--gray-200);border-radius:99px;background:white;color:var(--gray-500);cursor:pointer;transition:all .12s}
+.filter-btn.active,.filter-btn:hover{background:var(--gray-900);color:white;border-color:var(--gray-900)}
+.doc-table{width:100%;border-collapse:collapse}
+.doc-table th{font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.8px;padding:8px 12px;text-align:left;border-bottom:1px solid var(--gray-200)}
+.doc-table td{padding:10px 12px;font-size:12px;color:var(--gray-700);border-bottom:1px solid var(--gray-100);vertical-align:middle}
+.doc-table tr:hover td{background:var(--gray-50)}
+.doc-table tr:last-child td{border-bottom:none}
+.doc-name{font-weight:600;color:var(--gray-900);display:flex;align-items:center;gap:7px}
+.doc-actions{display:flex;gap:6px}
+.doc-btn{padding:3px 9px;font-size:10px;font-weight:600;border-radius:5px;border:1px solid var(--gray-200);background:white;cursor:pointer;color:var(--gray-600);transition:all .12s;white-space:nowrap}
+.doc-btn:hover{background:var(--gray-50);color:var(--gray-900)}
+.doc-btn.primary{background:var(--gray-900);color:white;border-color:var(--gray-900)}
+.doc-btn.primary:hover{background:var(--gray-700)}
+.share-link-copied{color:var(--green)!important;border-color:var(--green)!important}
+
+/* ── CHAT ── */
+.chat-wrap{display:flex;gap:16px;height:calc(100vh - var(--topbar) - 100px)}
+.chat-main{flex:1;display:flex;flex-direction:column;background:white;border:1px solid var(--gray-200);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+.chat-header{padding:14px 18px;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;gap:10px}
+.chat-header-title{font-size:14px;font-weight:700}
+.chat-header-sub{font-size:11px;color:var(--gray-400)}
+.chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.chat-msg{display:flex;gap:10px;max-width:85%}
+.chat-msg.own{align-self:flex-end;flex-direction:row-reverse}
+.chat-msg-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:white;flex-shrink:0;margin-top:2px}
+.chat-msg-body{display:flex;flex-direction:column;gap:3px}
+.chat-msg.own .chat-msg-body{align-items:flex-end}
+.chat-msg-name{font-size:10px;color:var(--gray-400);font-weight:600}
+.chat-msg-bubble{padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.5;color:var(--gray-900);background:var(--gray-100);border-radius:10px 10px 10px 2px}
+.chat-msg.own .chat-msg-bubble{background:var(--gray-900);color:white;border-radius:10px 10px 2px 10px}
+.chat-msg-time{font-size:10px;color:var(--gray-400)}
+.chat-doc-link{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:var(--blue-l);border:1px solid #bfdbfe;border-radius:7px;font-size:11px;font-weight:600;color:var(--blue);cursor:pointer;margin-top:4px;transition:all .12s}
+.chat-doc-link:hover{background:#dbeafe}
+.chat-doc-link.expired{opacity:.5;cursor:not-allowed;background:var(--gray-100);border-color:var(--gray-200);color:var(--gray-400)}
+.chat-input-area{padding:12px 16px;border-top:1px solid var(--gray-100);display:flex;gap:10px;align-items:flex-end}
+.chat-textarea{flex:1;padding:9px 12px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px;resize:none;outline:none;font-family:var(--font);line-height:1.4;max-height:80px;transition:border-color .12s}
+.chat-textarea:focus{border-color:var(--blue)}
+.chat-send-btn{padding:9px 16px;background:var(--gray-900);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;transition:background .15s;flex-shrink:0}
+.chat-send-btn:hover{background:var(--gray-700)}
+.chat-attach-btn{padding:9px;background:none;border:1px solid var(--gray-200);border-radius:8px;cursor:pointer;color:var(--gray-400);transition:all .12s;flex-shrink:0}
+.chat-attach-btn:hover{background:var(--gray-50);color:var(--gray-700)}
+
+/* ── ONLINE SIDEBAR ── */
+.online-panel{width:180px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
+.online-panel-title{font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.8px;padding:4px 0}
+.online-member{display:flex;align-items:center;gap:8px;padding:8px 10px;background:white;border:1px solid var(--gray-200);border-radius:8px}
+.online-member-info{flex:1;min-width:0}
+.online-member-name{font-size:12px;font-weight:600;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.online-member-action{font-size:10px;color:var(--gray-400)}
+
+/* ── SETTINGS ── */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.settings-card{background:white;border:1px solid var(--gray-200);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+.settings-card h3{font-size:13px;font-weight:700;margin-bottom:14px;color:var(--gray-900);display:flex;align-items:center;gap:7px}
+.settings-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray-100);font-size:13px}
+.settings-row:last-child{border-bottom:none}
+.settings-label{color:var(--gray-500);font-size:12px}
+.settings-val{font-weight:600;color:var(--gray-900);font-size:12px}
+.token-display{font-family:monospace;font-size:13px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+.copy-btn{padding:3px 10px;font-size:11px;font-weight:600;background:none;border:1px solid var(--gray-300);border-radius:5px;cursor:pointer;color:var(--gray-600);transition:all .12s}
+.copy-btn:hover{background:var(--gray-100)}
+.sig-upload-area{border:2px dashed var(--gray-300);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:all .15s;font-size:12px;color:var(--gray-400)}
+.sig-upload-area:hover{border-color:var(--blue);background:var(--blue-l)}
+.sig-preview{width:100%;height:80px;object-fit:contain;border:1px solid var(--gray-200);border-radius:6px;margin-top:8px}
+
+/* ── DEADLINE MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.modal{background:white;border-radius:14px;box-shadow:var(--shadow-lg);width:440px;max-width:94vw;overflow:hidden;animation:mIn .2s ease}
+@keyframes mIn{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:scale(1)}}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--gray-100)}
+.modal-hd h3{font-size:14px;font-weight:700}
+.modal-x{background:none;border:none;font-size:16px;color:var(--gray-400);cursor:pointer;padding:3px 6px;border-radius:4px;transition:all .12s}
+.modal-x:hover{background:var(--gray-100);color:var(--gray-700)}
+.modal-body{padding:20px}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--gray-900);color:white;padding:9px 18px;border-radius:8px;font-size:12px;font-weight:500;z-index:600;opacity:0;transition:all .2s;pointer-events:none;box-shadow:var(--shadow-md)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── EMPTY STATE ── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;text-align:center;color:var(--gray-400)}
+.empty svg{margin-bottom:12px;opacity:.4}
+.empty p{font-size:13px}
+
+/* ── UTIL ── */
+.btn{padding:8px 16px;border-radius:7px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .15s}
+.btn-primary{background:var(--gray-900);color:white}.btn-primary:hover{background:var(--gray-700)}
+.btn-ghost{background:none;color:var(--gray-600);border:1px solid var(--gray-300)}.btn-ghost:hover{background:var(--gray-50)}
+.full{width:100%}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mt-16{margin-top:16px}
+.flex-between{display:flex;align-items:center;justify-content:space-between}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════
+     AUTH GATE
+════════════════════════════════════ -->
+<div id="auth-gate">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg class="auth-logo-icon" viewBox="0 0 32 32" fill="none"><rect x="3" y="2" width="18" height="24" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="18" height="24" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="18" height="24" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span class="auth-logo-text">PDF<em>ortis</em> Dashboard</span>
+    </div>
+    <h2>Welcome back</h2>
+    <p>Sign in to access your company workspace</p>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('login')">Sign in</button>
+      <button class="auth-tab" onclick="switchAuthTab('signup')">Create account</button>
+    </div>
+    <div id="auth-login">
+      <div class="form-field"><label>Email</label><input class="form-input" id="l-email" type="email" placeholder="you@company.com"/></div>
+      <div class="form-field"><label>Password</label><input class="form-input" id="l-pw" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+      <div class="form-error" id="l-err"></div>
+      <button class="form-submit" onclick="doLogin()">Sign in</button>
+      <p class="form-note">Need an account? Switch to "Create account" above</p>
+    </div>
+    <div id="auth-signup" class="hidden">
+      <div class="form-field"><label>Your name</label><input class="form-input" id="s-name" type="text" placeholder="Anna Müller"/></div>
+      <div class="form-field"><label>Email</label><input class="form-input" id="s-email" type="email" placeholder="you@company.com"/></div>
+      <div class="form-field"><label>Password</label><input class="form-input" id="s-pw" type="password" placeholder="min. 8 characters"/></div>
+      <div class="form-field">
+        <label>Company Token <span style="font-weight:400;color:var(--gray-400)">(optional — enter to join your team)</span></label>
+        <div class="token-field-wrap"><input class="form-input" id="s-token" type="text" placeholder="COMPANY-XXXX-XXXX"/></div>
+      </div>
+      <div class="form-error" id="s-err"></div>
+      <button class="form-submit" onclick="doSignup()">Create free account</button>
+      <p class="form-note">Already have an account? Switch to "Sign in" above</p>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════
+     APP
+════════════════════════════════════ -->
+<div id="app">
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <a class="topbar-logo" href="/index.html">
+      <svg width="24" height="24" viewBox="0 0 32 32" fill="none"><rect x="3" y="2" width="18" height="24" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="18" height="24" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="18" height="24" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span>PDF<em>ortis</em></span>
+    </a>
+    <div class="topbar-company">
+      <div class="topbar-company-name rb-text" id="topbar-company-name">Company Dashboard</div>
+      <div class="topbar-company-sub" id="topbar-company-sub">Loading...</div>
+    </div>
+    <div class="topbar-right">
+      <button class="topbar-btn new-pdf-btn" onclick="window.location.href='/index.html'">
+        <svg width="12" height="12" fill="none" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        New PDF
+      </button>
+      <div class="topbar-avatar" id="topbar-avatar">?</div>
+      <span class="topbar-name" id="topbar-name">Loading...</span>
+      <button class="topbar-btn" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="app-body">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-nav">
+        <div class="sidebar-section-label">Workspace</div>
+        <button class="nav-item active" onclick="switchTab('overview')">
+          <svg width="15" height="15" fill="none" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+          Overview
+        </button>
+        <button class="nav-item" onclick="switchTab('team')">
+          <svg width="15" height="15" fill="none" viewBox="0 0 16 16"><circle cx="6" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/><circle cx="11" cy="5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M2 13c0-2.8 1.8-4 4-4s4 1.2 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M11 9c1.5.2 3 1.1 3 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          Team
+          <span class="nav-badge green" id="online-count">0</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('documents')">
+          <svg width="15" height="15" fill="none" viewBox="0 0 16 16"><rect x="2" y="1" width="10" height="13" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 5h5M5 8h5M5 11h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          Documents
+          <span class="nav-badge" id="doc-count">0</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('chat')">
+          <svg width="15" height="15" fill="none" viewBox="0 0 16 16"><path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v7a1 1 0 01-1 1H9l-3 2v-2H3a1 1 0 01-1-1V3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          Team Chat
+          <span class="nav-badge hidden" id="chat-badge">0</span>
+        </button>
+        <div class="sidebar-section-label" style="margin-top:8px">Account</div>
+        <button class="nav-item" onclick="switchTab('settings')">
+          <svg width="15" height="15" fill="none" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          Settings
+        </button>
+      </div>
+
+      <!-- SAVINGS PITCH -->
+      <div class="sidebar-savings">
+        <div class="savings-title">💰 You're saving</div>
+        <div class="savings-amount rb-text" id="savings-display">€0/mo</div>
+        <div class="savings-sub">vs Adobe Acrobat Pro</div>
+      </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+
+      <!-- ── OVERVIEW TAB ── -->
+      <div class="tab-panel active" id="tab-overview">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-val rb-text" id="stat-today">0</div>
+            <div class="stat-label">Documents today</div>
+            <div class="stat-delta neutral" id="stat-today-delta">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="stat-week">0</div>
+            <div class="stat-label">This week</div>
+            <div class="stat-delta up" id="stat-week-delta">↑ active team</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="stat-members">0</div>
+            <div class="stat-label">Team members</div>
+            <div class="stat-delta neutral"><span id="stat-online">0</span> online now</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" style="color:var(--green)" id="stat-saved">€0</div>
+            <div class="stat-label">Saved vs Adobe</div>
+            <div class="stat-delta up">per month</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">
+              <span>
+                <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.5l2 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Recent Activity
+              </span>
+              <button class="doc-btn" onclick="switchTab('documents')">See all</button>
+            </div>
+            <div class="activity-list" id="overview-activity">
+              <div class="empty"><svg width="32" height="32" fill="none" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" stroke="currentColor" stroke-width="1.5"/><path d="M16 10v6l4 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><p>No activity yet today</p></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">
+              <span>
+                <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" stroke="#22c55e" stroke-width="1.5"/><path d="M5.5 8l2 2L10.5 6" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Online Now
+              </span>
+            </div>
+            <div id="overview-online" class="activity-list">
+              <div class="empty"><p>Loading team...</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Deadline alerts -->
+        <div class="card mt-16" id="deadline-card" style="display:none">
+          <div class="card-title">
+            <span>⚠️ Upcoming Deadlines</span>
+          </div>
+          <div class="activity-list" id="deadline-list"></div>
+        </div>
+      </div>
+
+      <!-- ── TEAM TAB ── -->
+      <div class="tab-panel" id="tab-team">
+        <div class="flex-between" style="margin-bottom:16px">
+          <div>
+            <h2 style="font-size:16px;font-weight:700">Team Members</h2>
+            <p style="font-size:12px;color:var(--gray-500);margin-top:2px">Click a colleague to see their recent documents</p>
+          </div>
+        </div>
+        <div class="team-grid" id="team-grid">
+          <div class="empty" style="grid-column:1/-1"><p>Loading team...</p></div>
+        </div>
+      </div>
+
+      <!-- ── DOCUMENTS TAB ── -->
+      <div class="tab-panel" id="tab-documents">
+        <div class="flex-between" style="margin-bottom:16px">
+          <div>
+            <h2 style="font-size:16px;font-weight:700">Team Documents</h2>
+            <p style="font-size:12px;color:var(--gray-500);margin-top:2px">All documents shared in the last 48h</p>
+          </div>
+          <button class="btn btn-primary" onclick="openShareModal()">
+            + Share a document
+          </button>
+        </div>
+        <div class="doc-filters">
+          <button class="filter-btn active" onclick="filterDocs('all')">All</button>
+          <button class="filter-btn" onclick="filterDocs('edited')">Edited</button>
+          <button class="filter-btn" onclick="filterDocs('signed')">Signed</button>
+          <button class="filter-btn" onclick="filterDocs('compressed')">Compressed</button>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>Document</th>
+                <th>By</th>
+                <th>Action</th>
+                <th>Deadline</th>
+                <th>Expires</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="doc-tbody">
+              <tr><td colspan="6"><div class="empty"><p>No documents shared yet</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── CHAT TAB ── -->
+      <div class="tab-panel" id="tab-chat">
+        <div class="chat-wrap">
+          <div class="chat-main">
+            <div class="chat-header">
+              <div class="rb-dot"></div>
+              <div>
+                <div class="chat-header-title" id="chat-company-title">Team Channel</div>
+                <div class="chat-header-sub" id="chat-member-count">— members</div>
+              </div>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+              <div class="empty">
+                <svg width="32" height="32" fill="none" viewBox="0 0 32 32"><path d="M4 6a2 2 0 012-2h20a2 2 0 012 2v14a2 2 0 01-2 2H18l-5 4v-4H6a2 2 0 01-2-2V6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                <p>No messages yet — start the conversation!</p>
+              </div>
+            </div>
+            <div class="chat-input-area">
+              <button class="chat-attach-btn" onclick="attachDocToChat()" title="Attach document">
+                <svg width="15" height="15" fill="none" viewBox="0 0 16 16"><path d="M13 8.5l-5 5a4 4 0 01-5.7-5.6l6-6a2.5 2.5 0 013.5 3.5L6.2 11a1 1 0 01-1.4-1.4L10 4.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <textarea class="chat-textarea" id="chat-input" placeholder="Message your team..." rows="1" onkeydown="chatKeydown(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"></textarea>
+              <button class="chat-send-btn" onclick="sendMessage()">Send</button>
+            </div>
+          </div>
+          <div class="online-panel">
+            <div class="online-panel-title">Online</div>
+            <div id="online-members-chat"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SETTINGS TAB ── -->
+      <div class="tab-panel" id="tab-settings">
+        <div class="settings-grid">
+          <div class="settings-card">
+            <h3>
+              <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M8 2L3 4v4c0 3 2.5 5.5 5 6 2.5-.5 5-3 5-6V4L8 2z" stroke="currentColor" stroke-width="1.3"/></svg>
+              Company Details
+            </h3>
+            <div class="settings-row"><span class="settings-label">Company name</span><span class="settings-val" id="set-company-name">—</span></div>
+            <div class="settings-row"><span class="settings-label">Address</span><span class="settings-val" id="set-company-address" style="text-align:right;max-width:160px">—</span></div>
+            <div class="settings-row"><span class="settings-label">Contact email</span><span class="settings-val" id="set-company-email">—</span></div>
+            <div class="settings-row"><span class="settings-label">Members</span><span class="settings-val" id="set-member-count">—</span></div>
+            <div style="margin-top:14px">
+              <div style="font-size:11px;font-weight:600;color:var(--gray-600);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Your Company Token</div>
+              <div class="token-display">
+                <span id="set-token-display" style="font-size:12px;color:var(--gray-700)">—</span>
+                <button class="copy-btn" onclick="copyToken()">Copy</button>
+              </div>
+              <p style="font-size:11px;color:var(--gray-400);margin-top:6px">Share this with new team members so they can join your workspace.</p>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3>
+              <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M2 13c3-3 4-8 6-8s3 5 5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              Company Signature
+            </h3>
+            <p style="font-size:12px;color:var(--gray-500);margin-bottom:12px">Used automatically on all signed documents from your team.</p>
+            <div id="sig-area">
+              <label class="sig-upload-area" id="sig-upload-label">
+                <svg width="28" height="28" fill="none" viewBox="0 0 28 28"><path d="M14 4v16M8 12l6-6 6 6M4 22h20" stroke="#6366f1" stroke-width="1.8" stroke-linecap="round"/></svg>
+                <span style="display:block;margin-top:6px">Upload signature image</span>
+                <input type="file" accept="image/*" onchange="uploadCompanySig(event)" hidden/>
+              </label>
+              <img id="sig-preview-img" class="sig-preview hidden" src="" alt="Company signature"/>
+              <button class="btn btn-ghost full" style="margin-top:8px;display:none" id="sig-remove-btn" onclick="removeCompanySig()">Remove signature</button>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3>
+              <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><circle cx="8" cy="6" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              Your Profile
+            </h3>
+            <div class="settings-row"><span class="settings-label">Name</span><span class="settings-val" id="set-user-name">—</span></div>
+            <div class="settings-row"><span class="settings-label">Email</span><span class="settings-val" id="set-user-email">—</span></div>
+            <div class="settings-row"><span class="settings-label">Member since</span><span class="settings-val" id="set-member-since">—</span></div>
+            <button class="btn btn-ghost full" style="margin-top:14px" onclick="doLogout()">Sign out</button>
+          </div>
+
+          <div class="settings-card">
+            <h3>📊 Usage This Month</h3>
+            <div class="settings-row"><span class="settings-label">Documents edited</span><span class="settings-val" id="set-edits">—</span></div>
+            <div class="settings-row"><span class="settings-label">Documents signed</span><span class="settings-val" id="set-signs">—</span></div>
+            <div class="settings-row"><span class="settings-label">Downloads</span><span class="settings-val" id="set-downloads">—</span></div>
+            <div style="margin-top:14px;padding:12px;background:var(--green-l);border-radius:8px;border:1px solid #bbf7d0">
+              <div style="font-size:12px;font-weight:700;color:var(--green)">💰 Monthly savings</div>
+              <div style="font-size:22px;font-weight:800;color:var(--green);margin-top:4px" id="set-savings">€0</div>
+              <div style="font-size:11px;color:var(--gray-500);margin-top:2px">vs Adobe Acrobat Pro (€23.99/user/month)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /main -->
+  </div><!-- /app-body -->
+</div><!-- /app -->
+
+<!-- Share Modal -->
+<div class="modal-bg hidden" id="share-modal">
+  <div class="modal">
+    <div class="modal-hd"><h3>Share Document with Team</h3><button class="modal-x" onclick="closeModal('share-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-field"><label>Document name</label><input class="form-input" id="share-name" type="text" placeholder="e.g. Vertrag_Mueller.pdf"/></div>
+      <div class="form-field"><label>Action performed</label>
+        <select class="form-input" id="share-action">
+          <option value="edited">Edited</option>
+          <option value="signed">Signed</option>
+          <option value="compressed">Compressed</option>
+          <option value="merged">Merged</option>
+        </select>
+      </div>
+      <div class="form-field"><label>Deadline <span style="font-weight:400;color:var(--gray-400)">(optional)</span></label><input class="form-input" id="share-deadline" type="datetime-local"/></div>
+      <div class="form-field"><label>Comment <span style="font-weight:400;color:var(--gray-400)">(optional)</span></label><input class="form-input" id="share-comment" type="text" placeholder="e.g. Please review page 3"/></div>
+      <p style="font-size:11px;color:var(--gray-400);margin-bottom:14px">The document link will be accessible to your team for 48 hours. The PDF itself stays on your device.</p>
+      <button class="btn btn-primary full" onclick="shareDocument()">Share with team →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="/supabase.js"></script>
+<script src="/dashboard.js"></script>
+</body>
+</html>
