@@ -984,8 +984,12 @@ async function renderPage(n){
   _ctx.drawImage(img,0,0,canvas.width,canvas.height);
   // Editier-Masken (übermalte Originaltext-Bereiche) erneut auftragen
   (pageMasks[n]||[]).forEach(m=>{
-    _ctx.fillStyle=m.bg;
-    _ctx.fillRect(m.x,m.y,m.w,m.h);
+    if(m.data){
+      _ctx.putImageData(m.data, m.x, m.y);
+    }else{
+      _ctx.fillStyle=m.bg;
+      _ctx.fillRect(m.x,m.y,m.w,m.h);
+    }
   });
   loadTextItems(n,img.width,canvas.width);
 
@@ -1857,24 +1861,58 @@ async function openInlineEditor(span){
       pick(cx+cw*0.75, cy+ch+i);
     }
 
-    let bg='rgb(255,255,255)';
+    let bgR=255,bgG=255,bgB=255;
     if(samples.length){
       const med=c=>{
         const a=samples.map(s=>s[c]).sort((p,q)=>p-q);
         return a[Math.floor(a.length/2)];
       };
-      bg=`rgb(${med(0)},${med(1)},${med(2)})`;
+      bgR=med(0); bgG=med(1); bgB=med(2);
+    }
+    const bg=`rgb(${bgR},${bgG},${bgB})`;
+    const bgLum=(bgR+bgG+bgB)/3;
+
+    // Bereich klein halten – nur leichtes Padding für Antialiasing & Unterlängen
+    const padX=2;
+    const padY=Math.max(2, ch*0.25);
+    const mx0=Math.max(0, Math.floor(cx-padX));
+    const my0=Math.max(0, Math.floor(cy-padY));
+    const mw =Math.min(canvas.width -mx0, Math.ceil(cw+padX*2));
+    const mh =Math.min(canvas.height-my0, Math.ceil(ch+padY*2));
+
+    // PER-PIXEL Maske: nur Text-Pixel (dunkler als Hintergrund) ersetzen
+    // → farbige Balken/Hintergründe bleiben pixelgenau erhalten
+    let savedData=null;
+    try{
+      const imgData=ctx.getImageData(mx0,my0,mw,mh);
+      const d=imgData.data;
+      for(let i=0;i<d.length;i+=4){
+        const r=d[i], g=d[i+1], b=d[i+2];
+        const lum=(r+g+b)/3;
+        const dr=r-bgR, dg=g-bgG, db=b-bgB;
+        const dist=Math.sqrt(dr*dr+dg*dg+db*db);
+        // Pixel ist „Text", wenn:
+        //   a) deutlich anders als BG  UND
+        //   b) dunkler als BG (Antialiasing-Übergänge zählen mit)
+        if(dist>35 && lum < bgLum-10){
+          // Stärke der Übermalung: wie nah am BG (für weiche AA-Kanten)
+          const t=Math.min(1,(bgLum-lum)/120);
+          d[i  ]=r+(bgR-r)*Math.max(t,0.55);
+          d[i+1]=g+(bgG-g)*Math.max(t,0.55);
+          d[i+2]=b+(bgB-b)*Math.max(t,0.55);
+        }
+      }
+      ctx.putImageData(imgData,mx0,my0);
+      savedData=imgData;
+    }catch(e){
+      // Fallback: einfacher Rechteck-Fill
+      ctx.fillStyle=bg;
+      ctx.fillRect(mx0,my0,mw,mh);
     }
 
-    // Padding für Ober-/Unterlängen
-    const padY=Math.max(2,ch*0.25);
-    const padX=2;
-    const maskRect={ x:cx-padX, y:cy-padY, w:cw+padX*2, h:ch+padY*2, bg };
-
-    ctx.fillStyle=bg;
-    ctx.fillRect(maskRect.x,maskRect.y,maskRect.w,maskRect.h);
-
-    span.dataset.maskInfo=JSON.stringify(maskRect);
+    const maskRect={ x:mx0, y:my0, w:mw, h:mh, bg, data:savedData };
+    span.dataset.maskInfo='1'; // nur Marker – maskRect liegt unten in pageMasks
+    span._maskRect=maskRect;   // direkter Ref für closeInlineEditor
     span.dataset.maskPage=pageNum;
   }
 
@@ -1966,12 +2004,10 @@ async function closeInlineEditor(save=true){
 
   // === Text wurde geändert ===
   // 1) Maske dauerhaft in pageMasks übernehmen → bleibt nach Re-Render erhalten
-  if(span.dataset.maskInfo){
-    try{
-      const m=JSON.parse(span.dataset.maskInfo);
-      if(!pageMasks[pageNum]) pageMasks[pageNum]=[];
-      pageMasks[pageNum].push(m);
-    }catch(e){}
+  if(span._maskRect){
+    if(!pageMasks[pageNum]) pageMasks[pageNum]=[];
+    pageMasks[pageNum].push(span._maskRect);
+    delete span._maskRect;
     delete span.dataset.maskInfo;
     delete span.dataset.maskPage;
   }
