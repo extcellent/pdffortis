@@ -1011,9 +1011,15 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
   const res=await fetch(`${API}/extract`,{method:'POST',body:form});
   const {items, pageWidth, pageHeight}=await res.json();
 
-  // imgWidth ist 2x (Matrix(2,2) im Backend) → echte PDF-Breite = imgWidth/2
+  // imgWidth ist 2x (Matrix 2,2) → native PDF Breite
   const pdfNativeWidth=imgWidth/2;
+  // scale: wie viel Canvas-Pixel pro PDF-Punkt
   const scale=canvasWidth/pdfNativeWidth;
+
+  // pageHeight vom Backend = echte PDF-Höhe in Punkten
+  // canvasHeight berechnen damit top-Koordinaten stimmen
+  const canvas=document.getElementById('pdf-canvas');
+  const canvasHeight=canvas.height;
 
   const editActive=(editorMode==='edit'&&currentTab==='edit');
 
@@ -1033,9 +1039,11 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
     span.dataset.pdfX1=item.x1;
     span.dataset.pdfY1=item.y1;
     span.dataset.pdfFontSize=item.size;
+    // pageHeight speichern für closeInlineEditor
+    span.dataset.pdfPageHeight=pageHeight;
 
     const left=item.x*scale;
-    const top=item.y*scale;
+    const top=item.y*scale;  // PyMuPDF Y ist bereits von oben — kein Flip nötig
     const w=(item.x1-item.x)*scale;
     const h=(item.y1-item.y)*scale;
 
@@ -1046,9 +1054,11 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
       width:${Math.max(w,20)}px;
       height:${Math.max(h,10)}px;
       font-size:${item.size*scale}px;
+      line-height:${h}px;
       color:transparent;
       white-space:pre;
       cursor:text;
+      overflow:visible;
       pointer-events:${editActive?'all':'none'};
     `;
     layer.appendChild(span);
@@ -1830,7 +1840,7 @@ async function closeInlineEditor(save=true){
   if(!img)return;
 
   const canvas=document.getElementById('pdf-canvas');
-  // img.width ist 2x (Matrix 2,2) → native PDF width = img.width/2
+  // img ist 2x PNG → native PDF Dimensionen
   const pdfNativeWidth=img.width/2;
   const pdfNativeHeight=img.height/2;
   const scaleX=canvas.width/pdfNativeWidth;
@@ -1842,7 +1852,7 @@ async function closeInlineEditor(save=true){
   const y1=parseFloat(span.dataset.pdfY1);
   const size=parseFloat(span.dataset.pdfFontSize)||12;
 
-  // Edit speichern
+  // Edit speichern — alten überschreiben falls gleiche Position
   const idx=pendingEdits.findIndex(e=>e.page===pageNum&&e.x===x&&e.y===y);
   const edit={page:pageNum,x,y,x1,y1,size,newText,spanOrigText:origText};
   if(idx>-1) pendingEdits[idx]=edit;
@@ -1851,33 +1861,35 @@ async function closeInlineEditor(save=true){
   span.dataset.editedText=newText;
   span.textContent=newText;
 
-  // Canvas komplett neu zeichnen
+  // Canvas neu zeichnen
   const ctx=canvas.getContext('2d');
-  // 1. Original PNG wiederherstellen
+
+  // Schritt 1: Original PNG komplett wiederherstellen
   ctx.drawImage(img,0,0,canvas.width,canvas.height);
 
-  // 2. Jeden Edit draufmalen
+  // Schritt 2: Jeden Edit draufmalen
+  // PyMuPDF Y ist von OBEN — kein Flip nötig
   pendingEdits.filter(e=>e.page===pageNum).forEach(e=>{
-    // PDF Y-Koordinaten sind von unten — PNG von oben
-    // Daher: pngY = pdfNativeHeight - pdfY1
-    const pngSrcX = e.x * 2;
-    const pngSrcY = (pdfNativeHeight - e.y1) * 2;
-    const pngSrcW = (e.x1 - e.x) * 2;
-    const pngSrcH = (e.y1 - e.y) * 2;
+    const srcX=e.x*2;           // PNG ist 2x → *2
+    const srcY=e.y*2;
+    const srcW=(e.x1-e.x)*2;
+    const srcH=(e.y1-e.y)*2;
 
-    const dstX = e.x * scaleX;
-    const dstY = (pdfNativeHeight - e.y1) * scaleY;
-    const dstW = (e.x1 - e.x) * scaleX;
-    const dstH = (e.y1 - e.y) * scaleY;
+    const dstX=e.x*scaleX;
+    const dstY=e.y*scaleY;
+    const dstW=(e.x1-e.x)*scaleX;
+    const dstH=(e.y1-e.y)*scaleY;
 
-    // Originalbereich wiederherstellen (überschreibt alten Text)
-    ctx.drawImage(img, pngSrcX, pngSrcY, pngSrcW, pngSrcH, dstX, dstY, dstW, dstH);
+    // Originalbereich aus PNG wiederherstellen → überschreibt alten Text auf Canvas
+    ctx.drawImage(img, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH);
 
-    // Neuen Text draufmalen
-    ctx.font=`${e.size*scaleY}px Arial`;
+    // Neuen Text an Baseline zeichnen
+    ctx.save();
+    ctx.font=`${size*scaleY}px Arial`;
     ctx.fillStyle='black';
     ctx.textBaseline='alphabetic';
-    ctx.fillText(e.newText, dstX, dstY + dstH * 0.85);
+    ctx.fillText(e.newText, dstX, dstY+dstH*0.85);
+    ctx.restore();
   });
 }
    
