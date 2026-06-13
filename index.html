@@ -260,7 +260,6 @@ input,select,textarea{font-family:var(--font)}
 .canvas-area.look-mode{cursor:default}
 .canvas-area.edit-mode{cursor:text}
 
-/* PDF Text Inline Editor */
 .pdf-text-item{
   position:absolute;
   cursor:text;
@@ -269,22 +268,28 @@ input,select,textarea{font-family:var(--font)}
   background:transparent;
   outline:none;
   border:none;
+  border-radius:0;
+  padding:0;
   z-index:10;
 }
 .pdf-text-item:hover{
-  outline:1px solid rgba(99,102,241,0.35);
+  background:rgba(99,102,241,0.08);
 }
-/* Span wurde editiert → bleibt sichtbar als Maske über altem Canvas-Text */
+/* Editiert → nahtlos, KEINE Umrandung, KEIN weißer Hintergrund */
 .pdf-text-item.is-edited{
-  color:black !important;
-  background:white;
-  box-shadow:0 0 0 1px white;
+  background:transparent !important;
+  box-shadow:none !important;
+  border:none !important;
+  outline:none !important;
+  padding:0 !important;
 }
-/* Span wird gerade editiert */
+/* Wird gerade getippt – nur Caret, kein Rahmen */
 .pdf-text-item.editing{
-  color:black !important;
-  background:white;
-  outline:1px solid rgba(99,102,241,0.5);
+  background:transparent !important;
+  outline:none !important;
+  border:none !important;
+  box-shadow:none !important;
+  padding:0 !important;
   z-index:20;
 }
 
@@ -355,30 +360,7 @@ input,select,textarea{font-family:var(--font)}
 
    /* PDF Text Layer */
 .pdf-text-layer{z-index:2}
-.pdf-text-item{
-  position:absolute;
-  color:transparent;
-  cursor:text;
-  border-radius:2px;
-  transition:background .1s;
-}
-.pdf-text-item:hover{
-  background:rgba(99,102,241,0.12);
-  color:transparent;
-}
-.pdf-text-item.editing{
-  color:#111;
-  background:rgba(255,255,255,0.97);
-  border:1.5px solid #6366f1;
-  box-shadow:0 0 0 3px rgba(99,102,241,0.15);
-  outline:none;
-  z-index:15;
-  padding:2px 4px;
-  min-width:40px;
-  white-space:pre;
-  cursor:text;
-  border-radius:3px;
-}
+   
 /* Buttons */
 .btn{padding:9px 18px;border-radius:7px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all .15s}
 .btn-primary{background:var(--gray-900);color:white}.btn-primary:hover{background:var(--gray-700)}
@@ -1049,11 +1031,28 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
     span.dataset.pdfX1=item.x1;
     span.dataset.pdfY1=item.y1;
     span.dataset.pdfFontSize=item.size;
-    // pageHeight speichern für closeInlineEditor
     span.dataset.pdfPageHeight=pageHeight;
+    span.dataset.pdfColor=item.color||0;
+    span.dataset.pdfFont=item.font||'';
+    span.dataset.pdfFlags=item.flags||0;
+
+    // Farbe (PyMuPDF gibt int sRGB)
+    const ci=item.color|0;
+    const r=(ci>>16)&255, g=(ci>>8)&255, b=ci&255;
+    const rgb=`rgb(${r},${g},${b})`;
+
+    // Font-Family aus Fontnamen ableiten
+    const fn=(item.font||'').toLowerCase();
+    const fl=item.flags||0;
+    let family='Arial, Helvetica, sans-serif';
+    if(fl&8 || /mono|courier/.test(fn))      family='"Courier New", Courier, monospace';
+    else if(fl&4 || /times|roman|serif/.test(fn)) family='"Times New Roman", Times, serif';
+    else if(/helv|arial|sans/.test(fn))      family='Arial, Helvetica, sans-serif';
+    const weight=(fl&16 || /bold/.test(fn))?'700':'400';
+    const style =(fl&2  || /italic|oblique/.test(fn))?'italic':'normal';
 
     const left=item.x*scale;
-    const top=item.y*scale;  // PyMuPDF Y ist bereits von oben — kein Flip nötig
+    const top =item.y*scale;
     const w=(item.x1-item.x)*scale;
     const h=(item.y1-item.y)*scale;
 
@@ -1065,12 +1064,20 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
       height:${Math.max(h,10)}px;
       font-size:${item.size*scale}px;
       line-height:${h}px;
+      font-family:${family};
+      font-weight:${weight};
+      font-style:${style};
       color:transparent;
       white-space:pre;
       cursor:text;
       overflow:visible;
       pointer-events:${editActive?'all':'none'};
     `;
+    // Original-Farbe für später speichern
+    span.dataset.cssColor=rgb;
+    span.dataset.cssFamily=family;
+    span.dataset.cssWeight=weight;
+    span.dataset.cssStyle=style;
     layer.appendChild(span);
   });
 
@@ -1813,9 +1820,9 @@ async function openInlineEditor(span){
 
   // === Originaltext WIRKLICH vom Canvas entfernen ===
   if(img){
-    const pdfNativeWidth=img.width/2;
+    const pdfNativeWidth =img.width/2;
     const pdfNativeHeight=img.height/2;
-    const scaleX=canvas.width/pdfNativeWidth;
+    const scaleX=canvas.width /pdfNativeWidth;
     const scaleY=canvas.height/pdfNativeHeight;
 
     const x =parseFloat(span.dataset.pdfX);
@@ -1823,49 +1830,71 @@ async function openInlineEditor(span){
     const x1=parseFloat(span.dataset.pdfX1);
     const y1=parseFloat(span.dataset.pdfY1);
 
-    const cx=x*scaleX;
-    const cy=y*scaleY;
-    const cw=(x1-x)*scaleX;
-    const ch=(y1-y)*scaleY;
+    const cx=x*scaleX, cy=y*scaleY;
+    const cw=(x1-x)*scaleX, ch=(y1-y)*scaleY;
 
-    // Hintergrundfarbe sampeln – knapp ÜBER der Textzeile (da ist meist nichts drauf)
-    let bg='rgb(255,255,255)';
-    try{
-      const sx=Math.max(0,Math.min(canvas.width-1,Math.floor(cx+cw/2)));
-      const sy=Math.max(0,Math.floor(cy-Math.max(3,ch*0.4)));
-      const px=ctx.getImageData(sx,sy,1,1).data;
-      bg=`rgb(${px[0]},${px[1]},${px[2]})`;
-    }catch(e){}
-
-    // Etwas Padding für Ober-/Unterlängen
-    const padY=Math.max(2,ch*0.20);
-    const padX=2;
-    const maskRect={
-      x: cx-padX,
-      y: cy-padY,
-      w: cw+padX*2,
-      h: ch+padY*2,
-      bg
+    // Hintergrundfarbe ROBUST sampeln: mehrere Punkte AUSSERHALB der Textbox
+    // → Median pro Kanal ignoriert Text-/Antialiasing-Pixel
+    const samples=[];
+    const pick=(sx,sy)=>{
+      if(sx<0||sy<0||sx>=canvas.width||sy>=canvas.height) return;
+      try{
+        const px=ctx.getImageData(sx|0,sy|0,1,1).data;
+        // Ignoriere fast-schwarze Pixel (sehr wahrscheinlich Text)
+        if(px[0]<40 && px[1]<40 && px[2]<40) return;
+        samples.push([px[0],px[1],px[2]]);
+      }catch(e){}
     };
+    const midY=cy+ch/2;
+    for(let i=3;i<=14;i+=2){
+      pick(cx-i,   midY);            // links neben Text
+      pick(cx+cw+i,midY);            // rechts neben Text
+    }
+    for(let i=3;i<=8;i+=2){
+      pick(cx+cw*0.25, cy-i);        // oberhalb
+      pick(cx+cw*0.75, cy-i);
+      pick(cx+cw*0.25, cy+ch+i);     // unterhalb
+      pick(cx+cw*0.75, cy+ch+i);
+    }
 
-    // Maske SOFORT zeichnen → Originaltext verschwindet
+    let bg='rgb(255,255,255)';
+    if(samples.length){
+      const med=c=>{
+        const a=samples.map(s=>s[c]).sort((p,q)=>p-q);
+        return a[Math.floor(a.length/2)];
+      };
+      bg=`rgb(${med(0)},${med(1)},${med(2)})`;
+    }
+
+    // Padding für Ober-/Unterlängen
+    const padY=Math.max(2,ch*0.25);
+    const padX=2;
+    const maskRect={ x:cx-padX, y:cy-padY, w:cw+padX*2, h:ch+padY*2, bg };
+
     ctx.fillStyle=bg;
     ctx.fillRect(maskRect.x,maskRect.y,maskRect.w,maskRect.h);
 
-    // Maske am Span merken – wird beim Speichern in pageMasks übernommen
     span.dataset.maskInfo=JSON.stringify(maskRect);
     span.dataset.maskPage=pageNum;
   }
 
-  // Span editierbar machen – sichtbarer schwarzer Text statt transparent
+  // Span editierbar machen – Original-Farbe & Font verwenden, KEIN weißer Hintergrund
   span.classList.remove('is-edited');
   span.classList.add('editing');
-  span.style.color='black';
-  span.style.background='transparent';
-  span.style.caretColor='#4f46e5';
-  span.style.minWidth='20px';
-  span.contentEditable='true';
-  span.spellcheck=false;
+  span.style.color       = span.dataset.cssColor  || 'black';
+  span.style.fontFamily  = span.dataset.cssFamily || 'Arial,sans-serif';
+  span.style.fontWeight  = span.dataset.cssWeight || '400';
+  span.style.fontStyle   = span.dataset.cssStyle  || 'normal';
+  span.style.background  = 'transparent';
+  span.style.boxShadow   = 'none';
+  span.style.border      = 'none';
+  span.style.outline     = 'none';
+  span.style.padding     = '0';
+  span.style.caretColor  = '#4f46e5';
+  span.style.minWidth    = '20px';
+  span.contentEditable   = 'true';
+  span.spellcheck        = false;
+
 
   span.focus();
   const range=document.createRange();
@@ -1902,6 +1931,12 @@ async function closeInlineEditor(save=true){
 
   span.contentEditable = 'false';
   span.classList.remove('editing');
+  // Sicherheit: alle inline-Styles vom Editing-Modus killen
+  span.style.boxShadow = 'none';
+  span.style.border    = 'none';
+  span.style.outline   = 'none';
+  span.style.background= 'transparent';
+  span.style.padding   = '0';
 
   const canvas = document.getElementById('pdf-canvas');
   const ctx    = canvas.getContext('2d');
@@ -1941,11 +1976,18 @@ async function closeInlineEditor(save=true){
     delete span.dataset.maskPage;
   }
 
-  // 2) Neuen Text im Span sichtbar lassen
-  span.textContent       = newText;
-  span.dataset.editedText= newText;
-  span.style.color       = 'black';
-  span.style.background  = 'transparent';
+  // 2) Neuen Text im Span sichtbar lassen – Original-Farbe/Font
+  span.textContent        = newText;
+  span.dataset.editedText = newText;
+  span.style.color        = span.dataset.cssColor  || 'black';
+  span.style.fontFamily   = span.dataset.cssFamily || 'Arial,sans-serif';
+  span.style.fontWeight   = span.dataset.cssWeight || '400';
+  span.style.fontStyle    = span.dataset.cssStyle  || 'normal';
+  span.style.background   = 'transparent';
+  span.style.boxShadow    = 'none';
+  span.style.border       = 'none';
+  span.style.outline      = 'none';
+  span.style.padding      = '0';
   span.classList.add('is-edited');
 
   // 3) Für Download an Backend merken
@@ -1955,8 +1997,11 @@ async function closeInlineEditor(save=true){
   const y1 = parseFloat(span.dataset.pdfY1);
   const size = parseFloat(span.dataset.pdfFontSize) || 12;
 
+  const color = parseInt(span.dataset.pdfColor||0,10);
+  const font  = span.dataset.pdfFont  || '';
+  const flags = parseInt(span.dataset.pdfFlags||0,10);
   const idx = pendingEdits.findIndex(e => e.page===pageNum && e.x===x && e.y===y);
-  const edit = {page:pageNum, x, y, x1, y1, size, newText, spanOrigText:origText};
+  const edit = {page:pageNum, x, y, x1, y1, size, color, font, flags, newText, spanOrigText:origText};
   if(idx > -1) pendingEdits[idx] = edit;
   else pendingEdits.push(edit);
 }
