@@ -385,8 +385,16 @@ input,select,textarea{font-family:var(--font)}
         <button class="lang-btn active" onclick="setLang('en')">EN</button>
         <button class="lang-btn" onclick="setLang('de')">DE</button>
       </div>
-      <button class="nav-auth-btn nav-login" onclick="openAuth('login')" data-i="nav_login">Sign in</button>
-      <button class="nav-auth-btn nav-signup" onclick="openAuth('signup')" data-i="nav_signup">Get started</button>
+      <div id="landing-auth-btns">
+        <button class="nav-auth-btn nav-login" onclick="openAuth('login')" data-i="nav_login">Sign in</button>
+        <button class="nav-auth-btn nav-signup" onclick="openAuth('signup')" data-i="nav_signup">Get started</button>
+      </div>
+      <div id="landing-user-area" class="nav-user hidden">
+        <div class="nav-avatar" id="landing-avatar">?</div>
+        <span id="landing-username"></span>
+        <a class="nav-auth-btn nav-signup" href="/dashboard.html" style="text-decoration:none;display:inline-flex;align-items:center">Dashboard</a>
+        <button class="nav-auth-btn nav-login" onclick="logout()" style="font-size:11px" data-i="logout">Logout</button>
+      </div>
     </div>
   </nav>
 
@@ -1647,8 +1655,9 @@ async function doLogin(){
   try{
     const r=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY},body:JSON.stringify({email,password:pw})});
     const d=await r.json();
-    if(d.error){err.textContent=d.error_description||d.error;err.classList.remove('hidden');return}
-    currentUser={email,name:d.user?.user_metadata?.name||email.split('@')[0],token:d.access_token};
+    if(d.error||d.error_description){err.textContent=d.error_description||d.msg||d.error;err.classList.remove('hidden');return}
+    currentUser={id:d.user?.id,email,name:d.user?.user_metadata?.name||email.split('@')[0],token:d.access_token};
+    try{ localStorage.setItem('pf_session', JSON.stringify({ user:{...d.user, access_token:d.access_token}, expires_at: Date.now()+(d.expires_in||3600)*1000 })); }catch(e){}
     applyUserUI();closeModal('auth-modal');
     toast(lang==='de'?`Willkommen zurück!`:`Welcome back!`,'ok');
   }catch(e){err.textContent='Connection error';err.classList.remove('hidden')}
@@ -1664,29 +1673,57 @@ async function doSignup(){
   try{
     const r=await fetch(`${SUPABASE_URL}/auth/v1/signup`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY},body:JSON.stringify({email,password:pw,data:{name}})});
     const d=await r.json();
-    if(d.error){err.textContent=d.error_description||d.error;err.classList.remove('hidden');return}
-    currentUser={email,name,token:d.access_token};
+    if(d.error||d.error_description||d.msg){err.textContent=d.error_description||d.msg||d.error;err.classList.remove('hidden');return}
+    currentUser={id:d.user?.id,email,name,token:d.access_token};
+    if(d.access_token){
+      try{ localStorage.setItem('pf_session', JSON.stringify({ user:{...d.user, access_token:d.access_token}, expires_at: Date.now()+(d.expires_in||3600)*1000 })); }catch(e){}
+    }
     applyUserUI();closeModal('auth-modal');
     toast(lang==='de'?'Konto erstellt! Willkommen.':'Account created! Welcome.','ok');
   }catch(e){err.textContent='Connection error';err.classList.remove('hidden')}
 }
 function applyUserUI(){
+  if(!currentUser) return;
   const initials=(currentUser.name||'?').slice(0,2).toUpperCase();
-  ['upload-auth-btns'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
-  ['upload-user-area'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('hidden')});
-  const av=document.getElementById('upload-avatar');if(av)av.textContent=initials;
-  const un=document.getElementById('upload-username');if(un)un.textContent=currentUser.name;
-  document.getElementById('sign-lock-icon').style.display='none';
+
+  ['upload-auth-btns','landing-auth-btns'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
+  ['upload-user-area','landing-user-area'].forEach(id=>document.getElementById(id)?.classList.remove('hidden'));
+
+  const setAv=(id)=>{const el=document.getElementById(id);if(el)el.textContent=initials};
+  const setNm=(id)=>{const el=document.getElementById(id);if(el)el.textContent=currentUser.name};
+  setAv('upload-avatar');  setNm('upload-username');
+  setAv('landing-avatar'); setNm('landing-username');
+
+  const lock=document.getElementById('sign-lock-icon'); if(lock) lock.style.display='none';
   loadRecent();
 }
 function logout(){
   currentUser=null;
-  ['upload-auth-btns'].forEach(id=>document.getElementById(id)?.classList.remove('hidden'));
-  ['upload-user-area'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
-  document.getElementById('sign-lock-icon').style.display='';
-  document.getElementById('recent-section').classList.add('hidden');
+  try{ localStorage.removeItem('pf_session'); }catch(e){}
+  ['upload-auth-btns','landing-auth-btns'].forEach(id=>document.getElementById(id)?.classList.remove('hidden'));
+  ['upload-user-area','landing-user-area'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
+  const lock=document.getElementById('sign-lock-icon'); if(lock) lock.style.display='';
+  document.getElementById('recent-section')?.classList.add('hidden');
   toast(lang==='de'?'Abgemeldet':'Logged out');
 }
+function restoreSessionFromStorage(){
+  try{
+    const raw=localStorage.getItem('pf_session');
+    if(!raw) return;
+    const s=JSON.parse(raw);
+    if(!s?.user || (s.expires_at && s.expires_at < Date.now())){
+      localStorage.removeItem('pf_session'); return;
+    }
+    currentUser={
+      id: s.user.id,
+      email: s.user.email,
+      name: s.user.user_metadata?.name || s.user.email?.split('@')[0] || 'User',
+      token: s.user.access_token
+    };
+    applyUserUI();
+  }catch(e){ console.warn('session restore failed', e); }
+}
+window.addEventListener('load', restoreSessionFromStorage);
 
 // ═══════════════════════════════════════
 // RECENT DOCS (localStorage, no real storage)
