@@ -1881,6 +1881,11 @@ async function openInlineEditor(span){
     }
     const bg=`rgb(${bgR},${bgG},${bgB})`;
 
+Nur eine kleine Stelle ändern:
+
+🔧 Patch — in openInlineEditor Padding minimieren + Auto-Clip
+Finden:
+
     // Bereich: leichtes Padding für Antialiasing
     const padX=2;
     const padY=Math.max(2, ch*0.25);
@@ -1920,6 +1925,91 @@ async function openInlineEditor(span){
     }
 
     const maskRect={ x:mx0, y:my0, w:mw, h:mh, bg, data:savedData };
+Ersetzen mit:
+
+    // Bereich: MINIMALES Padding — nur 1px für AA-Kanten
+    const padX=1;
+    const padY=1;
+    const mx0=Math.max(0, Math.floor(cx-padX));
+    const my0=Math.max(0, Math.floor(cy-padY));
+    const mw =Math.min(canvas.width -mx0, Math.ceil(cw+padX*2));
+    const mh =Math.min(canvas.height-my0, Math.ceil(ch+padY*2));
+
+    // === Schritt 1: Text-Pixel finden (Scan, ohne zu schreiben) ===
+    // → echte Ober-/Unterkante der Glyphen ermitteln, damit Maske exakt sitzt
+    let savedData=null;
+    try{
+      const imgData=ctx.getImageData(mx0,my0,mw,mh);
+      const d=imgData.data;
+      const TH2=18*18;
+      const SOFT2=42*42;
+
+      // Pass 1: ermitteln, in welchen Zeilen Text-Pixel auftreten
+      const rowHasText=new Uint8Array(mh);
+      const colHasText=new Uint8Array(mw);
+      for(let y=0;y<mh;y++){
+        for(let x=0;x<mw;x++){
+          const i=(y*mw+x)*4;
+          const dr=d[i]-bgR, dg=d[i+1]-bgG, db=d[i+2]-bgB;
+          if(dr*dr+dg*dg+db*db > TH2){
+            rowHasText[y]=1;
+            colHasText[x]=1;
+          }
+        }
+      }
+      // Tightes Bounding der Text-Pixel
+      let yMin=0; while(yMin<mh && !rowHasText[yMin]) yMin++;
+      let yMax=mh-1; while(yMax>=0 && !rowHasText[yMax]) yMax--;
+      let xMin=0; while(xMin<mw && !colHasText[xMin]) xMin++;
+      let xMax=mw-1; while(xMax>=0 && !colHasText[xMax]) xMax--;
+      if(yMin>yMax || xMin>xMax){ yMin=0; yMax=mh-1; xMin=0; xMax=mw-1; }
+
+      // Pass 2: NUR innerhalb der gefundenen Text-Box ersetzen (+1px AA-Slack)
+      const yA=Math.max(0,yMin-1), yB=Math.min(mh-1,yMax+1);
+      const xA=Math.max(0,xMin-1), xB=Math.min(mw-1,xMax+1);
+      for(let y=yA;y<=yB;y++){
+        for(let x=xA;x<=xB;x++){
+          const i=(y*mw+x)*4;
+          const dr=d[i]-bgR, dg=d[i+1]-bgG, db=d[i+2]-bgB;
+          const dist2=dr*dr+dg*dg+db*db;
+          if(dist2 > SOFT2){
+            d[i]=bgR; d[i+1]=bgG; d[i+2]=bgB;
+          } else if(dist2 > TH2){
+            const t=(Math.sqrt(dist2)-18)/(42-18);
+            d[i  ]=Math.round(d[i  ]+(bgR-d[i  ])*t);
+            d[i+1]=Math.round(d[i+1]+(bgG-d[i+1])*t);
+            d[i+2]=Math.round(d[i+2]+(bgB-d[i+2])*t);
+          }
+        }
+      }
+
+      // Maske auf tatsächlichen Text-Bereich zuschneiden
+      const tightX=mx0+xA, tightY=my0+yA;
+      const tightW=xB-xA+1, tightH=yB-yA+1;
+      const tightData=ctx.createImageData(tightW,tightH);
+      const td=tightData.data;
+      for(let y=0;y<tightH;y++){
+        for(let x=0;x<tightW;x++){
+          const si=((y+yA)*mw+(x+xA))*4;
+          const ti=(y*tightW+x)*4;
+          td[ti  ]=d[si  ];
+          td[ti+1]=d[si+1];
+          td[ti+2]=d[si+2];
+          td[ti+3]=d[si+3];
+        }
+      }
+      ctx.putImageData(tightData,tightX,tightY);
+      savedData=tightData;
+
+      // maskRect tight machen, damit pageMasks später dasselbe wiederherstellt
+      var _maskFinal={ x:tightX, y:tightY, w:tightW, h:tightH, bg, data:tightData };
+    }catch(e){
+      ctx.fillStyle=bg;
+      ctx.fillRect(mx0,my0,mw,mh);
+      var _maskFinal={ x:mx0, y:my0, w:mw, h:mh, bg, data:null };
+    }
+
+    const maskRect=_maskFinal;
     span.dataset.maskInfo='1';
     span._maskRect=maskRect;
     span.dataset.maskPage=pageNum;
