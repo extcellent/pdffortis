@@ -1830,8 +1830,11 @@ async function closeInlineEditor(save=true){
   if(!img)return;
 
   const canvas=document.getElementById('pdf-canvas');
+  // img.width ist 2x (Matrix 2,2) → native PDF width = img.width/2
   const pdfNativeWidth=img.width/2;
-  const finalScale=canvas.width/pdfNativeWidth;
+  const pdfNativeHeight=img.height/2;
+  const scaleX=canvas.width/pdfNativeWidth;
+  const scaleY=canvas.height/pdfNativeHeight;
 
   const x=parseFloat(span.dataset.pdfX);
   const y=parseFloat(span.dataset.pdfY);
@@ -1839,7 +1842,7 @@ async function closeInlineEditor(save=true){
   const y1=parseFloat(span.dataset.pdfY1);
   const size=parseFloat(span.dataset.pdfFontSize)||12;
 
-  // Edit speichern (alten ersetzen falls gleiche Position)
+  // Edit speichern
   const idx=pendingEdits.findIndex(e=>e.page===pageNum&&e.x===x&&e.y===y);
   const edit={page:pageNum,x,y,x1,y1,size,newText,spanOrigText:origText};
   if(idx>-1) pendingEdits[idx]=edit;
@@ -1848,20 +1851,33 @@ async function closeInlineEditor(save=true){
   span.dataset.editedText=newText;
   span.textContent=newText;
 
-  // Canvas neu zeichnen: Original PNG + alle Edits dieser Seite
+  // Canvas komplett neu zeichnen
   const ctx=canvas.getContext('2d');
+  // 1. Original PNG wiederherstellen
   ctx.drawImage(img,0,0,canvas.width,canvas.height);
+
+  // 2. Jeden Edit draufmalen
   pendingEdits.filter(e=>e.page===pageNum).forEach(e=>{
-    ctx.drawImage(
-      img,
-      e.x*2, e.y*2,
-      (e.x1-e.x)*2, (e.y1-e.y)*2,
-      e.x*finalScale, e.y*finalScale,
-      (e.x1-e.x)*finalScale, (e.y1-e.y)*finalScale
-    );
-    ctx.font=`${e.size*finalScale}px Arial`;
+    // PDF Y-Koordinaten sind von unten — PNG von oben
+    // Daher: pngY = pdfNativeHeight - pdfY1
+    const pngSrcX = e.x * 2;
+    const pngSrcY = (pdfNativeHeight - e.y1) * 2;
+    const pngSrcW = (e.x1 - e.x) * 2;
+    const pngSrcH = (e.y1 - e.y) * 2;
+
+    const dstX = e.x * scaleX;
+    const dstY = (pdfNativeHeight - e.y1) * scaleY;
+    const dstW = (e.x1 - e.x) * scaleX;
+    const dstH = (e.y1 - e.y) * scaleY;
+
+    // Originalbereich wiederherstellen (überschreibt alten Text)
+    ctx.drawImage(img, pngSrcX, pngSrcY, pngSrcW, pngSrcH, dstX, dstY, dstW, dstH);
+
+    // Neuen Text draufmalen
+    ctx.font=`${e.size*scaleY}px Arial`;
     ctx.fillStyle='black';
-    ctx.fillText(e.newText, e.x*finalScale, e.y1*finalScale-(e.y1-e.y)*finalScale*0.15);
+    ctx.textBaseline='alphabetic';
+    ctx.fillText(e.newText, dstX, dstY + dstH * 0.85);
   });
 }
    
