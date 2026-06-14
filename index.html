@@ -111,7 +111,6 @@ input,select,textarea{font-family:var(--font)}
   transition:all .2s;
   margin-bottom:4px;
   position:relative;
-  overflow:hidden;
 }
 .pf-captcha:hover{border-color:var(--gray-300)}
 .pf-captcha.verified{
@@ -131,15 +130,18 @@ input,select,textarea{font-family:var(--font)}
 .pf-captcha.verified::before{
   content:'';
   position:absolute;inset:0;
+  border-radius:8px;
   background:linear-gradient(
     105deg,
-    transparent 40%,
-    rgba(255,255,255,.55) 50%,
-    transparent 60%
+    transparent 35%,
+    rgba(255,255,255,.7) 50%,
+    transparent 65%
   );
-  background-size:200% 100%;
-  animation:captchaGlass .75s ease forwards;
+  background-size:250% 100%;
+  animation:captchaGlass .8s ease forwards;
   pointer-events:none;
+  z-index:1;
+  overflow:hidden;
 }
 @keyframes captchaGlass{
   from{background-position:200% 0}
@@ -187,7 +189,7 @@ input,select,textarea{font-family:var(--font)}
 .pf-captcha.verified .pf-captcha-brand{
   background:linear-gradient(135deg,var(--rb1),var(--rb3));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}
+}  
 .pf-hp{position:absolute;left:-9999px;opacity:0;pointer-events:none}
   
 /* ═══════════════════════════════════════
