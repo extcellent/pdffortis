@@ -115,9 +115,12 @@ input,select,textarea{font-family:var(--font)}
 }
 .pf-captcha:hover{border-color:var(--gray-300)}
 .pf-captcha.verified{
-  border-color:#16a34a;
-  background:#f0fdf4;
+  border:1.5px solid transparent;
+  background:linear-gradient(white,white) padding-box,
+    linear-gradient(135deg,var(--rb1),var(--rb2),var(--rb3),var(--rb4),var(--rb5),var(--rb6)) border-box;
+  box-shadow:0 0 0 3px rgba(99,102,241,.1),0 4px 20px rgba(99,102,241,.08);
   cursor:default;
+  animation:rbShift 4s ease infinite;
 }
 .pf-captcha.verified::after{
   content:'';
@@ -133,7 +136,8 @@ input,select,textarea{font-family:var(--font)}
   transition:all .2s;
 }
 .pf-captcha.verified .pf-captcha-box{
-  border-color:#16a34a;background:#16a34a;
+  border:none;
+  background:linear-gradient(135deg,var(--rb1),var(--rb2),var(--rb3));
 }
 .pf-captcha-check{
   display:none;
@@ -142,12 +146,16 @@ input,select,textarea{font-family:var(--font)}
 @keyframes checkPop{from{transform:scale(0)}to{transform:scale(1)}}
 .pf-captcha.verified .pf-captcha-check{display:block}
 .pf-captcha-text{flex:1;font-size:13px;color:var(--gray-600);font-weight:500}
-.pf-captcha.verified .pf-captcha-text{color:#16a34a;font-weight:600}
-.pf-captcha-brand{
-  font-size:9px;color:var(--gray-400);text-align:right;line-height:1.4;
+.pf-captcha.verified .pf-captcha-text{
+  font-weight:600;
+  background:linear-gradient(135deg,var(--rb1),var(--rb2),var(--rb3));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
 }
-.pf-captcha.verified .pf-captcha-brand{color:#16a34a}
-/* Honeypot */
+.pf-captcha-brand{font-size:9px;color:var(--gray-400);text-align:right;line-height:1.4}
+.pf-captcha.verified .pf-captcha-brand{
+  background:linear-gradient(135deg,var(--rb1),var(--rb3));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
 .pf-hp{position:absolute;left:-9999px;opacity:0;pointer-events:none}
   
 /* ═══════════════════════════════════════
