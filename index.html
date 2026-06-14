@@ -1333,7 +1333,7 @@ function deactivateTextBox(wrap){
 }
   
 function addDateBox(){
-  if(!pdfDoc){toast('Load a PDF first','err');return}
+  if(!pdfLibDoc){toast('Load a PDF first','err');return}
   setMode('edit');
   const ol=document.getElementById('overlay-layer');
   const el=document.createElement('div');
@@ -2014,16 +2014,18 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(!ol)return;
 
   // ── ADD TEXT: Klick auf leere Fläche ──
-ol.addEventListener('click',function(e){
+let _wasDragging=false;
+  document.addEventListener('mousedown',()=>{_wasDragging=false});
+  document.addEventListener('mousemove',()=>{_wasDragging=true},{passive:true});
+
+  ol.addEventListener('click',function(e){
     if(editorMode!=='edit')return;
     if(currentTab!=='add')return;
-    // Klick auf aktive Box → ignorieren
+    if(_wasDragging){_wasDragging=false;return}
     if(e.target.classList.contains('pdf-text-box'))return;
-    // Klick auf Wrapper einer existierenden Box → deaktivieren
     if(e.target.classList.contains('pdf-overlay')){
       deactivateTextBox(e.target);return;
     }
-    // Klick auf leere Fläche → aktive Box schließen ODER neue öffnen
     const active=ol.querySelector('.pdf-text-box.is-active');
     if(active){deactivateTextBox(active.closest('.pdf-overlay'));return}
     const rect=ol.getBoundingClientRect();
