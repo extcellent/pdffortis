@@ -1858,8 +1858,15 @@ function applyUserUI(){
   if(!currentUser) return;
   const initials=(currentUser.name||'?').slice(0,2).toUpperCase();
 
+  // ► Anti-Flicker-Klasse jetzt auf authed umschalten (war 'pf-anon' beim Laden)
+  document.documentElement.classList.remove('pf-anon');
+  document.documentElement.classList.add('pf-authed');
+
   ['upload-auth-btns','landing-auth-btns'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
-  ['upload-user-area','landing-user-area','landing-logout-btn'].forEach(id=>document.getElementById(id)?.classList.remove('hidden'));
+  ['upload-user-area','landing-user-area','landing-logout-btn'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.classList.remove('hidden'); el.classList.add('pf-ready'); }
+  });
 
   const setAv=(id)=>{const el=document.getElementById(id);if(el)el.textContent=initials};
   const setNm=(id)=>{const el=document.getElementById(id);if(el)el.textContent=currentUser.name};
@@ -1871,10 +1878,18 @@ function applyUserUI(){
 }
 
 async function logout(){
-  await sbLogout();
+  try{ await sbLogout(); }catch(e){}
   currentUser=null;
+
+  // ► Anti-Flicker-Klasse zurück auf anon
+  document.documentElement.classList.remove('pf-authed');
+  document.documentElement.classList.add('pf-anon');
+
   ['upload-auth-btns','landing-auth-btns'].forEach(id=>document.getElementById(id)?.classList.remove('hidden'));
-  ['upload-user-area','landing-user-area','landing-logout-btn'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
+  ['upload-user-area','landing-user-area','landing-logout-btn'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.classList.add('hidden'); el.classList.remove('pf-ready'); }
+  });
   const lock=document.getElementById('sign-lock-icon'); if(lock) lock.style.display='';
   document.getElementById('recent-section')?.classList.add('hidden');
   toast(lang==='de'?'Abgemeldet':'Logged out');
