@@ -437,7 +437,22 @@ input,select,textarea{font-family:var(--font)}
       </a>
       <button id="landing-logout-btn" class="nav-auth-btn nav-login hidden" onclick="logout()" style="font-size:11px" data-i="logout">Logout</button>
     </div>
-  </nav>
+  </nav>  
+  <script>
+  // Synchron während HTML-Parsing: Werte reinschreiben, dann sichtbar machen.
+  // Läuft VOR dem ersten Paint -> der Browser sieht nie das "?".
+  (function(){
+    var a = window.__pfAuth; if(!a) return;
+    var av = document.getElementById('landing-avatar');
+    var un = document.getElementById('landing-username');
+    var ua = document.getElementById('landing-user-area');
+    var lo = document.getElementById('landing-logout-btn');
+    if(av) av.textContent = a.initials;
+    if(un) un.textContent = a.name;
+    if(ua){ ua.classList.remove('hidden'); ua.classList.add('pf-ready'); }
+    if(lo){ lo.classList.remove('hidden'); lo.classList.add('pf-ready'); }
+  })();
+</script>
 
   <div class="landing-hero">
     <div class="hero-cycle-wrapper" style="width:100%;max-width:700px">
@@ -496,6 +511,17 @@ input,select,textarea{font-family:var(--font)}
         <button class="nav-auth-btn nav-login" onclick="logout()" style="font-size:11px" data-i="logout">Logout</button>
       </div>
     </div>
+  <script>
+  (function(){
+    var a = window.__pfAuth; if(!a) return;
+    var av = document.getElementById('upload-avatar');
+    var un = document.getElementById('upload-username');
+    var ua = document.getElementById('upload-user-area');
+    if(av) av.textContent = a.initials;
+    if(un) un.textContent = a.name;
+    if(ua){ ua.classList.remove('hidden'); ua.classList.add('pf-ready'); }
+  })();
+</script>
   </nav>
 
   <div class="upload-container">
