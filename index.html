@@ -1238,7 +1238,11 @@ function addTextBox(x,y){
   if(!pdfLibDoc){toast('Lade zuerst ein PDF','err');return}
   const ol=document.getElementById('overlay-layer');
 
-  // Wrapper: draggbar, enthält Box + Delete-Button
+  // Verhindere dass ein Klick auf leere Fläche sofort neues Box öffnet
+  // während gerade eine aktive Box existiert
+  const activeBox=ol.querySelector('.pdf-text-box.is-active');
+  if(activeBox){deactivateTextBox(activeBox.closest('.pdf-overlay'));return}
+
   const wrap=document.createElement('div');
   wrap.className='pdf-overlay';
   wrap.style.cssText=`position:absolute;left:${x}px;top:${y}px;z-index:10;`;
@@ -1259,28 +1263,29 @@ function addTextBox(x,y){
   `;
   del.onclick=e=>{e.stopPropagation();wrap.remove()};
   wrap.appendChild(del);
-  wrap.addEventListener('mouseenter',()=>del.style.display='flex');
-  wrap.addEventListener('mouseleave',()=>del.style.display='none');
 
-  // Editierbares Textfeld
+  // Textfeld
   const box=document.createElement('div');
   box.contentEditable='true';
-  box.className='pdf-text-box';
+  box.className='pdf-text-box is-active';
   box.style.cssText=`
     min-width:120px;min-height:28px;
     font-size:${document.getElementById('font-size')?.value||'14'}px;
     font-family:${document.getElementById('font-family')?.value||'Arial'};
     color:${document.getElementById('text-color')?.value||'#000000'};
     cursor:text;
+    border:1.5px dashed #6366f1;
+    border-radius:3px;
+    padding:2px 4px;
+    outline:none;
   `;
   box.setAttribute('spellcheck','false');
   wrap.appendChild(box);
 
-  // Drag nur über Wrapper, NICHT wenn man im Textfeld tippt
+  // Drag — nur über Wrapper-Bereich außerhalb der Box
   let sx,sy,il,it,dragging=false;
   wrap.addEventListener('mousedown',e=>{
-    if(e.target===box||e.target.isContentEditable)return; // Tippen erlauben
-    if(e.target===del)return;
+    if(e.target===box||e.target===del)return;
     dragging=true;
     sx=e.clientX;sy=e.clientY;
     il=parseInt(wrap.style.left)||0;it=parseInt(wrap.style.top)||0;
@@ -1293,9 +1298,40 @@ function addTextBox(x,y){
   });
   document.addEventListener('mouseup',()=>{dragging=false});
 
+  // Hover → Delete-Button zeigen
+  wrap.addEventListener('mouseenter',()=>{if(!box.classList.contains('is-active'))del.style.display='flex'});
+  wrap.addEventListener('mouseleave',()=>del.style.display='none');
+
+  // Klick auf Box → aktiv machen
+  box.addEventListener('focus',()=>{
+    box.classList.add('is-active');
+    box.style.border='1.5px dashed #6366f1';
+  });
+
   ol.appendChild(wrap);
   setTimeout(()=>box.focus(),50);
 }
+
+function deactivateTextBox(wrap){
+  if(!wrap)return;
+  const box=wrap.querySelector('.pdf-text-box');
+  if(!box)return;
+  box.classList.remove('is-active');
+  // Leere Box → entfernen
+  if(!box.textContent.trim()){wrap.remove();return}
+  // Border entfernen → nur Text sichtbar
+  box.style.border='none';
+  box.style.padding='2px 4px';
+  box.contentEditable='false';
+  // Doppelklick zum erneuten Editieren
+  box.addEventListener('dblclick',()=>{
+    box.contentEditable='true';
+    box.classList.add('is-active');
+    box.style.border='1.5px dashed #6366f1';
+    box.focus();
+  },{once:false});
+}
+  
 function addDateBox(){
   if(!pdfDoc){toast('Load a PDF first','err');return}
   setMode('edit');
@@ -1978,10 +2014,18 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(!ol)return;
 
   // ── ADD TEXT: Klick auf leere Fläche ──
-  ol.addEventListener('click',function(e){
+ol.addEventListener('click',function(e){
     if(editorMode!=='edit')return;
     if(currentTab!=='add')return;
-    if(e.target!==ol&&!e.target.classList.contains('pdf-text-layer'))return;
+    // Klick auf aktive Box → ignorieren
+    if(e.target.classList.contains('pdf-text-box'))return;
+    // Klick auf Wrapper einer existierenden Box → deaktivieren
+    if(e.target.classList.contains('pdf-overlay')){
+      deactivateTextBox(e.target);return;
+    }
+    // Klick auf leere Fläche → aktive Box schließen ODER neue öffnen
+    const active=ol.querySelector('.pdf-text-box.is-active');
+    if(active){deactivateTextBox(active.closest('.pdf-overlay'));return}
     const rect=ol.getBoundingClientRect();
     addTextBox(e.clientX-rect.left,e.clientY-rect.top);
   });
