@@ -1647,10 +1647,29 @@ async function sbGetDLCount(fp){
 async function sbLogDL(fp){
   await fetch(`${SUPABASE_URL}/rest/v1/download_logs`,{method:'POST',headers:SB_HEADERS,body:JSON.stringify({ip_hash:fp})});
 }
-async function sbValidateToken(tok){
-  const r=await fetch(`${SUPABASE_URL}/rest/v1/company_tokens?token=eq.${encodeURIComponent(tok)}&select=*`,{headers:SB_HEADERS});
-  const d=await r.json();return d.length>0?d[0]:null;
+  
+async function validateToken(){
+  const val=document.getElementById('token-val').value.trim();
+  if(!val){toast('Enter a token','err');return}
+  toast(lang==='de'?'Token wird geprüft...':'Checking token...');
+  try{
+    const data=await sbValidateToken(val);
+    if(!data){toast(lang==='de'?'Ungültiger Token':'Invalid token','err');return}
+    localStorage.setItem(LS_TOKDAT,JSON.stringify(data));
+    currentToken=data;applyTokenUI(data);
+
+    // ► Token am Profil persistieren → User wird im Dashboard-Team sichtbar
+    if(currentUser?.id && currentUser?.token){
+      await sbUpsertProfile(currentUser.id, { company_token: data.token }, currentUser.token);
+      currentUser.company_token = data.token;
+    }
+
+    closeModal('token-modal');
+    toast(`${lang==='de'?'Token aktiviert':'Token activated'}: ${data.company_name}`,'ok');
+    updateDLDisplay();
+  }catch(e){toast(lang==='de'?'Verbindungsfehler':'Connection error','err')}
 }
+  
 async function logTokenUsage(action){
   if(!currentToken)return;
   await fetch(`${SUPABASE_URL}/rest/v1/token_usage`,{method:'POST',headers:SB_HEADERS,body:JSON.stringify({token:currentToken.token,action})});
@@ -1688,6 +1707,10 @@ function applyTokenUI(d){
 }
 function removeToken(){
   localStorage.removeItem(LS_TOKDAT);currentToken=null;
+  if(currentUser?.id && currentUser?.token){
+  sbUpsertProfile(currentUser.id, { company_token: null }, currentUser.token).catch(()=>{});
+  currentUser.company_token = null;
+}
   document.getElementById('token-label-bar').textContent=i18n[lang].token_btn;
   document.getElementById('token-input-area').classList.remove('hidden');
   document.getElementById('token-active-display').classList.add('hidden');
@@ -1708,6 +1731,7 @@ function switchAuthTab(tab){
     document.getElementById(`auth-tab-${t}`).classList.toggle('active',t===tab);
   });
 }
+
 async function doLogin(){
   const email=document.getElementById('login-email').value.trim();
   const pw=document.getElementById('login-pw').value;
@@ -1715,15 +1739,59 @@ async function doLogin(){
   err.classList.add('hidden');
   if(!email||!pw){err.textContent=lang==='de'?'Bitte alle Felder ausfüllen':'Please fill all fields';err.classList.remove('hidden');return}
   try{
-    const r=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY},body:JSON.stringify({email,password:pw})});
-    const d=await r.json();
-    if(d.error||d.error_description){err.textContent=d.error_description||d.msg||d.error;err.classList.remove('hidden');return}
-    currentUser={id:d.user?.id,email,name:d.user?.user_metadata?.name||email.split('@')[0],token:d.access_token};
-    try{ localStorage.setItem('pf_session', JSON.stringify({ user:{...d.user, access_token:d.access_token}, expires_at: Date.now()+(d.expires_in||3600)*1000 })); }catch(e){}
-    applyUserUI();closeModal('auth-modal');
-    toast(lang==='de'?`Willkommen zurück!`:`Welcome back!`,'ok');
-  }catch(e){err.textContent='Connection error';err.classList.remove('hidden')}
+    const d = await sbLogin(email, pw);
+    if(d.error||d.error_description){
+      err.textContent=d.error_description||d.msg||d.error;
+      err.classList.remove('hidden');return;
+    }
+    pfSaveSession(d);
+
+    // Profil aus DB laden (wie dashboard.js loadUserProfile)
+    let profile = await sbGetProfile(d.user.id, d.access_token);
+    if(!profile){
+      profile = await sbUpsertProfile(d.user.id, {
+        email,
+        display_name: d.user.user_metadata?.name || email.split('@')[0]
+      }, d.access_token);
+    }
+
+    currentUser = {
+      id: d.user.id,
+      email,
+      name: profile?.display_name || d.user.user_metadata?.name || email.split('@')[0],
+      token: d.access_token,
+      company_token: profile?.company_token || null
+    };
+
+    // Session-Mirror mit echtem Namen (damit Anti-Flicker beim Reload den Namen kennt)
+    try{
+      const userObj = {...d.user, access_token: d.access_token};
+      userObj.user_metadata = {...(d.user.user_metadata||{}), name: currentUser.name};
+      localStorage.setItem('pf_session', JSON.stringify({
+        user: userObj,
+        expires_at: Date.now()+(d.expires_in||3600)*1000
+      }));
+    }catch(e){}
+
+    // Falls Profil bereits company_token hat → Token-UI sofort anwenden
+    if(currentUser.company_token){
+      const tok = await sbValidateToken(currentUser.company_token);
+      if(tok){
+        currentToken = tok;
+        localStorage.setItem(LS_TOKDAT, JSON.stringify(tok));
+        applyTokenUI(tok);
+      }
+    }
+
+    applyUserUI();
+    closeModal('auth-modal');
+    toast(lang==='de'?'Willkommen zurück!':'Welcome back!','ok');
+  }catch(e){
+    err.textContent='Connection error';
+    err.classList.remove('hidden');
+  }
 }
+
 async function doSignup(){
   const name=document.getElementById('signup-name').value.trim();
   const email=document.getElementById('signup-email').value.trim();
@@ -1732,25 +1800,66 @@ async function doSignup(){
   err.classList.add('hidden');
   if(!name||!email||!pw){err.textContent=lang==='de'?'Bitte alle Felder ausfüllen':'Please fill all fields';err.classList.remove('hidden');return}
   if(pw.length<8){err.textContent=lang==='de'?'Passwort min. 8 Zeichen':'Password min. 8 characters';err.classList.remove('hidden');return}
+
   try{
-    const r=await fetch(`${SUPABASE_URL}/auth/v1/signup`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY},body:JSON.stringify({email,password:pw,data:{name}})});
-    const d=await r.json();
-    if(d.error||d.error_description||d.msg){err.textContent=d.error_description||d.msg||d.error;err.classList.remove('hidden');return}
-    currentUser={id:d.user?.id,email,name,token:d.access_token};
-    if(d.access_token){
-      try{ localStorage.setItem('pf_session', JSON.stringify({ user:{...d.user, access_token:d.access_token}, expires_at: Date.now()+(d.expires_in||3600)*1000 })); }catch(e){}
+    // Optional: schon eingegebener Firmen-Token wird mit übergeben
+    const preToken = (currentToken && currentToken.token) || null;
+
+    const d = await sbSignup(email, pw, name, preToken);
+    if(d.error||d.error_description||d.msg){
+      err.textContent=d.error_description||d.msg||d.error;
+      err.classList.remove('hidden');return;
     }
-    applyUserUI();closeModal('auth-modal');
+
+    // Email-Confirm AN → kein access_token zurück
+    if(!d.access_token){
+      err.textContent = lang==='de'
+        ? '✅ Konto erstellt. Bitte E-Mail bestätigen und einloggen.'
+        : '✅ Account created. Please confirm email and sign in.';
+      err.classList.remove('hidden');
+      return;
+    }
+
+    pfSaveSession(d);
+
+    // ► user_profiles-Row anlegen (DAS war der fehlende Teil im Index!)
+    const profile = await sbUpsertProfile(d.user.id, {
+      email,
+      display_name: name,
+      company_token: preToken
+    }, d.access_token);
+
+    currentUser = {
+      id: d.user.id, email, name,
+      token: d.access_token,
+      company_token: profile?.company_token || preToken || null
+    };
+
+    // Session-Mirror mit Namen
+    try{
+      const userObj = {...d.user, access_token: d.access_token};
+      userObj.user_metadata = {...(d.user.user_metadata||{}), name};
+      localStorage.setItem('pf_session', JSON.stringify({
+        user: userObj,
+        expires_at: Date.now()+(d.expires_in||3600)*1000
+      }));
+    }catch(e){}
+
+    applyUserUI();
+    closeModal('auth-modal');
     toast(lang==='de'?'Konto erstellt! Willkommen.':'Account created! Welcome.','ok');
-  }catch(e){err.textContent='Connection error';err.classList.remove('hidden')}
+  }catch(e){
+    err.textContent='Connection error';
+    err.classList.remove('hidden');
+  }
 }
+
 function applyUserUI(){
   if(!currentUser) return;
   const initials=(currentUser.name||'?').slice(0,2).toUpperCase();
 
   ['upload-auth-btns','landing-auth-btns'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
   ['upload-user-area','landing-user-area','landing-logout-btn'].forEach(id=>document.getElementById(id)?.classList.remove('hidden'));
-
 
   const setAv=(id)=>{const el=document.getElementById(id);if(el)el.textContent=initials};
   const setNm=(id)=>{const el=document.getElementById(id);if(el)el.textContent=currentUser.name};
@@ -1760,15 +1869,17 @@ function applyUserUI(){
   const lock=document.getElementById('sign-lock-icon'); if(lock) lock.style.display='none';
   loadRecent();
 }
-function logout(){
+
+async function logout(){
+  await sbLogout();
   currentUser=null;
-  try{ localStorage.removeItem('pf_session'); }catch(e){}
   ['upload-auth-btns','landing-auth-btns'].forEach(id=>document.getElementById(id)?.classList.remove('hidden'));
   ['upload-user-area','landing-user-area','landing-logout-btn'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
   const lock=document.getElementById('sign-lock-icon'); if(lock) lock.style.display='';
   document.getElementById('recent-section')?.classList.add('hidden');
   toast(lang==='de'?'Abgemeldet':'Logged out');
 }
+  
 function restoreSessionFromStorage(){
   try{
     const raw=localStorage.getItem('pf_session');
