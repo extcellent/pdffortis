@@ -99,6 +99,57 @@ input,select,textarea{font-family:var(--font)}
 .page{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--white);transition:opacity .35s ease,transform .35s ease;z-index:10}
 .page.out{opacity:0;transform:translateY(-8px);pointer-events:none}
 
+/* ── CAPTCHA ── */
+.pf-captcha{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 14px;
+  border:1.5px solid var(--gray-200);
+  border-radius:8px;
+  background:var(--gray-50);
+  cursor:pointer;
+  user-select:none;
+  transition:all .2s;
+  margin-bottom:4px;
+  position:relative;
+  overflow:hidden;
+}
+.pf-captcha:hover{border-color:var(--gray-300)}
+.pf-captcha.verified{
+  border-color:#16a34a;
+  background:#f0fdf4;
+  cursor:default;
+}
+.pf-captcha.verified::after{
+  content:'';
+  position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);
+  animation:captchaShine .6s ease forwards;
+}
+@keyframes captchaShine{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.pf-captcha-box{
+  width:22px;height:22px;flex-shrink:0;
+  border:2px solid var(--gray-300);border-radius:4px;
+  background:white;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;
+}
+.pf-captcha.verified .pf-captcha-box{
+  border-color:#16a34a;background:#16a34a;
+}
+.pf-captcha-check{
+  display:none;
+  animation:checkPop .25s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+@keyframes checkPop{from{transform:scale(0)}to{transform:scale(1)}}
+.pf-captcha.verified .pf-captcha-check{display:block}
+.pf-captcha-text{flex:1;font-size:13px;color:var(--gray-600);font-weight:500}
+.pf-captcha.verified .pf-captcha-text{color:#16a34a;font-weight:600}
+.pf-captcha-brand{
+  font-size:9px;color:var(--gray-400);text-align:right;line-height:1.4;
+}
+.pf-captcha.verified .pf-captcha-brand{color:#16a34a}
+/* Honeypot */
+.pf-hp{position:absolute;left:-9999px;opacity:0;pointer-events:none}
+  
 /* ═══════════════════════════════════════
    NAV BAR (shared)
 ═══════════════════════════════════════ */
@@ -592,6 +643,7 @@ input,select,textarea{font-family:var(--font)}
     </div>
   </div>
 
+  
   <!-- Ribbon -->
   <div class="editor-ribbon">
     <div class="ribbon-tabs">
@@ -801,12 +853,23 @@ input,select,textarea{font-family:var(--font)}
         <p class="form-note" data-i="no_account">No account? Create one free →</p>
       </div>
       <div id="auth-signup-form" class="hidden">
+        <!-- Honeypot (Bots füllen das aus, User nie) -->
+        <input class="pf-hp" id="hp-field" type="text" tabindex="-1" autocomplete="off"/>
         <div class="form-field"><label data-i="name_lbl">Name</label><input class="form-input" id="signup-name" type="text" placeholder="Your name"/></div>
         <div class="form-field"><label data-i="email_lbl">Email</label><input class="form-input" id="signup-email" type="email" placeholder="you@example.com"/></div>
         <div class="form-field"><label data-i="pw_lbl">Password</label><input class="form-input" id="signup-pw" type="password" placeholder="min. 8 characters"/></div>
+        <!-- CAPTCHA -->
+        <div class="pf-captcha" id="pf-captcha" onclick="pfVerifyCaptcha()">
+          <div class="pf-captcha-box">
+            <svg class="pf-captcha-check" width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M2 6.5l3.5 3.5 5.5-6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="pf-captcha-text" id="pf-captcha-text">Ich bin kein Roboter</div>
+          <div class="pf-captcha-brand">PDFortis<br/>Security 🔒</div>
+        </div>
         <div class="form-error hidden" id="signup-error"></div>
         <button class="form-submit" onclick="doSignup()" data-i="nav_signup">Create free account</button>
-        <p class="form-note" data-i="has_account">Already have an account? Sign in →</p>
       </div>
     </div>
   </div>
@@ -927,7 +990,14 @@ let thumbCanvases=[];
 const MAX_DL=5, LIMIT_MS=8*60*60*1000;
 const LS_DL='pf_dl', LS_TOKEN='pf_tok', LS_TOKDAT='pf_tokdat', LS_USER='pf_user';
 let lang='en';
-
+// ── CAPTCHA ──
+let pfCaptchaVerified = false;
+let pfSignupTime = null;
+const BLOCKED_DOMAINS = [
+  'mailinator.com','guerrillamail.com','tempmail.com','10minutemail.com',
+  'throwaway.email','sharklasers.com','trashmail.com','yopmail.com',
+  'getnada.com','fakeinbox.com','dispostable.com','maildrop.cc','temp-mail.org'
+];
 // ═══════════════════════════════════════
 // i18n
 // ═══════════════════════════════════════
@@ -1814,6 +1884,7 @@ function switchAuthTab(tab){
     document.getElementById(`auth-${t}-form`).classList.toggle('hidden',t!==tab);
     document.getElementById(`auth-tab-${t}`).classList.toggle('active',t===tab);
   });
+  if(tab === 'signup'){ pfResetCaptcha(); }
 }
 
 async function doLogin(){
@@ -1884,7 +1955,23 @@ async function doSignup(){
   err.classList.add('hidden');
   if(!name||!email||!pw){err.textContent=lang==='de'?'Bitte alle Felder ausfüllen':'Please fill all fields';err.classList.remove('hidden');return}
   if(pw.length<8){err.textContent=lang==='de'?'Passwort min. 8 Zeichen':'Password min. 8 characters';err.classList.remove('hidden');return}
-
+  // Honeypot Check
+  if(document.getElementById('hp-field')?.value){ return; }
+  // Disposable Email
+  const domain = email.split('@')[1]?.toLowerCase();
+  const blocked = ['mailinator.com','guerrillamail.com','tempmail.com','10minutemail.com',
+    'throwaway.email','sharklasers.com','trashmail.com','yopmail.com',
+    'getnada.com','fakeinbox.com','dispostable.com','maildrop.cc','temp-mail.org'];
+  if(blocked.includes(domain)){
+    err.textContent=lang==='de'?'Bitte eine echte E-Mail verwenden':'Please use a real email address';
+    err.classList.remove('hidden');return;
+  }
+  // Captcha
+  if(!pfCaptchaVerified){
+    err.textContent=lang==='de'?'Bitte bestätige dass du kein Roboter bist':'Please verify you are not a robot';
+    err.classList.remove('hidden');return;
+  }
+  
   try{
     // Optional: schon eingegebener Firmen-Token wird mit übergeben
     const preToken = (currentToken && currentToken.token) || null;
@@ -1997,7 +2084,27 @@ function restoreSessionFromStorage(){
   }catch(e){ console.warn('session restore failed', e); }
 }
 window.addEventListener('load', restoreSessionFromStorage);
+  
+function pfVerifyCaptcha(){
+  const el = document.getElementById('pf-captcha');
+  if(el.classList.contains('verified')) return;
+  // Timing-Check: zu schnell = Bot
+  if(pfSignupTime && Date.now() - pfSignupTime < 2000){
+    toast('Bitte warte einen Moment','err'); return;
+  }
+  el.classList.add('verified');
+  document.getElementById('pf-captcha-text').textContent = 'Verifiziert ✓';
+  pfCaptchaVerified = true;
+}
 
+function pfResetCaptcha(){
+  pfCaptchaVerified = false;
+  pfSignupTime = Date.now();
+  const el = document.getElementById('pf-captcha');
+  if(el){ el.classList.remove('verified');
+    document.getElementById('pf-captcha-text').textContent = 'Ich bin kein Roboter';
+  }
+}
 // ═══════════════════════════════════════
 // RECENT DOCS (localStorage, no real storage)
 // ═══════════════════════════════════════
