@@ -23,10 +23,18 @@
   const shareToken = params.get('share');
   if (shareToken) {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/document_activity?share_token=eq.${encodeURIComponent(shareToken)}&select=*`,
-        { headers: authHeaders(sess.user.access_token) });
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/document_activity?share_token=eq.${encodeURIComponent(shareToken)}&select=*`,
+        { headers: authHeaders(sess.user.access_token) }
+      );
       const arr = await r.json();
-      if (arr?.[0]) console.log('Opened shared document:', arr[0].document_name);
+      if (arr?.[0] && !arr[0].share_expires_at || new Date(arr[0].share_expires_at) > new Date()) {
+        // Signed URL holen und PDF direkt laden
+        const pdfUrl = await sbGetSharedPDFUrl(shareToken, sess.user.access_token);
+        if (pdfUrl) {
+          window.__pfSharedPDF = { url: pdfUrl, name: arr[0].document_name };
+        }
+      }
     } catch(e) {}
   }
 
