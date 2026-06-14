@@ -1648,6 +1648,19 @@ async function sbLogDL(fp){
   await fetch(`${SUPABASE_URL}/rest/v1/download_logs`,{method:'POST',headers:SB_HEADERS,body:JSON.stringify({ip_hash:fp})});
 }
   
+async function logTokenUsage(action){
+  if(!currentToken)return;
+  await fetch(`${SUPABASE_URL}/rest/v1/token_usage`,{method:'POST',headers:SB_HEADERS,body:JSON.stringify({token:currentToken.token,action})});
+}
+
+// ═══════════════════════════════════════
+// TOKEN SYSTEM
+// ═══════════════════════════════════════
+function loadStoredToken(){
+  const raw=localStorage.getItem(LS_TOKDAT);if(!raw)return;
+  try{currentToken=JSON.parse(raw);applyTokenUI(currentToken)}catch(e){localStorage.removeItem(LS_TOKDAT)}
+}
+  
 async function validateToken(){
   const val=document.getElementById('token-val').value.trim();
   if(!val){toast('Enter a token','err');return}
@@ -1670,32 +1683,6 @@ async function validateToken(){
   }catch(e){toast(lang==='de'?'Verbindungsfehler':'Connection error','err')}
 }
   
-async function logTokenUsage(action){
-  if(!currentToken)return;
-  await fetch(`${SUPABASE_URL}/rest/v1/token_usage`,{method:'POST',headers:SB_HEADERS,body:JSON.stringify({token:currentToken.token,action})});
-}
-
-// ═══════════════════════════════════════
-// TOKEN SYSTEM
-// ═══════════════════════════════════════
-function loadStoredToken(){
-  const raw=localStorage.getItem(LS_TOKDAT);if(!raw)return;
-  try{currentToken=JSON.parse(raw);applyTokenUI(currentToken)}catch(e){localStorage.removeItem(LS_TOKDAT)}
-}
-async function validateToken(){
-  const val=document.getElementById('token-val').value.trim();
-  if(!val){toast('Enter a token','err');return}
-  toast(lang==='de'?'Token wird geprüft...':'Checking token...');
-  try{
-    const data=await sbValidateToken(val);
-    if(!data){toast(lang==='de'?'Ungültiger Token':'Invalid token','err');return}
-    localStorage.setItem(LS_TOKDAT,JSON.stringify(data));
-    currentToken=data;applyTokenUI(data);
-    closeModal('token-modal');
-    toast(`${lang==='de'?'Token aktiviert':'Token activated'}: ${data.company_name}`,'ok');
-    updateDLDisplay();
-  }catch(e){toast(lang==='de'?'Verbindungsfehler':'Connection error','err')}
-}
 function applyTokenUI(d){
   document.getElementById('token-label-bar').textContent=d.company_name;
   document.getElementById('token-input-area').classList.add('hidden');
