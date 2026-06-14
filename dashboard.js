@@ -528,30 +528,46 @@ async function shareDocument() {
   const comment  = document.getElementById('share-comment').value.trim();
   if (!name) return toast('Bitte Dokumentnamen eingeben', 'err');
 
-  const shareToken = crypto.randomUUID();
-  const expiresAt  = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+  // PDF-Datei auswählen
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'application/pdf';
+  fileInput.click();
+  fileInput.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  const ok = await sbFetch('POST', '/rest/v1/document_activity', {
-    user_id: currentUser.id,
-    document_name: name,
-    action,
-    share_token: shareToken,
-    share_expires_at: expiresAt,
-    deadline: deadline ? new Date(deadline).toISOString() : null,
-    comment: comment || null
-  });
+    toast('PDF wird hochgeladen...', 'info');
+    const shareToken = crypto.randomUUID();
+    const expiresAt  = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const pdfBytes   = new Uint8Array(await file.arrayBuffer());
 
-  if (!ok) return toast('Fehler beim Teilen', 'err');
+    // PDF in Storage hochladen
+    const uploaded = await sbUploadSharedPDF(shareToken, pdfBytes, currentUser.access_token);
+    if (!uploaded) return toast('Upload fehlgeschlagen', 'err');
 
-  if (currentUser.company_token) {
-    sbLogTokenUsage(currentUser.company_token, action, name, currentUser.email, currentUser.name);
-  }
+    // Eintrag in document_activity (unverändert wie vorher)
+    const ok = await sbFetch('POST', '/rest/v1/document_activity', {
+      user_id: currentUser.id,
+      document_name: name || file.name,
+      action,
+      share_token: shareToken,
+      share_expires_at: expiresAt,
+      deadline: deadline ? new Date(deadline).toISOString() : null,
+      comment: comment || null
+    });
 
-  closeModal('share-modal');
-  ['share-name', 'share-deadline', 'share-comment'].forEach(id => document.getElementById(id).value = '');
-  toast('Dokument für 48h geteilt!', 'ok');
-  await loadDocuments();
-  renderOverviewActivity();
+    if (!ok) return toast('Fehler beim Teilen', 'err');
+    if (currentUser.company_token) {
+      sbLogTokenUsage(currentUser.company_token, action, name, currentUser.email, currentUser.name);
+    }
+
+    closeModal('share-modal');
+    ['share-name','share-deadline','share-comment'].forEach(id => document.getElementById(id).value = '');
+    toast('Dokument für 48h geteilt!', 'ok');
+    await loadDocuments();
+    renderOverviewActivity();
+  };
 }
 
 function openSharedDoc(shareToken) {
