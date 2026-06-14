@@ -1013,6 +1013,16 @@ async function loadPDF(file){
   goTo('editor');
 }
 
+window.addEventListener('load', async () => {
+  if (window.__pfSharedPDF) {
+    const { url, name } = window.__pfSharedPDF;
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const file = new File([blob], name || 'shared.pdf', { type: 'application/pdf' });
+    await loadPDF(file);
+  }
+});
+
 async function renderPage(n){
   if(!pdfBytes)return;
   const canvas=document.getElementById('pdf-canvas');
