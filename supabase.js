@@ -183,3 +183,32 @@ async function getFingerprint() {
   return Array.from(new Uint8Array(buf))
     .map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
 }
+async function sbUploadSharedPDF(shareToken, pdfBytes, accessToken) {
+  const path = `${shareToken}.pdf`;
+  const r = await fetch(`${SUPABASE_URL}/storage/v1/object/shared-pdfs/${path}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'apikey': SUPABASE_ANON_KEY,
+      'Content-Type': 'application/pdf',
+      'x-upsert': 'true'
+    },
+    body: pdfBytes
+  });
+  return r.ok;
+}
+
+async function sbGetSharedPDFUrl(shareToken, accessToken) {
+  const path = `${shareToken}.pdf`;
+  const r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/shared-pdfs/${path}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'apikey': SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ expiresIn: 172800 }) // 48h
+  });
+  const d = await r.json();
+  return d?.signedURL ? `${SUPABASE_URL}/storage/v1${d.signedURL}` : null;
+}
