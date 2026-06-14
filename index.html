@@ -1235,7 +1235,7 @@ function switchRTab(tab){
 // TEXT BOX (Add)
 // ═══════════════════════════════════════
 function addTextBox(x,y){
-  if(!pdfDoc){toast('Lade zuerst ein PDF','err');return}
+  if(!pdfLibDoc){toast('Lade zuerst ein PDF','err');return}
   const ol=document.getElementById('overlay-layer');
 
   // Wrapper: draggbar, enthält Box + Delete-Button
