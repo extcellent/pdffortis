@@ -108,66 +108,46 @@ input,select,textarea{font-family:var(--font)}
   background:var(--gray-50);
   cursor:pointer;
   user-select:none;
-  transition:all .2s;
+  transition:box-shadow .3s;
   margin-bottom:4px;
   position:relative;
+  overflow:hidden;
 }
 .pf-captcha:hover{border-color:var(--gray-300)}
 .pf-captcha.verified{
   border:1.5px solid transparent;
   background:linear-gradient(white,white) padding-box,
     linear-gradient(135deg,var(--rb1),var(--rb2),var(--rb3),var(--rb4),var(--rb5),var(--rb6)) border-box;
-  background-size:200% 200%;
-  box-shadow:0 0 0 3px rgba(99,102,241,.08),0 4px 20px rgba(99,102,241,.06);
+  background-size:300% 300%;
+  box-shadow:0 0 0 3px rgba(99,102,241,.09),0 4px 20px rgba(99,102,241,.07);
   cursor:default;
-  animation:rbBorderSpin 3s linear infinite;
+  animation:rbBorderSpin 4s linear infinite;
 }
 @keyframes rbBorderSpin{
   0%{background-position:0% 50%}
   50%{background-position:100% 50%}
   100%{background-position:0% 50%}
 }
-.pf-captcha.verified::before{
-  content:'';
-  position:absolute;inset:0;
-  border-radius:8px;
-  background:linear-gradient(
-    105deg,
-    transparent 35%,
-    rgba(255,255,255,.7) 50%,
-    transparent 65%
-  );
-  background-size:250% 100%;
-  animation:captchaGlass .8s ease forwards;
-  pointer-events:none;
-  z-index:1;
-  overflow:hidden;
-}
-@keyframes captchaGlass{
-  from{background-position:200% 0}
-  to{background-position:-50% 0}
-}
 .pf-captcha.verified::after{
   content:'';
-  position:absolute;
-  inset:-2px;
+  position:absolute;inset:-2px;
   border-radius:9px;
   background:linear-gradient(135deg,var(--rb1),var(--rb2),var(--rb3),var(--rb4),var(--rb5),var(--rb6));
   background-size:300% 300%;
-  animation:rbOuterSpin 2s linear infinite;
-  z-index:-1;
-  opacity:.5;
+  animation:rbBorderSpin 3s linear infinite;
+  z-index:0;opacity:.3;
 }
-@keyframes rbOuterSpin{
-  0%{background-position:0% 50%}
-  50%{background-position:100% 50%}
-  100%{background-position:0% 50%}
+.pf-captcha-shimmer{
+  position:absolute;top:0;left:0;
+  width:100px;height:100%;
+  background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.2) 20%,rgba(255,255,255,0.85) 50%,rgba(255,255,255,0.2) 80%,rgba(255,255,255,0) 100%);
+  pointer-events:none;z-index:20;display:none;
 }
 .pf-captcha-box{
   width:22px;height:22px;flex-shrink:0;
   border:2px solid var(--gray-300);border-radius:4px;
   background:white;display:flex;align-items:center;justify-content:center;
-  transition:all .2s;
+  transition:all .3s;position:relative;z-index:5;
 }
 .pf-captcha.verified .pf-captcha-box{
   border:none;
@@ -175,21 +155,22 @@ input,select,textarea{font-family:var(--font)}
 }
 .pf-captcha-check{
   display:none;
-  animation:checkPop .25s cubic-bezier(.34,1.56,.64,1) forwards;
+  animation:checkPop .3s cubic-bezier(.34,1.56,.64,1) forwards;
 }
 @keyframes checkPop{from{transform:scale(0)}to{transform:scale(1)}}
 .pf-captcha.verified .pf-captcha-check{display:block}
-.pf-captcha-text{flex:1;font-size:13px;color:var(--gray-600);font-weight:500}
+.pf-captcha-text{flex:1;font-size:13px;color:var(--gray-600);font-weight:500;position:relative;z-index:5}
 .pf-captcha.verified .pf-captcha-text{
   font-weight:600;
   background:linear-gradient(135deg,var(--rb1),var(--rb2),var(--rb3));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
 }
-.pf-captcha-brand{font-size:9px;color:var(--gray-400);text-align:right;line-height:1.4}
+.pf-captcha-brand{font-size:10px;font-weight:600;color:var(--gray-400);text-align:right;line-height:1.5;position:relative;z-index:5}
+.pf-captcha-brand span{display:block;font-size:8px;font-weight:400}
 .pf-captcha.verified .pf-captcha-brand{
   background:linear-gradient(135deg,var(--rb1),var(--rb3));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}  
+}
 .pf-hp{position:absolute;left:-9999px;opacity:0;pointer-events:none}
   
 /* ═══════════════════════════════════════
@@ -902,13 +883,14 @@ input,select,textarea{font-family:var(--font)}
         <div class="form-field"><label data-i="pw_lbl">Password</label><input class="form-input" id="signup-pw" type="password" placeholder="min. 8 characters"/></div>
         <!-- CAPTCHA -->
         <div class="pf-captcha" id="pf-captcha" onclick="pfVerifyCaptcha()">
+          <div class="pf-captcha-shimmer" id="pf-captcha-shimmer"></div>
           <div class="pf-captcha-box">
             <svg class="pf-captcha-check" width="13" height="13" viewBox="0 0 13 13" fill="none">
               <path d="M2 6.5l3.5 3.5 5.5-6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
           <div class="pf-captcha-text" id="pf-captcha-text">Ich bin kein Roboter</div>
-          <div class="pf-captcha-brand">PDFortis<br/>Security 🔒</div>
+          <div class="pf-captcha-brand">reCAPTCHA<span>PDFortis Security</span></div>
         </div>
         <div class="form-error hidden" id="signup-error"></div>
         <button class="form-submit" onclick="doSignup()" data-i="nav_signup">Create free account</button>
@@ -2130,13 +2112,21 @@ window.addEventListener('load', restoreSessionFromStorage);
 function pfVerifyCaptcha(){
   const el = document.getElementById('pf-captcha');
   if(el.classList.contains('verified')) return;
-  // Timing-Check: zu schnell = Bot
   if(pfSignupTime && Date.now() - pfSignupTime < 2000){
     toast('Bitte warte einen Moment','err'); return;
   }
   el.classList.add('verified');
   document.getElementById('pf-captcha-text').textContent = 'Verifiziert ✓';
   pfCaptchaVerified = true;
+  setTimeout(()=>{
+    const sh=document.getElementById('pf-captcha-shimmer');
+    const w=el.offsetWidth; const sw=100; let t0=null;
+    sh.style.display='block';
+    function f(ts){if(!t0)t0=ts;const p=Math.min((ts-t0)/900,1);
+      sh.style.transform=`translateX(${-sw+(w+sw*2)*p}px) skewX(-12deg)`;
+      p<1?requestAnimationFrame(f):sh.style.display='none';}
+    requestAnimationFrame(f);
+  },100);
 }
 
 function pfResetCaptcha(){
