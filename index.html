@@ -118,17 +118,49 @@ input,select,textarea{font-family:var(--font)}
   border:1.5px solid transparent;
   background:linear-gradient(white,white) padding-box,
     linear-gradient(135deg,var(--rb1),var(--rb2),var(--rb3),var(--rb4),var(--rb5),var(--rb6)) border-box;
-  box-shadow:0 0 0 3px rgba(99,102,241,.1),0 4px 20px rgba(99,102,241,.08);
+  background-size:200% 200%;
+  box-shadow:0 0 0 3px rgba(99,102,241,.08),0 4px 20px rgba(99,102,241,.06);
   cursor:default;
-  animation:rbShift 4s ease infinite;
+  animation:rbBorderSpin 3s linear infinite;
+}
+@keyframes rbBorderSpin{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
+.pf-captcha.verified::before{
+  content:'';
+  position:absolute;inset:0;
+  background:linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255,255,255,.55) 50%,
+    transparent 60%
+  );
+  background-size:200% 100%;
+  animation:captchaGlass .75s ease forwards;
+  pointer-events:none;
+}
+@keyframes captchaGlass{
+  from{background-position:200% 0}
+  to{background-position:-50% 0}
 }
 .pf-captcha.verified::after{
   content:'';
-  position:absolute;inset:0;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);
-  animation:captchaShine .6s ease forwards;
+  position:absolute;
+  inset:-2px;
+  border-radius:9px;
+  background:linear-gradient(135deg,var(--rb1),var(--rb2),var(--rb3),var(--rb4),var(--rb5),var(--rb6));
+  background-size:300% 300%;
+  animation:rbOuterSpin 2s linear infinite;
+  z-index:-1;
+  opacity:.5;
 }
-@keyframes captchaShine{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+@keyframes rbOuterSpin{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
 .pf-captcha-box{
   width:22px;height:22px;flex-shrink:0;
   border:2px solid var(--gray-300);border-radius:4px;
