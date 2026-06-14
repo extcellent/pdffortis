@@ -29,6 +29,16 @@
     }catch(e){}
   })();
 </script>
+<style>
+  /* Anti-Flicker: wenn eingeloggt, Sign in / Get started gar nicht erst zeigen */
+  html.pf-authed #landing-auth-btns,
+  html.pf-authed #upload-auth-btns      { display: none !important; }
+
+  /* …und stattdessen User-Avatar + Logout sofort zeigen */
+  html.pf-authed #landing-user-area.hidden,
+  html.pf-authed #upload-user-area.hidden,
+  html.pf-authed #landing-logout-btn.hidden { display: inline-flex !important; }
+</style>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>PDFortis — Free PDF Editor</title>
