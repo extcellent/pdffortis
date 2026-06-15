@@ -1108,14 +1108,53 @@ async function loadPDF(file){
 }
 
 window.addEventListener('load', async () => {
+  // Direkt aus URL lesen, NICHT auf auth-badge.js warten (Race-Condition!)
+  const params = new URLSearchParams(location.search);
+  const shareToken = params.get('share');
+
+  // Variante A: bereits von auth-badge.js gesetzt
   if (window.__pfSharedPDF) {
-    const { url, name } = window.__pfSharedPDF;
-    const res = await fetch(url);
-    const blob = await res.blob();
-    const file = new File([blob], name || 'shared.pdf', { type: 'application/pdf' });
-    await loadPDF(file);
+    return loadSharedFromObj(window.__pfSharedPDF);
+  }
+
+  // Variante B: Share-Token in URL, aber auth-badge.js noch nicht fertig
+  if (shareToken && typeof pfGetSession === 'function') {
+    const sess = pfGetSession();
+    if (!sess) {
+      console.warn('[PDFortis] Share-Link aber nicht eingeloggt');
+      return;
+    }
+    try {
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/document_activity?share_token=eq.${encodeURIComponent(shareToken)}&select=*`,
+        { headers: authHeaders(sess.user.access_token) }
+      );
+      const arr = await r.json();
+      const row = arr?.[0];
+      const valid = row && (!row.share_expires_at || new Date(row.share_expires_at) > new Date());
+      if (!valid) {
+        console.warn('[PDFortis] Share-Token ungültig/abgelaufen:', shareToken);
+        return;
+      }
+      const pdfUrl = await sbGetSharedPDFUrl(shareToken, sess.user.access_token);
+      if (!pdfUrl) {
+        console.warn('[PDFortis] Signed URL konnte nicht erzeugt werden');
+        return;
+      }
+      await loadSharedFromObj({ url: pdfUrl, name: row.document_name });
+    } catch(e) {
+      console.error('[PDFortis] Share-Load Fehler', e);
+    }
   }
 });
+
+async function loadSharedFromObj({ url, name }) {
+  const res = await fetch(url);
+  if (!res.ok) { console.error('[PDFortis] PDF-Download fehlgeschlagen', res.status); return; }
+  const blob = await res.blob();
+  const file = new File([blob], name || 'shared.pdf', { type: 'application/pdf' });
+  await loadPDF(file);
+}
 
 async function renderPage(n){
   if(!pdfBytes)return;
