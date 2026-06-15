@@ -28,15 +28,21 @@
         { headers: authHeaders(sess.user.access_token) }
       );
       const arr = await r.json();
-      if (arr?.[0] && !arr[0].share_expires_at || new Date(arr[0].share_expires_at) > new Date()) {
-        // Signed URL holen und PDF direkt laden
+      const row = arr?.[0];
+      const stillValid = row && (!row.share_expires_at || new Date(row.share_expires_at) > new Date());
+      if (stillValid) {
         const pdfUrl = await sbGetSharedPDFUrl(shareToken, sess.user.access_token);
         if (pdfUrl) {
-          window.__pfSharedPDF = { url: pdfUrl, name: arr[0].document_name };
+          window.__pfSharedPDF = { url: pdfUrl, name: row.document_name };
+        } else {
+          console.warn('[PDFortis] Signed URL konnte nicht erzeugt werden für', shareToken);
         }
+      } else {
+        console.warn('[PDFortis] Share-Token nicht gefunden oder abgelaufen:', shareToken);
       }
-    } catch(e) {}
+    } catch(e) { console.warn('[PDFortis] Share-Load Fehler', e); }
   }
+
 
   sbHeartbeat(sess.user.id, sess.user.access_token);
   setInterval(() => sbHeartbeat(sess.user.id, sess.user.access_token), 30000);
