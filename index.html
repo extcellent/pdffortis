@@ -1149,11 +1149,39 @@ window.addEventListener('load', async () => {
 });
 
 async function loadSharedFromObj({ url, name }) {
-  const res = await fetch(url);
-  if (!res.ok) { console.error('[PDFortis] PDF-Download fehlgeschlagen', res.status); return; }
-  const blob = await res.blob();
-  const file = new File([blob], name || 'shared.pdf', { type: 'application/pdf' });
-  await loadPDF(file);
+  showPdfLoader('Geteiltes Dokument wird geladen...');
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Download fehlgeschlagen');
+    const blob = await res.blob();
+    const file = new File([blob], name || 'shared.pdf', { type: 'application/pdf' });
+    await loadPDF(file);
+  } catch(e) {
+    console.error(e);
+    alert('PDF konnte nicht geladen werden');
+  } finally {
+    hidePdfLoader();
+  }
+}
+
+function showPdfLoader(msg = 'Lädt…') {
+  let el = document.getElementById('pdf-loader');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'pdf-loader';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;font-family:system-ui';
+    el.innerHTML = `
+      <div style="width:48px;height:48px;border:4px solid #e0e7ff;border-top-color:#6366f1;border-radius:50%;animation:pfspin .8s linear infinite"></div>
+      <div id="pdf-loader-msg" style="margin-top:16px;color:#374151;font-size:14px;font-weight:500"></div>
+      <style>@keyframes pfspin{to{transform:rotate(360deg)}}</style>`;
+    document.body.appendChild(el);
+  }
+  el.querySelector('#pdf-loader-msg').textContent = msg;
+  el.style.display = 'flex';
+}
+function hidePdfLoader() {
+  const el = document.getElementById('pdf-loader');
+  if (el) el.style.display = 'none';
 }
 
 async function renderPage(n){
