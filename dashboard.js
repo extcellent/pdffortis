@@ -448,7 +448,7 @@ function renderDocTable(docs) {
         </td>
       </tr>`;
   }).join('');
-
+}
 
 function filterDocs(filter) {
   currentDocFilter = filter;
