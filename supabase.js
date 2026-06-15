@@ -203,12 +203,14 @@ async function sbGetSharedPDFUrl(shareToken, accessToken) {
   const r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/shared-pdfs/${path}`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
+      'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
       'apikey': SUPABASE_ANON_KEY,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ expiresIn: 172800 }) // 48h
   });
+  if (!r.ok) { console.warn('signedURL request failed', r.status); return null; }
   const d = await r.json();
-  return d?.signedURL ? `${SUPABASE_URL}/storage/v1${d.signedURL}` : null;
+  const signed = d?.signedURL || d?.signedUrl; // beide Varianten akzeptieren
+  return signed ? `${SUPABASE_URL}/storage/v1${signed}` : null;
 }
