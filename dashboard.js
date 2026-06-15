@@ -53,6 +53,7 @@ async function initDashboard() {
   }
 
   await loadTeam();
+  await cleanupExpired();
   await loadDocuments();
   renderOverviewActivity();
   await renderUsageStats();
@@ -415,11 +416,23 @@ function renderDocTable(docs) {
     return;
   }
   tbody.innerHTML = docs.map(d => {
-    const expired = d.share_expires_at && new Date(d.share_expires_at) < new Date();
-    const expiresIn = d.share_expires_at ? timeAgo(new Date(d.share_expires_at), true) : '—';
+    const hasShare = !!d.share_token;
+    const expired = hasShare && d.share_expires_at && new Date(d.share_expires_at) < new Date();
+    const expiresIn = hasShare && d.share_expires_at ? timeAgo(new Date(d.share_expires_at), true) : '—';
     const deadlineBadge = d.deadline ? getDeadlineBadge(d.deadline) : '—';
     const authorName = d.user_profiles?.display_name || d.user_profiles?.email || 'Unknown';
     const badgeCls = ({ edited:'badge-edit', signed:'badge-sign', compressed:'badge-compress', merged:'badge-merge' })[d.action] || 'badge-edit';
+
+    let actionsHtml;
+    if (!hasShare) {
+      actionsHtml = `<span style="font-size:11px;color:var(--gray-400)" title="Nur Edit-Aktivität — nicht geteilt">Local edit</span>`;
+    } else if (expired) {
+      actionsHtml = `<span style="font-size:11px;color:var(--red)">Expired</span>`;
+    } else {
+      actionsHtml = `<button class="doc-btn primary" onclick="openSharedDoc('${d.share_token}')">Open</button>
+                     <button class="doc-btn" onclick="copyShareLink('${d.share_token}', this)">Copy link</button>`;
+    }
+
     return `
       <tr>
         <td><div class="doc-name">
@@ -431,16 +444,11 @@ function renderDocTable(docs) {
         <td>${deadlineBadge}</td>
         <td style="font-size:11px;color:${expired ? 'var(--red)' : 'var(--gray-400)'}">${expiresIn}</td>
         <td>
-          <div class="doc-actions">
-            ${!expired && d.share_token
-              ? `<button class="doc-btn primary" onclick="openSharedDoc('${d.share_token}')">Open</button>
-                 <button class="doc-btn" onclick="copyShareLink('${d.share_token}', this)">Copy link</button>`
-              : `<span style="font-size:11px;color:var(--red)">Expired</span>`}
-          </div>
+          <div class="doc-actions">${actionsHtml}</div>
         </td>
       </tr>`;
   }).join('');
-}
+
 
 function filterDocs(filter) {
   currentDocFilter = filter;
@@ -718,9 +726,17 @@ function copyToken() {
 // ════════════════════════════════════
 async function cleanupExpired() {
   const nowIso = new Date().toISOString();
+  const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+  // Optional: serverseitige Storage-Cleanup-Function callen (falls vorhanden)
+  sbFetch('POST', '/rest/v1/rpc/delete_expired_shared_pdfs', {}).catch(() => {});
+
   await Promise.all([
     sbFetch('DELETE', `/rest/v1/team_messages?expires_at=lt.${nowIso}`),
+    // a) Geshared mit abgelaufenem expires_at
     sbFetch('DELETE', `/rest/v1/document_activity?share_expires_at=lt.${nowIso}`),
+    // b) Reine Edit-Metadaten (kein share_token) älter als 48h
+    sbFetch('DELETE', `/rest/v1/document_activity?share_token=is.null&created_at=lt.${cutoff48h}`),
     sbFetch('DELETE', `/rest/v1/download_logs?downloaded_at=lt.${new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()}`)
   ]).catch(() => {});
 }
