@@ -382,8 +382,13 @@
     }
   }
 
-  function renderResults() {
+function renderResults() {
     if (!state.lastResult) return;
+    
+    // FIX: Die Box muss auch in dieser Funktion kurz gegriffen werden
+    const resultsBox = document.getElementById('pft-results');
+    if (!resultsBox) return;
+
     const items = state.lastResult.items;
     const html = `
       <div class="pft-col"><h4>Original</h4>${items.map(i => `<div class="pft-line">${escapeHtml(i.text)}</div>`).join('')}</div>
