@@ -249,7 +249,7 @@
       if (badge) { badge.className = 'pft-badge loading'; badge.textContent = '⏳ Loading local model…'; }
     } else if (state.localReady) {
       fab.classList.add('local');
-      if (badge) { badge.className = 'pft-badge local'; badge.textContent = '🔒   Privacy-Modus (local)'; }
+      if (badge) { badge.className = 'pft-badge local'; badge.textContent = '🔒   Privacy-Mode (local)'; }
     } else {
       if (badge) { badge.className = 'pft-badge'; badge.textContent = '⚡ Server-Mode'; }
     }
