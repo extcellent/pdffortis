@@ -80,7 +80,7 @@
       .pft-sel:focus{outline:2px solid #6366f1;outline-offset:1px}
       .pft-go{background:#0b1220;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:600;font-size:13px;cursor:pointer}
       .pft-go:hover{background:#1e293b}
-      .pft-go:disabled{opacity:.5;cursor:not-allowed}
+      .pft-go:disabled{opacity:.6;cursor:not-allowed}
       .pft-secondary{background:#fff;color:#0f172a;border:1px solid #cbd5e1;border-radius:8px;padding:8px 14px;font-weight:500;font-size:13px;cursor:pointer}
       .pft-secondary:hover{background:#f8fafc}
 
