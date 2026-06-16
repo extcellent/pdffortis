@@ -434,15 +434,20 @@
     }
   }
 
-  async function translateLocal(texts, src, tgt) {
+async function translateLocal(texts, src, tgt) {
     await ensureLocal();
-    const out = [];
     const srcLang = (src && src !== 'auto') ? src : 'en';
-    for (const t of texts) {
-      const r = await state.translator(t, { src_lang: srcLang, tgt_lang: tgt });
-      out.push(Array.isArray(r) ? (r[0].translation_text || '') : (r.translation_text || ''));
-    }
-    return out;
+    
+    if (!texts.length) return [];
+
+    // BATCH-PROCESSING: Übergibt das gesamte Array in einem Rutsch an Transformers.js
+    const results = await state.translator(texts, { src_lang: srcLang, tgt_lang: tgt });
+    
+    // Ergebnisse sauber auslesen
+    return results.map(r => {
+      if (Array.isArray(r)) return r[0]?.translation_text || '';
+      return r?.translation_text || '';
+    });
   }
 
   // Smart-Preload: schedule background load after first idle moment
