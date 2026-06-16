@@ -293,58 +293,74 @@
     }
   }
 
+// --------------------------------------------------------------
+  // 6. TRANSLATION FLOW (OPTIMIERT MIT TIMEOUTS & PROGRESS)
   // --------------------------------------------------------------
-  // 6. TRANSLATION FLOW
-  // --------------------------------------------------------------
+  async function fetchWithTimeout(url, options = {}) {
+    const { timeout = 20000 } = options; // 20 Sekunden Timeout
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(id);
+      return response;
+    } catch (e) {
+      clearTimeout(id);
+      if (e.name === 'AbortError') throw new Error('Server antwortet nicht (Timeout). Schalte auf lokal um...');
+      throw e;
+    }
+  }
+
   async function runTranslate() {
     const gate = canTranslate();
     if (!gate.ok) {
       refreshAuthPrompt();
-      toast('Guest limit reached — sign in for unlimited');
+      toast('Gast-Limit erreicht — bitte einloggen');
       return;
     }
     const src = document.getElementById('pft-src').value;
     const tgt = document.getElementById('pft-tgt').value;
     const btn = document.getElementById('pft-run');
     btn.disabled = true;
-    btn.innerHTML = `<span class="pft-spin"></span>Working…`;
-    document.getElementById('pft-results').innerHTML =
-      `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Extracting & translating…</div>`;
+    btn.innerHTML = `<span class="pft-spin"></span>Rechne…`;
+    
+    const resultsBox = document.getElementById('pft-results');
+    resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Lese PDF-Text aus (Server)...</div>`;
 
     try {
+      // 1. Text extrahieren (mit Timeout)
       const extracted = await extractCurrentPage();
       const items = extracted.items || [];
       if (!items.length) {
-        document.getElementById('pft-results').innerHTML =
-          `<div class="pft-empty" style="grid-column:1 / -1">No selectable text found on this page.</div>`;
+        resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1">Kein lesbarer Text auf dieser Seite gefunden.</div>`;
         return;
       }
       const texts = items.map(i => i.text);
 
-      // Decide engine: local if ready, else server, else local (load & wait)
+      // 2. Engine auswählen
       let translated = null, provider = '';
       if (state.localReady) {
+        resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Übersetze lokal im Browser...</div>`;
         translated = await translateLocal(texts, src, tgt);
         provider = 'local (Transformers.js)';
       } else {
         try {
+          resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Übersetze via Server KI...</div>`;
           const r = await translateServer(texts, src, tgt);
           translated = r.translated;
           provider = r.provider + ' (server)';
         } catch (e) {
-          // All server providers failed → load local
-          document.getElementById('pft-results').innerHTML =
-            `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Server quota reached — loading local model (one-time, ~250MB)…</div>`;
+          console.warn('[pft] Server fehlgeschlagen oder Timeout, lade lokalen Modus:', e);
+          resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Server ausgelastet – aktiviere lokalen Privacy-Modus (~250MB)...</div>`;
           await ensureLocal();
+          resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Übersetze lokal im Browser...</div>`;
           translated = await translateLocal(texts, src, tgt);
           provider = 'local (Transformers.js)';
         }
       }
 
-      // count guest usage only on success
       if (!isLoggedIn()) incGuestUsed();
 
-      // store result tied to current page
       state.lastResult = {
         page: window.currentPageNum || 1,
         pageWidth: extracted.pageWidth,
@@ -355,11 +371,10 @@
 
       renderResults();
       renderOverlay();
-      document.getElementById('pft-provider').textContent = `via ${provider} · ${translated.length} segments`;
+      document.getElementById('pft-provider').textContent = `via ${provider} · ${translated.length} Segmente`;
     } catch (e) {
-      console.error('[pft] translate failed', e);
-      document.getElementById('pft-results').innerHTML =
-        `<div class="pft-empty" style="grid-column:1 / -1;color:#b91c1c">Translation failed: ${escapeHtml(e.message || String(e))}</div>`;
+      console.error('[pft] Übersetzung fehlgeschlagen', e);
+      resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1;color:#b91c1c">Fehler: ${escapeHtml(e.message || String(e))}</div>`;
     } finally {
       btn.disabled = false;
       btn.textContent = 'Translate page';
@@ -372,8 +387,8 @@
     const items = state.lastResult.items;
     const html = `
       <div class="pft-col"><h4>Original</h4>${items.map(i => `<div class="pft-line">${escapeHtml(i.text)}</div>`).join('')}</div>
-      <div class="pft-col"><h4>Translation</h4>${items.map(i => `<div class="pft-line">${escapeHtml(i.trans)}</div>`).join('')}</div>`;
-    document.getElementById('pft-results').innerHTML = html;
+      <div class="pft-col"><h4>Übersetzung</h4>${items.map(i => `<div class="pft-line">${escapeHtml(i.trans)}</div>`).join('')}</div>`;
+    resultsBox.innerHTML = html;
   }
 
   async function extractCurrentPage() {
@@ -381,8 +396,8 @@
     const file = new Blob([window.currentPDF], { type: 'application/pdf' });
     fd.append('pdf', file, 'doc.pdf');
     fd.append('page', String((window.currentPageNum || 1) - 1));
-    const r = await fetch(`${API_BASE}/extract`, { method: 'POST', body: fd });
-    if (!r.ok) throw new Error(`Extract failed (${r.status})`);
+    const r = await fetchWithTimeout(`${API_BASE}/extract`, { method: 'POST', body: fd });
+    if (!r.ok) throw new Error(`Extraktion fehlgeschlagen (${r.status})`);
     return await r.json();
   }
 
@@ -391,22 +406,21 @@
     fd.append('texts', JSON.stringify(texts));
     fd.append('source', source);
     fd.append('target', target);
-    const r = await fetch(`${API_BASE}/translate`, { method: 'POST', body: fd });
+    const r = await fetchWithTimeout(`${API_BASE}/translate`, { method: 'POST', body: fd });
     if (r.status === 503) throw new Error('all_server_exhausted');
-    if (!r.ok) throw new Error(`Server error ${r.status}`);
+    if (!r.ok) throw new Error(`Server-Fehler ${r.status}`);
     return await r.json();
   }
 
   // --------------------------------------------------------------
-  // 7. LOCAL ENGINE (Transformers.js / m2m100)
+  // 7. LOCAL ENGINE (STABILE BATCH-VERARBEITUNG)
   // --------------------------------------------------------------
   async function ensureLocal() {
     if (state.localReady) return;
     if (state.localLoading) {
-      // wait until ready
       while (state.localLoading) await new Promise(r => setTimeout(r, 300));
       if (state.localReady) return;
-      throw new Error(state.localError || 'Local model failed');
+      throw new Error(state.localError || 'Lokales Modell konnte nicht geladen werden.');
     }
     state.localLoading = true;
     refreshBadge();
@@ -416,17 +430,19 @@
       state.translator = await mod.pipeline('translation', 'Xenova/m2m100_418M', {
         quantized: true,
         progress_callback: (p) => {
-          if (p.status === 'progress' && p.total) {
-            const pct = ((p.loaded / p.total) * 100).toFixed(0);
-            const badge = document.getElementById('pft-badge');
-            if (badge) badge.textContent = `⏳ Loading model… ${pct}%`;
+          const badge = document.getElementById('pft-badge');
+          if (p.status === 'downloading' || p.status === 'progress') {
+            const pct = p.total ? ` (${((p.loaded / p.total) * 100).toFixed(0)}%)` : '';
+            if (badge) badge.textContent = `⏳ Lade KI-Modell herunter${pct}…`;
+          } else if (p.status === 'done') {
+            if (badge) badge.textContent = `⚙️ Initialisiere KI...`;
           }
         },
       });
       state.localReady = true;
     } catch (e) {
       state.localError = e.message || String(e);
-      console.error('[pft] local load failed', e);
+      console.error('[pft] Lokaler Ladefehler', e);
       throw e;
     } finally {
       state.localLoading = false;
@@ -434,20 +450,36 @@
     }
   }
 
-async function translateLocal(texts, src, tgt) {
+  async function translateLocal(texts, src, tgt) {
     await ensureLocal();
-    const srcLang = (src && src !== 'auto') ? src : 'en';
-    
     if (!texts.length) return [];
+    const srcLang = (src && src !== 'auto') ? src : 'en';
 
-    // BATCH-PROCESSING: Übergibt das gesamte Array in einem Rutsch an Transformers.js
-    const results = await state.translator(texts, { src_lang: srcLang, tgt_lang: tgt });
-    
-    // Ergebnisse sauber auslesen
-    return results.map(r => {
-      if (Array.isArray(r)) return r[0]?.translation_text || '';
-      return r?.translation_text || '';
-    });
+    // Wir teilen in kleine Chunks (z.B. 5 Texte auf einmal), damit das UI nicht einfriert
+    const chunkSize = 5;
+    const out = [];
+    const resultsBox = document.getElementById('pft-results');
+
+    for (let i = 0; i < texts.length; i += chunkSize) {
+      const chunk = texts.slice(i, i + chunkSize);
+      
+      // UI updaten, damit der User sieht, dass gearbeitet wird
+      if (resultsBox) {
+        resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Übersetze Segmente ${i + 1} bis ${Math.min(i + chunkSize, texts.length)} von ${texts.length}...</div>`;
+      }
+      
+      // Kurz dem UI Zeit geben zum Rendern (verhindert das Einfrieren des Tabs)
+      await new Promise(r => setTimeout(r, 20));
+
+      const results = await state.translator(chunk, { src_lang: srcLang, tgt_lang: tgt });
+      
+      const mapped = results.map(r => {
+        if (Array.isArray(r)) return r[0]?.translation_text || '';
+        return r?.translation_text || '';
+      });
+      out.push(...mapped);
+    }
+    return out;
   }
 
   // Smart-Preload: schedule background load after first idle moment
