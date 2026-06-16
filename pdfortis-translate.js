@@ -341,7 +341,7 @@
       let translated = null, provider = '';
       if (state.localReady) {
         translated = await translateLocal(texts, src, tgt);
-        provider = 'local;
+        provider = 'local';
       } else {
         try {
           const r = await translateServer(texts, src, tgt);
