@@ -457,37 +457,20 @@ async function ensureLocal() {
     }
   }
 
-  async function translateLocal(texts, src, tgt) {
+async function translateLocal(texts, src, tgt) {
     await ensureLocal();
-    if (!texts.length) return [];
     const srcLang = (src && src !== 'auto') ? src : 'en';
-
-    // Wir teilen in kleine Chunks (z.B. 5 Texte auf einmal), damit das UI nicht einfriert
-    const chunkSize = 5;
-    const out = [];
-    const resultsBox = document.getElementById('pft-results');
-
-    for (let i = 0; i < texts.length; i += chunkSize) {
-      const chunk = texts.slice(i, i + chunkSize);
-      
-      // UI updaten, damit der User sieht, dass gearbeitet wird
-      if (resultsBox) {
-        resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Extracting & translating…</div>`;
-;
-      }
-      
-      // Kurz dem UI Zeit geben zum Rendern (verhindert das Einfrieren des Tabs)
-      await new Promise(r => setTimeout(r, 20));
-
-      const results = await state.translator(chunk, { src_lang: srcLang, tgt_lang: tgt });
-      
-      const mapped = results.map(r => {
-        if (Array.isArray(r)) return r[0]?.translation_text || '';
-        return r?.translation_text || '';
-      });
-      out.push(...mapped);
-    }
-    return out;
+    
+    // SCHNELLER BATCH-MODUS: Alle Texte werden gleichzeitig an das Modell übergeben
+    const results = await state.translator(texts, { 
+      src_lang: srcLang, 
+      tgt_lang: tgt 
+    });
+    
+    // Bringt die Ergebnisse wieder in das richtige Format (Array von Strings)
+    return Array.isArray(results) 
+      ? results.map(r => r.translation_text || '') 
+      : [results.translation_text || ''];
   }
 
   // Smart-Preload: schedule background load after first idle moment
