@@ -460,17 +460,29 @@ async function ensureLocal() {
 async function translateLocal(texts, src, tgt) {
     await ensureLocal();
     const srcLang = (src && src !== 'auto') ? src : 'en';
-    
-    // SCHNELLER BATCH-MODUS: Alle Texte werden gleichzeitig an das Modell übergeben
-    const results = await state.translator(texts, { 
-      src_lang: srcLang, 
-      tgt_lang: tgt 
-    });
-    
-    // Bringt die Ergebnisse wieder in das richtige Format (Array von Strings)
-    return Array.isArray(results) 
-      ? results.map(r => r.translation_text || '') 
-      : [results.translation_text || ''];
+    const out = [];
+
+    for (const t of texts) {
+      // 1. SCHUTZ: Wenn der Text leer ist, überspringen wir die KI komplett
+      const cleanText = (t || '').trim();
+      if (!cleanText) {
+        out.push('');
+        continue;
+      }
+
+      // 2. SCHUTZ: Zu lange Texte kürzen, damit die KI nicht abstürzt
+      const safeText = cleanText.length > 200 ? cleanText.substring(0, 200) : cleanText;
+
+      try {
+        const r = await state.translator(safeText, { src_lang: srcLang, tgt_lang: tgt });
+        out.push(Array.isArray(r) ? (r[0].translation_text || '') : (r.translation_text || ''));
+      } catch (err) {
+        console.error('[pft] Fehler bei Segment:', safeText, err);
+        out.push(cleanText); // Falls ein Segment fehlschlägt, nimm das Original statt abzustürzen
+      }
+    }
+
+    return out;
   }
 
   // Smart-Preload: schedule background load after first idle moment
