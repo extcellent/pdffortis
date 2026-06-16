@@ -149,7 +149,7 @@
       <div class="pft-modal" data-testid="translate-modal">
         <div class="pft-head">
           <h3>🌍 Translate this page</h3>
-          <span class="pft-badge" id="pft-badge" data-testid="translate-mode-badge">⚡ Server-Modus</span>
+          <span class="pft-badge" id="pft-badge" data-testid="translate-mode-badge">⚡ Server-Mode</span>
           <button class="pft-close" id="pft-close" aria-label="Close">×</button>
         </div>
         <div class="pft-body">
@@ -249,9 +249,9 @@
       if (badge) { badge.className = 'pft-badge loading'; badge.textContent = '⏳ Loading local model…'; }
     } else if (state.localReady) {
       fab.classList.add('local');
-      if (badge) { badge.className = 'pft-badge local'; badge.textContent = '🔒 Privacy-Modus (local)'; }
+      if (badge) { badge.className = 'pft-badge local'; badge.textContent = '🔒   Privacy-Modus (local)'; }
     } else {
-      if (badge) { badge.className = 'pft-badge'; badge.textContent = '⚡ Server-Modus'; }
+      if (badge) { badge.className = 'pft-badge'; badge.textContent = '⚡ Server-Mode'; }
     }
   }
 
