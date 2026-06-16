@@ -222,9 +222,21 @@
     btn.setAttribute('data-testid', 'translate-fab');
     btn.innerHTML = `<span class="pft-dot"></span><span>🌍 Translate</span>`;
     btn.title = 'Translate this PDF page';
+    btn.style.display = 'none';
     btn.onclick = openModal;
     document.body.appendChild(btn);
     refreshBadge();
+    // Show FAB only when editor is visible and a PDF is loaded
+    const updateFabVisibility = () => {
+      const editorVisible = document.getElementById('page-editor') &&
+                            !document.getElementById('page-editor').classList.contains('out');
+      btn.style.display = (editorVisible && window.currentPDF) ? 'flex' : 'none';
+    };
+    new MutationObserver(updateFabVisibility).observe(document.body, {
+      attributes: true, subtree: true, attributeFilter: ['class']
+    });
+    // Also poll for currentPDF becoming available
+    setInterval(updateFabVisibility, 800);
   }
 
   function refreshBadge() {
@@ -300,13 +312,14 @@
       `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Extracting & translating…</div>`;
 
     try {
-      const items = await extractCurrentPage();
+      const extracted = await extractCurrentPage();
+      const items = extracted.items || [];
       if (!items.length) {
         document.getElementById('pft-results').innerHTML =
           `<div class="pft-empty" style="grid-column:1 / -1">No selectable text found on this page.</div>`;
         return;
       }
-      const texts = items.items.map(i => i.text);
+      const texts = items.map(i => i.text);
 
       // Decide engine: local if ready, else server, else local (load & wait)
       let translated = null, provider = '';
@@ -334,9 +347,9 @@
       // store result tied to current page
       state.lastResult = {
         page: window.currentPageNum || 1,
-        pageWidth: items.pageWidth,
-        pageHeight: items.pageHeight,
-        items: items.items.map((it, idx) => ({ ...it, trans: translated[idx] || '' })),
+        pageWidth: extracted.pageWidth,
+        pageHeight: extracted.pageHeight,
+        items: items.map((it, idx) => ({ ...it, trans: translated[idx] || '' })),
         source: src, target: tgt, provider,
       };
 
