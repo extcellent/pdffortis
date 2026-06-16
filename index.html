@@ -2636,8 +2636,15 @@ window.addEventListener('load',()=>{
   updateDLDisplay();
   loadRecent();
 });
+// ── expose for pdfortis-translate.js ──────────────────────────
+Object.defineProperty(window, 'currentPDF',     { get: () => pdfBytes });
+Object.defineProperty(window, 'currentPageNum', { get: () => currentPage });
+window.openAuthModal = () => document.getElementById('auth-modal')?.classList.remove('hidden');
+
 </script>
 <script src="/supabase.js"></script>
 <script src="/auth-badge.js"></script>
+<script>window.PDFORTIS_API = "https://pdffortis-api.onrender.com";</script>
+<script src="/pdfortis-translate.js" defer></script>
 </body>
 </html>
