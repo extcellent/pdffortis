@@ -349,7 +349,7 @@
           provider = r.provider + ' (server)';
         } catch (e) {
           console.warn('[pft] Server failed or timeout, loading local mode:', e);
-          resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Server quota reached — loading local model (one-time, ~250MB)…</div>;
+          resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Server quota reached — loading local model (one-time, ~250MB)…</div>`;
           await ensureLocal();
           translated = await translateLocal(texts, src, tgt);
           provider = 'local';
