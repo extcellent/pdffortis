@@ -306,7 +306,7 @@
       return response;
     } catch (e) {
       clearTimeout(id);
-      if (e.name === 'AbortError') throw new Error('Server antwortet nicht (Timeout). Schalte auf lokal um...');
+      if (e.name === 'AbortError') throw new Error('Server timeout');
       throw e;
     }
   }
@@ -315,24 +315,24 @@
     const gate = canTranslate();
     if (!gate.ok) {
       refreshAuthPrompt();
-      toast('Gast-Limit erreicht — bitte einloggen');
+      toast('Guest limit reached — sign in for unlimited');
       return;
     }
     const src = document.getElementById('pft-src').value;
     const tgt = document.getElementById('pft-tgt').value;
     const btn = document.getElementById('pft-run');
     btn.disabled = true;
-    btn.innerHTML = `<span class="pft-spin"></span>Rechne…`;
+    btn.innerHTML = `<span class="pft-spin"></span>Working…`;
     
     const resultsBox = document.getElementById('pft-results');
-    resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Lese PDF-Text aus (Server)...</div>`;
+    resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Extracting & translating…</div>`;
 
     try {
       // 1. Text extrahieren (mit Timeout)
       const extracted = await extractCurrentPage();
       const items = extracted.items || [];
       if (!items.length) {
-        resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1">Kein lesbarer Text auf dieser Seite gefunden.</div>`;
+        resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1">No selectable text found on this page.</div>`;
         return;
       }
       const texts = items.map(i => i.text);
@@ -340,22 +340,19 @@
       // 2. Engine auswählen
       let translated = null, provider = '';
       if (state.localReady) {
-        resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Übersetze lokal im Browser...</div>`;
         translated = await translateLocal(texts, src, tgt);
-        provider = 'local (Transformers.js)';
+        provider = 'local;
       } else {
         try {
-          resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Übersetze via Server KI...</div>`;
           const r = await translateServer(texts, src, tgt);
           translated = r.translated;
           provider = r.provider + ' (server)';
         } catch (e) {
-          console.warn('[pft] Server fehlgeschlagen oder Timeout, lade lokalen Modus:', e);
-          resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Server ausgelastet – aktiviere lokalen Privacy-Modus (~250MB)...</div>`;
+          console.warn('[pft] Server failed or timeout, loading local mode:', e);
+          resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Server quota reached — loading local model (one-time, ~250MB)…</div>;
           await ensureLocal();
-          resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Übersetze lokal im Browser...</div>`;
           translated = await translateLocal(texts, src, tgt);
-          provider = 'local (Transformers.js)';
+          provider = 'local';
         }
       }
 
@@ -371,10 +368,10 @@
 
       renderResults();
       renderOverlay();
-      document.getElementById('pft-provider').textContent = `via ${provider} · ${translated.length} Segmente`;
+      document.getElementById('pft-provider').textContent = `via ${provider} · ${translated.length} segments`;
     } catch (e) {
       console.error('[pft] Übersetzung fehlgeschlagen', e);
-      resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1;color:#b91c1c">Fehler: ${escapeHtml(e.message || String(e))}</div>`;
+      resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1;color:#b91c1c">Translation failed: ${escapeHtml(e.message || String(e))}</div>`;
     } finally {
       btn.disabled = false;
       btn.textContent = 'Translate page';
@@ -392,7 +389,7 @@ function renderResults() {
     const items = state.lastResult.items;
     const html = `
       <div class="pft-col"><h4>Original</h4>${items.map(i => `<div class="pft-line">${escapeHtml(i.text)}</div>`).join('')}</div>
-      <div class="pft-col"><h4>Übersetzung</h4>${items.map(i => `<div class="pft-line">${escapeHtml(i.trans)}</div>`).join('')}</div>`;
+      <div class="pft-col"><h4>Translation</h4>${items.map(i => `<div class="pft-line">${escapeHtml(i.trans)}</div>`).join('')}</div>`;
     resultsBox.innerHTML = html;
   }
 
@@ -402,7 +399,7 @@ function renderResults() {
     fd.append('pdf', file, 'doc.pdf');
     fd.append('page', String((window.currentPageNum || 1) - 1));
     const r = await fetchWithTimeout(`${API_BASE}/extract`, { method: 'POST', body: fd });
-    if (!r.ok) throw new Error(`Extraktion fehlgeschlagen (${r.status})`);
+    if (!r.ok) throw new Error(`Extract failed (${r.status})`);
     return await r.json();
   }
 
@@ -413,7 +410,7 @@ function renderResults() {
     fd.append('target', target);
     const r = await fetchWithTimeout(`${API_BASE}/translate`, { method: 'POST', body: fd });
     if (r.status === 503) throw new Error('all_server_exhausted');
-    if (!r.ok) throw new Error(`Server-Fehler ${r.status}`);
+    if (!r.ok) throw new Error(`Server error ${r.status}`);
     return await r.json();
   }
 
@@ -425,7 +422,7 @@ async function ensureLocal() {
     if (state.localLoading) {
       while (state.localLoading) await new Promise(r => setTimeout(r, 300));
       if (state.localReady) return;
-      throw new Error(state.localError || 'Lokales Modell konnte nicht geladen werden.');
+      throw new Error(state.localError || 'Local model failed');
     }
     state.localLoading = true;
     refreshBadge();
@@ -444,11 +441,8 @@ async function ensureLocal() {
         progress_callback: (p) => {
           const badge = document.getElementById('pft-badge');
           if (p.status === 'downloading' || p.status === 'progress') {
-            // Fix für fehlende Content-Length: Wenn p.total fehlt, Text-Fallback anzeigen
-            const pct = p.total ? ` (${((p.loaded / p.total) * 100).toFixed(0)}%)` : ' (wird im Hintergrund geladen...)';
-            if (badge) badge.textContent = `⏳ Lade KI-Modell herunter${pct}…`;
-          } else if (p.status === 'done') {
-            if (badge) badge.textContent = `⚙️ Initialisiere KI...`;
+            const pct = p.total ? ` (${((p.loaded / p.total) * 100).toFixed(0)}%)` : '';
+            if (badge) badge.textContent = `⏳ Loading model… ${pct}%`;
           }
         },
       });
@@ -478,7 +472,8 @@ async function ensureLocal() {
       
       // UI updaten, damit der User sieht, dass gearbeitet wird
       if (resultsBox) {
-        resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Übersetze Segmente ${i + 1} bis ${Math.min(i + chunkSize, texts.length)} von ${texts.length}...</div>`;
+        resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Extracting & translating…</div>`;
+;
       }
       
       // Kurz dem UI Zeit geben zum Rendern (verhindert das Einfrieren des Tabs)
