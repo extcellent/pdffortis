@@ -415,7 +415,7 @@
   // --------------------------------------------------------------
   // 7. LOCAL ENGINE (STABILE BATCH-VERARBEITUNG)
   // --------------------------------------------------------------
-  async function ensureLocal() {
+async function ensureLocal() {
     if (state.localReady) return;
     if (state.localLoading) {
       while (state.localLoading) await new Promise(r => setTimeout(r, 300));
@@ -427,12 +427,20 @@
     try {
       const mod = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
       mod.env.allowLocalModels = false;
+
+      // PERFORMANCE-BOOST: Nutze die echten CPU-Kerne des Nutzers (max. 4 parallel)
+      // Das beschleunigt die eigentliche Übersetzung nach dem Laden massiv!
+      if (navigator.hardwareConcurrency) {
+        mod.env.backends.onnx.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency);
+      }
+
       state.translator = await mod.pipeline('translation', 'Xenova/m2m100_418M', {
         quantized: true,
         progress_callback: (p) => {
           const badge = document.getElementById('pft-badge');
           if (p.status === 'downloading' || p.status === 'progress') {
-            const pct = p.total ? ` (${((p.loaded / p.total) * 100).toFixed(0)}%)` : '';
+            // Fix für fehlende Content-Length: Wenn p.total fehlt, Text-Fallback anzeigen
+            const pct = p.total ? ` (${((p.loaded / p.total) * 100).toFixed(0)}%)` : ' (wird im Hintergrund geladen...)';
             if (badge) badge.textContent = `⏳ Lade KI-Modell herunter${pct}…`;
           } else if (p.status === 'done') {
             if (badge) badge.textContent = `⚙️ Initialisiere KI...`;
