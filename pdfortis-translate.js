@@ -368,7 +368,7 @@
 
       renderResults();
       renderOverlay();
-      document.getElementById('pft-provider').textContent = `via ${provider} · ${translated.length} segments`;
+      document.getElementById('pft-provider').textContent = provider.includes('local') ? `🔒 Translated locally · powered by PDFortis` : `powered by PDFortis`;
     } catch (e) {
       console.error('[pft] Übersetzung fehlgeschlagen', e);
       resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1;color:#b91c1c">Translation failed: ${escapeHtml(e.message || String(e))}</div>`;
