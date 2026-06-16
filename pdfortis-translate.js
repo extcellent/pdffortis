@@ -460,27 +460,43 @@ async function ensureLocal() {
 async function translateLocal(texts, src, tgt) {
     await ensureLocal();
     const srcLang = (src && src !== 'auto') ? src : 'en';
-    const out = [];
-
-    for (const t of texts) {
-      // 1. SCHUTZ: Wenn der Text leer ist, überspringen wir die KI komplett
-      const cleanText = (t || '').trim();
-      if (!cleanText) {
-        out.push('');
-        continue;
+    
+    // 1. SCHRITT: Echte Texte filtern und ihre ursprüngliche Position (Index) merken
+    const cleanItems = [];
+    texts.forEach((t, index) => {
+      const cleaned = (t || '').trim();
+      if (cleaned) {
+        // Zu lange Texte kürzen, um Abstürze zu vermeiden
+        const safeText = cleaned.length > 250 ? cleaned.substring(0, 250) : cleaned;
+        cleanItems.push({ text: safeText, index });
       }
+    });
 
-      // 2. SCHUTZ: Zu lange Texte kürzen, damit die KI nicht abstürzt
-      const safeText = cleanText.length > 200 ? cleanText.substring(0, 200) : cleanText;
-
-      try {
-        const r = await state.translator(safeText, { src_lang: srcLang, tgt_lang: tgt });
-        out.push(Array.isArray(r) ? (r[0].translation_text || '') : (r.translation_text || ''));
-      } catch (err) {
-        console.error('[pft] Fehler bei Segment:', safeText, err);
-        out.push(cleanText); // Falls ein Segment fehlschlägt, nimm das Original statt abzustürzen
-      }
+    // Falls das PDF überhaupt keinen Text enthält
+    if (cleanItems.length === 0) {
+      return texts.map(() => '');
     }
+
+    // 2. SCHRITT: Alle echten Texte GLEICHZEITIG an die lokale KI senden (Spart 99% der Zeit!)
+    const rawTextsToTranslate = cleanItems.map(item => item.text);
+    let translatedResults = [];
+    
+    try {
+      const r = await state.translator(rawTextsToTranslate, { src_lang: srcLang, tgt_lang: tgt });
+      translatedResults = Array.isArray(r) ? r : [r];
+    } catch (err) {
+      console.error('[pft] Massen-Übersetzung fehlgeschlagen:', err);
+      // Fallback: Wenn alles fehlschlägt, geben wir das Original zurück
+      return texts;
+    }
+
+    // 3. SCHRITT: Das Ergebnis-Array in der exakt richtigen Reihenfolge wieder aufbauen
+    const out = new Array(texts.length).fill('');
+    
+    cleanItems.forEach((item, i) => {
+      const res = translatedResults[i];
+      out[item.index] = res ? (res.translation_text || '') : item.text;
+    });
 
     return out;
   }
