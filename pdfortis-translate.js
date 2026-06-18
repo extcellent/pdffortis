@@ -448,7 +448,7 @@ const workerCode = `
     const { type, data } = e.data;
     if (type === 'init') {
       try {
-        translator = await pipeline('translation', 'Xenova/m2m100_418M', {
+        translator = await pipeline('translation', 'Xenova/nllb-200-distilled-600M', {
           device: 'wasm',
           dtype: 'q8',
           progress_callback: (p) => {
@@ -467,47 +467,24 @@ const workerCode = `
         if (!translator) throw new Error('Translator not initialized');
         const { chunk, srcLang, tgt } = data;
 
-        // Plain ISO-639-1 Codes — genau das was m2m100 in v3 erwartet
-        const langMap = {
-          'auto': 'en',
-          'albanian': 'sq', 'shqip': 'sq', 'sq': 'sq',
-          'arabic': 'ar', 'العربية': 'ar', 'ar': 'ar',
-          'bulgarian': 'bg', 'български': 'bg', 'bg': 'bg',
-          'chinese': 'zh', '中文': 'zh', 'zh': 'zh',
-          'croatian': 'hr', 'hrvatski': 'hr', 'hr': 'hr',
-          'czech': 'cs', 'čeština': 'cs', 'cs': 'cs',
-          'danish': 'da', 'dansk': 'da', 'da': 'da',
-          'dutch': 'nl', 'nederlands': 'nl', 'nl': 'nl',
-          'english': 'en', 'en': 'en',
-          'estonian': 'et', 'eesti': 'et', 'et': 'et',
-          'finnish': 'fi', 'suomi': 'fi', 'fi': 'fi',
-          'french': 'fr', 'français': 'fr', 'fr': 'fr',
-          'german': 'de', 'deutsch': 'de', 'de': 'de',
-          'greek': 'el', 'ελληνικά': 'el', 'el': 'el',
-          'hindi': 'hi', 'हिन्दी': 'hi', 'hi': 'hi',
-          'hungarian': 'hu', 'magyar': 'hu', 'hu': 'hu',
-          'italian': 'it', 'italiano': 'it', 'it': 'it',
-          'japanese': 'ja', '日本語': 'ja', 'ja': 'ja',
-          'korean': 'ko', '한국어': 'ko', 'ko': 'ko',
-          'latvian': 'lv', 'latviešu': 'lv', 'lv': 'lv',
-          'lithuanian': 'lt', 'lietuvių': 'lt', 'lt': 'lt',
-          'norwegian': 'no', 'norsk': 'no', 'no': 'no',
-          'polish': 'pl', 'polski': 'pl', 'pl': 'pl',
-          'portuguese': 'pt', 'português': 'pt', 'pt': 'pt',
-          'romanian': 'ro', 'română': 'ro', 'ro': 'ro',
-          'russian': 'ru', 'русский': 'ru', 'ru': 'ru',
-          'serbian': 'sr', 'српски': 'sr', 'sr': 'sr',
-          'slovak': 'sk', 'slovenčina': 'sk', 'sk': 'sk',
-          'slovenian': 'sl', 'slovenščina': 'sl', 'sl': 'sl',
-          'spanish': 'es', 'español': 'es', 'es': 'es',
-          'swedish': 'sv', 'svenska': 'sv', 'sv': 'sv',
-          'turkish': 'tr', 'türkçe': 'tr', 'tr': 'tr',
-          'ukrainian': 'uk', 'українська': 'uk', 'uk': 'uk',
-          'hebrew': 'he', 'עברית': 'he', 'he': 'he'
+        // NLLB braucht dieses Format:
+        const nllbMap = {
+          'en': 'eng_Latn', 'de': 'deu_Latn', 'fr': 'fra_Latn',
+          'es': 'spa_Latn', 'it': 'ita_Latn', 'pt': 'por_Latn',
+          'nl': 'nld_Latn', 'pl': 'pol_Latn', 'ru': 'rus_Cyrl',
+          'uk': 'ukr_Cyrl', 'cs': 'ces_Latn', 'ro': 'ron_Latn',
+          'sv': 'swe_Latn', 'da': 'dan_Latn', 'fi': 'fin_Latn',
+          'el': 'ell_Grek', 'hu': 'hun_Latn', 'bg': 'bul_Cyrl',
+          'ar': 'arb_Arab', 'he': 'heb_Hebr', 'hi': 'hin_Deva',
+          'zh': 'zho_Hans', 'ja': 'jpn_Jpan', 'ko': 'kor_Hang',
+          'tr': 'tur_Latn', 'hr': 'hrv_Latn', 'sk': 'slk_Latn',
+          'sl': 'slv_Latn', 'no': 'nob_Latn', 'lt': 'lit_Latn',
+          'lv': 'lvs_Latn', 'et': 'est_Latn', 'sr': 'srp_Cyrl',
+          'sq': 'als_Latn'
         };
-
-        const safeSrc = langMap[String(srcLang || '').toLowerCase().trim()] || 'en';
-        const safeTgt = langMap[String(tgt || '').toLowerCase().trim()] || 'de';
+        
+        const safeSrc = nllbMap[langMap[String(srcLang || '').toLowerCase().trim()] || 'en'] || 'eng_Latn';
+        const safeTgt = nllbMap[langMap[String(tgt || '').toLowerCase().trim()] || 'de'] || 'deu_Latn';
 
         const r = await translator(chunk, {
           src_lang: safeSrc,
