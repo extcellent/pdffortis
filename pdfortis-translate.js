@@ -351,6 +351,7 @@
           console.warn('[pft] Server failed or timeout, loading local mode:', e);
           resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Server quota reached — loading local model (one-time, ~250MB)…</div>`;
           await ensureLocal();
+          // Progress-Anzeige wird jetzt in translateLocal selbst gesetzt
           translated = await translateLocal(texts, src, tgt);
           provider = 'local';
         }
@@ -458,48 +459,59 @@ async function ensureLocal() {
   }
 
 async function translateLocal(texts, src, tgt) {
-    await ensureLocal();
-    const srcLang = (src && src !== 'auto') ? src : 'en';
-    
-    // 1. SCHRITT: Echte Texte filtern und ihre ursprüngliche Position (Index) merken
-    const cleanItems = [];
-    texts.forEach((t, index) => {
-      const cleaned = (t || '').trim();
-      if (cleaned) {
-        // Zu lange Texte kürzen, um Abstürze zu vermeiden
-        const safeText = cleaned.length > 250 ? cleaned.substring(0, 250) : cleaned;
-        cleanItems.push({ text: safeText, index });
-      }
-    });
+  await ensureLocal();
+  const srcLang = (src && src !== 'auto') ? src : 'en';
+  const resultsBox = document.getElementById('pft-results');
 
-    // Falls das PDF überhaupt keinen Text enthält
-    if (cleanItems.length === 0) {
-      return texts.map(() => '');
+  // 1. Echte Texte filtern
+  const cleanItems = [];
+  texts.forEach((t, index) => {
+    const cleaned = (t || '').trim();
+    if (cleaned) {
+      const safeText = cleaned.length > 250 ? cleaned.substring(0, 250) : cleaned;
+      cleanItems.push({ text: safeText, index });
+    }
+  });
+
+  if (cleanItems.length === 0) return texts.map(() => '');
+
+  // 2. In Chunks übersetzen (je 8 Spans), damit der Browser nicht einfriert
+  const CHUNK_SIZE = 8;
+  const translatedResults = new Array(cleanItems.length).fill('');
+
+  for (let i = 0; i < cleanItems.length; i += CHUNK_SIZE) {
+    const chunk = cleanItems.slice(i, i + CHUNK_SIZE);
+    const chunkTexts = chunk.map(c => c.text);
+
+    // Progress-Anzeige
+    if (resultsBox) {
+      const pct = Math.round((i / cleanItems.length) * 100);
+      resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Translating… ${pct}% (${i}/${cleanItems.length} segments)</div>`;
     }
 
-    // 2. SCHRITT: Alle echten Texte GLEICHZEITIG an die lokale KI senden (Spart 99% der Zeit!)
-    const rawTextsToTranslate = cleanItems.map(item => item.text);
-    let translatedResults = [];
-    
+    // Kurze Pause damit der Browser UI-Updates rendern kann
+    await new Promise(r => setTimeout(r, 0));
+
     try {
-      const r = await state.translator(rawTextsToTranslate, { src_lang: srcLang, tgt_lang: tgt });
-      translatedResults = Array.isArray(r) ? r : [r];
+      const r = await state.translator(chunkTexts, { src_lang: srcLang, tgt_lang: tgt });
+      const results = Array.isArray(r) ? r : [r];
+      results.forEach((res, j) => {
+        translatedResults[i + j] = res ? (res.translation_text || '') : chunkTexts[j];
+      });
     } catch (err) {
-      console.error('[pft] Massen-Übersetzung fehlgeschlagen:', err);
-      // Fallback: Wenn alles fehlschlägt, geben wir das Original zurück
-      return texts;
+      console.error('[pft] Chunk-Übersetzung fehlgeschlagen:', i, err);
+      chunk.forEach((_, j) => { translatedResults[i + j] = chunkTexts[j]; });
     }
-
-    // 3. SCHRITT: Das Ergebnis-Array in der exakt richtigen Reihenfolge wieder aufbauen
-    const out = new Array(texts.length).fill('');
-    
-    cleanItems.forEach((item, i) => {
-      const res = translatedResults[i];
-      out[item.index] = res ? (res.translation_text || '') : item.text;
-    });
-
-    return out;
   }
+
+  // 3. Ergebnis-Array wieder aufbauen
+  const out = new Array(texts.length).fill('');
+  cleanItems.forEach((item, i) => {
+    out[item.index] = translatedResults[i] || item.text;
+  });
+
+  return out;
+}
 
   // Smart-Preload: schedule background load after first idle moment
   function schedulePreload() {
