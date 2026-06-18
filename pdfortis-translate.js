@@ -437,13 +437,10 @@ let workerProgressCallback = null;
 const pendingChunks = new Map();
 let chunkCounter = 0;
 
-// Dieser Code läuft isoliert im Hintergrund auf der CPU (WASM mit Multi-Threading)
 const workerCode = `
   import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3';
   env.allowLocalModels = false;
-
-  // Nutzt automatisch Multi-Threading im Hintergrund für maximale CPU-Geschwindigkeit
-  env.backends.onnx.wasm.numThreads = 4; 
+  env.backends.onnx.wasm.numThreads = 1;
 
   let translator = null;
 
@@ -451,13 +448,9 @@ const workerCode = `
     const { type, data } = e.data;
     if (type === 'init') {
       try {
-        // HIER ERZWINGEN WIR DEN STABILEN WASM-fallback MIT HOHER Q8-QUALITÄT
-        const device = 'wasm';
-        const dtype  = 'q8';
-
         translator = await pipeline('translation', 'Xenova/m2m100_418M', {
-          device,
-          dtype,
+          device: 'wasm',
+          dtype: 'q8',
           progress_callback: (p) => {
             if (p.status === 'downloading' || p.status === 'progress') {
               const pct = p.total ? ((p.loaded / p.total) * 100).toFixed(0) : '';
@@ -465,7 +458,7 @@ const workerCode = `
             }
           },
         });
-        self.postMessage({ type: 'ready', device });
+        self.postMessage({ type: 'ready', device: 'wasm' });
       } catch (err) {
         self.postMessage({ type: 'error', error: err.message || String(err) });
       }
@@ -473,61 +466,57 @@ const workerCode = `
       try {
         if (!translator) throw new Error('Translator not initialized');
         const { chunk, srcLang, tgt } = data;
-        
-        // Wörterbuch: Wandelt HTML-Dropdown-Namen exakt in die erlaubten 2-stelligen Kürzel um
+
+        // Plain ISO-639-1 Codes — genau das was m2m100 in v3 erwartet
         const langMap = {
-          'albanian': 'sq', 'shqip': 'sq',
-          'arabic': 'ar', 'العربية': 'ar',
-          'bulgarian': 'bg', 'български': 'bg',
-          'chinese': 'zh', '中文': 'zh',
-          'croatian': 'hr', 'hrvatski': 'hr',
-          'czech': 'cs', 'čeština': 'cs',
-          'danish': 'da', 'dansk': 'da',
-          'dutch': 'nl', 'nederlands': 'nl',
+          'auto': 'en',
+          'albanian': 'sq', 'shqip': 'sq', 'sq': 'sq',
+          'arabic': 'ar', 'العربية': 'ar', 'ar': 'ar',
+          'bulgarian': 'bg', 'български': 'bg', 'bg': 'bg',
+          'chinese': 'zh', '中文': 'zh', 'zh': 'zh',
+          'croatian': 'hr', 'hrvatski': 'hr', 'hr': 'hr',
+          'czech': 'cs', 'čeština': 'cs', 'cs': 'cs',
+          'danish': 'da', 'dansk': 'da', 'da': 'da',
+          'dutch': 'nl', 'nederlands': 'nl', 'nl': 'nl',
           'english': 'en', 'en': 'en',
-          'estonian': 'et', 'eesti': 'et',
-          'finnish': 'fi', 'suomi': 'fi',
+          'estonian': 'et', 'eesti': 'et', 'et': 'et',
+          'finnish': 'fi', 'suomi': 'fi', 'fi': 'fi',
           'french': 'fr', 'français': 'fr', 'fr': 'fr',
           'german': 'de', 'deutsch': 'de', 'de': 'de',
-          'greek': 'el', 'ελληνικά': 'el',
-          'hindi': 'hi', 'हिन्दी': 'hi',
-          'hungarian': 'hu', 'magyar': 'hu',
-          'italian': 'it', 'italiano': 'it',
-          'japanese': 'ja', '日本語': 'ja',
-          'korean': 'ko', '한국어': 'ko',
-          'latvian': 'lv', 'latviešu': 'lv',
-          'lithuanian': 'lt', 'lietuvių': 'lt',
-          'norwegian': 'no', 'norsk': 'no',
-          'polish': 'pl', 'polski': 'pl',
-          'portuguese': 'pt', 'português': 'pt',
-          'romanian': 'ro', 'română': 'ro',
-          'russian': 'ru', 'русский': 'ru',
-          'serbian': 'sr', 'српски': 'sr',
-          'slovak': 'sk', 'slovenčina': 'sk',
-          'slovenian': 'sl', 'slovenščina': 'sl',
+          'greek': 'el', 'ελληνικά': 'el', 'el': 'el',
+          'hindi': 'hi', 'हिन्दी': 'hi', 'hi': 'hi',
+          'hungarian': 'hu', 'magyar': 'hu', 'hu': 'hu',
+          'italian': 'it', 'italiano': 'it', 'it': 'it',
+          'japanese': 'ja', '日本語': 'ja', 'ja': 'ja',
+          'korean': 'ko', '한국어': 'ko', 'ko': 'ko',
+          'latvian': 'lv', 'latviešu': 'lv', 'lv': 'lv',
+          'lithuanian': 'lt', 'lietuvių': 'lt', 'lt': 'lt',
+          'norwegian': 'no', 'norsk': 'no', 'no': 'no',
+          'polish': 'pl', 'polski': 'pl', 'pl': 'pl',
+          'portuguese': 'pt', 'português': 'pt', 'pt': 'pt',
+          'romanian': 'ro', 'română': 'ro', 'ro': 'ro',
+          'russian': 'ru', 'русский': 'ru', 'ru': 'ru',
+          'serbian': 'sr', 'српски': 'sr', 'sr': 'sr',
+          'slovak': 'sk', 'slovenčina': 'sk', 'sk': 'sk',
+          'slovenian': 'sl', 'slovenščina': 'sl', 'sl': 'sl',
           'spanish': 'es', 'español': 'es', 'es': 'es',
-          'swedish': 'sv', 'svenska': 'sv',
-          'turkish': 'tr', 'türkçe': 'tr',
-          'ukrainian': 'uk', 'українська': 'uk'
+          'swedish': 'sv', 'svenska': 'sv', 'sv': 'sv',
+          'turkish': 'tr', 'türkçe': 'tr', 'tr': 'tr',
+          'ukrainian': 'uk', 'українська': 'uk', 'uk': 'uk',
+          'hebrew': 'he', 'עברית': 'he', 'he': 'he'
         };
 
-        // Eingabe säubern
-        const cleanSrc = String(srcLang || '').toLowerCase().trim();
-        const cleanTgt = String(tgt || '').toLowerCase().trim();
+        const safeSrc = langMap[String(srcLang || '').toLowerCase().trim()] || 'en';
+        const safeTgt = langMap[String(tgt || '').toLowerCase().trim()] || 'de';
 
-        // NEU — v3 braucht __xx__ FLORES-Format für m2m100:
-        const safeSrc = '__' + (langMap[cleanSrc] || 'en') + '__';
-        const safeTgt = '__' + (langMap[cleanTgt] || 'de') + '__';
-        
-        const r = await translator(chunk, { 
-          src_lang: safeSrc, 
+        const r = await translator(chunk, {
+          src_lang: safeSrc,
           tgt_lang: safeTgt,
-          max_new_tokens: 256, 
-          num_beams: 5,
+          max_new_tokens: 256,
+          num_beams: 4,
           do_sample: false
         });
-        
-        // v3 gibt direkt ein Array von {translation_text: ...} zurück — gleich wie v2
+
         self.postMessage({ type: 'translated', result: r, chunkId: data.chunkId });
       } catch (err) {
         self.postMessage({ type: 'translate_error', error: err.message || String(err), chunkId: data.chunkId });
