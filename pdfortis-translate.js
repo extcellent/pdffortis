@@ -518,15 +518,23 @@ const workerCode = `
         // 2-stelliges Kürzel ermitteln (Fallback auf en/de)
         const safeSrc = langMap[cleanSrc] || 'en';
         const safeTgt = langMap[cleanTgt] || 'de';
+
+        const contextChunk = chunk.length < 15 ? (chunk + " .") : chunk;
         
         const r = await translator(chunk, { 
           src_lang: safeSrc, 
           tgt_lang: safeTgt,
           max_new_tokens: 256, 
           num_beams: 5,        // Verhindert verlässliche Wortdreher
-          temperature: 1.0,
+          temperature: 0.1,
           do_sample: false
         });
+
+        // Falls ein Punkt hinzugefügt wurde, entfernen wir ihn wieder aus dem Ergebnis
+        let resultText = r[0].translation_text;
+        if (chunk.length < 15 && resultText.endsWith('.')) {
+            resultText = resultText.slice(0, -1).trim();
+        }
         
         self.postMessage({ type: 'translated', result: r, chunkId: data.chunkId });
       } catch (err) {
