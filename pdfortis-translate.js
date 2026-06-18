@@ -432,45 +432,58 @@ function renderResults() {
   // --------------------------------------------------------------
   // 7. LOCAL ENGINE (STABILE BATCH-VERARBEITUNG)
   // --------------------------------------------------------------
+Um auf ~10s zu kommen brauchst du WebGPU (10-30x schneller als WASM). Transformers.js v2 unterstützt das nicht, deshalb müssen wir auf v3 wechseln und denselben Model auf der GPU laufen lassen.
+
+Ersetze ensureLocal komplett damit:
+
 async function ensureLocal() {
+  if (state.localReady) return;
+  if (state.localLoading) {
+    while (state.localLoading) await new Promise(r => setTimeout(r, 300));
     if (state.localReady) return;
-    if (state.localLoading) {
-      while (state.localLoading) await new Promise(r => setTimeout(r, 300));
-      if (state.localReady) return;
-      throw new Error(state.localError || 'Local model failed');
-    }
-    state.localLoading = true;
-    refreshBadge();
-    try {
-      const mod = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
-      mod.env.allowLocalModels = false;
-
-      // PERFORMANCE-BOOST: Nutze die echten CPU-Kerne des Nutzers (max. 4 parallel)
-      // Das beschleunigt die eigentliche Übersetzung nach dem Laden massiv!
-      if (navigator.hardwareConcurrency) {
-        mod.env.backends.onnx.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency);
-      }
-
-      state.translator = await mod.pipeline('translation', 'Xenova/m2m100_418M', {
-        quantized: true,
-        progress_callback: (p) => {
-          const badge = document.getElementById('pft-badge');
-          if (p.status === 'downloading' || p.status === 'progress') {
-            const pct = p.total ? ` (${((p.loaded / p.total) * 100).toFixed(0)}%)` : '';
-            if (badge) badge.textContent = `⏳ Loading model… ${pct}%`;
-          }
-        },
-      });
-      state.localReady = true;
-    } catch (e) {
-      state.localError = e.message || String(e);
-      console.error('[pft] Lokaler Ladefehler', e);
-      throw e;
-    } finally {
-      state.localLoading = false;
-      refreshBadge();
-    }
+    throw new Error(state.localError || 'Local model failed');
   }
+  state.localLoading = true;
+  refreshBadge();
+  try {
+    // Transformers.js v3 — unterstützt WebGPU
+    const mod = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3');
+    mod.env.allowLocalModels = false;
+
+    // WebGPU-Check (Chrome/Edge 113+, Safari 18+)
+    const hasWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator
+                      && !!(await navigator.gpu.requestAdapter().catch(() => null));
+    const device = hasWebGPU ? 'webgpu' : 'wasm';
+    const dtype  = hasWebGPU ? 'q4'     : 'q8';     // GPU: 4-bit, CPU: 8-bit
+    console.log('[pft] loading model', { device, dtype, hasWebGPU });
+
+    if (!hasWebGPU && navigator.hardwareConcurrency) {
+      mod.env.backends.onnx.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency);
+    }
+
+    state.translator = await mod.pipeline('translation', 'Xenova/m2m100_418M', {
+      device,
+      dtype,
+      progress_callback: (p) => {
+        const badge = document.getElementById('pft-badge');
+        if (p.status === 'downloading' || p.status === 'progress') {
+          const pct = p.total ? ` (${((p.loaded / p.total) * 100).toFixed(0)}%)` : '';
+          if (badge) badge.textContent = `⏳ Loading model${pct}`;
+        }
+      },
+    });
+    state.localReady = true;
+    state.localDevice = device;          // für Debug
+    console.log('[pft] model ready on', device);
+  } catch (e) {
+    state.localError = e.message || String(e);
+    console.error('[pft] Lokaler Ladefehler', e);
+    throw e;
+  } finally {
+    state.localLoading = false;
+    refreshBadge();
+  }
+}
 
 
 async function translateLocal(texts, src, tgt) {
