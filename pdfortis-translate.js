@@ -688,6 +688,11 @@ async function translateLocal(texts, src, tgt) {
       if (!it.trans) return;
       const el = document.createElement('div');
       el.className = 'pft-overlay-item';
+
+      el.style.boxShadow = 'none';       // Versteckt den Rahmen
+      el.style.overflow = 'visible';     // Schaltet das "..." Abschneiden ab
+      el.style.whiteSpace = 'normal';    // Erlaubt dem Text zu fließen
+      
       const w = (it.x1 - it.x) * scaleX;
       const h = (it.y1 - it.y) * scaleY;
       el.style.left = (it.x * scaleX) + 'px';
