@@ -483,8 +483,9 @@ const workerCode = `
           'sq': 'als_Latn'
         };
         
-        const safeSrc = nllbMap[langMap[String(srcLang || '').toLowerCase().trim()] || 'en'] || 'eng_Latn';
-        const safeTgt = nllbMap[langMap[String(tgt || '').toLowerCase().trim()] || 'de'] || 'deu_Latn';
+        // NEU (direkt in nllbMap schauen):
+        const safeSrc = nllbMap[String(srcLang || '').toLowerCase().trim()] || 'eng_Latn';
+        const safeTgt = nllbMap[String(tgt || '').toLowerCase().trim()] || 'deu_Latn';
 
         const r = await translator(chunk, {
           src_lang: safeSrc,
