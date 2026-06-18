@@ -477,7 +477,7 @@ async function ensureLocal() {
     throw e;
   } finally {
     state.localLoading = false;
-5    refreshBadge();
+    refreshBadge();
   }
 }
 
