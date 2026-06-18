@@ -196,7 +196,16 @@
 
     // listeners
     bg.querySelector('#pft-close').onclick = () => closeModal();
-    bg.addEventListener('click', (e) => { if (e.target === bg) closeModal(); });
+
+    bg.addEventListener('click', (e) => {
+      if (e.target !== bg) return;
+      if (state.translating) {
+        console.warn('[pft] Backdrop-Click ignoriert — Übersetzung läuft noch');
+        return;
+      }
+      closeModal();
+    });
+    
     bg.querySelector('#pft-run').onclick = runTranslate;
     bg.querySelector('#pft-inline').onchange = (e) => {
       state.overlayOn = e.target.checked;
@@ -327,10 +336,14 @@
     const resultsBox = document.getElementById('pft-results');
     resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Extracting & translating…</div>`;
 
+    state.translating = true;
+    
     try {
       // 1. Text extrahieren (mit Timeout)
       const extracted = await extractCurrentPage();
       const items = extracted.items || [];
+      console.log('[pft] extracted', { items: items.length, w: extracted.pageWidth, h: extracted.pageHeight });
+
       if (!items.length) {
         resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1">No selectable text found on this page.</div>`;
         return;
@@ -374,6 +387,7 @@
       console.error('[pft] Übersetzung fehlgeschlagen', e);
       resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1;color:#b91c1c">Translation failed: ${escapeHtml(e.message || String(e))}</div>`;
     } finally {
+      state.translating = false;  
       btn.disabled = false;
       btn.textContent = 'Translate page';
       refreshAuthPrompt();
@@ -462,13 +476,15 @@ async function translateLocal(texts, src, tgt) {
   await ensureLocal();
   const srcLang = (src && src !== 'auto') ? src : 'en';
   const resultsBox = document.getElementById('pft-results');
+  const T0 = performance.now();
+  console.log('[pft] translateLocal START', { totalTexts: texts.length, src: srcLang, tgt });
 
-  // 1. Dedup: gleiche Strings nur 1x übersetzen (riesiger Speedup bei Verträgen)
-  const cache = new Map();          // key -> translation
-  const jobs = [];                  // {index, key}
+  // 1. Dedup + Filter (zu kurze Strings können m2m100 crashen)
+  const cache = new Map();
+  const jobs = [];
   texts.forEach((t, index) => {
     const cleaned = (t || '').trim();
-    if (!cleaned) return;
+    if (cleaned.length < 2) return;                  // skip 1-char Schrott
     const key = cleaned.length > 200 ? cleaned.substring(0, 200) : cleaned;
     if (!cache.has(key)) cache.set(key, null);
     jobs.push({ index, key });
@@ -476,36 +492,57 @@ async function translateLocal(texts, src, tgt) {
 
   const uniqueKeys = [...cache.keys()];
   const total = uniqueKeys.length;
-  if (total === 0) return texts.map(() => '');
+  console.log('[pft] dedup result', { totalJobs: jobs.length, unique: total });
 
-  // 2. Einen Text NACH dem anderen — gibt Browser nach jedem Step echte Luft
+  if (total === 0) {
+    console.warn('[pft] nichts zu übersetzen');
+    return texts.map(() => '');
+  }
+
   const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
+  let success = 0, failed = 0;
 
   for (let i = 0; i < total; i++) {
     const key = uniqueKeys[i];
 
-    // Progress-UI VOR der Inferenz setzen + echten Repaint erzwingen
-    if (resultsBox) {
+    // Progress (immer schauen ob Box noch existiert!)
+    if (resultsBox && resultsBox.isConnected) {
       const pct = Math.round((i / total) * 100);
       resultsBox.innerHTML =
         `<div class="pft-empty" style="grid-column:1 / -1">` +
         `<span class="pft-spin"></span>Translating… ${pct}% ` +
-        `(${i}/${total} unique segments)</div>`;
+        `(${i}/${total} unique • ok:${success} fail:${failed})</div>`;
+    } else {
+      console.warn('[pft] resultsBox weg! Modal wurde geschlossen?', { i, total });
     }
-    await nextFrame();                              // Frame zeichnen lassen
-    await new Promise(r => setTimeout(r, 0));       // Microtask flushen
+    await nextFrame();
+    await new Promise(r => setTimeout(r, 0));
 
+    const t0 = performance.now();
     try {
       const r = await state.translator(key, { src_lang: srcLang, tgt_lang: tgt });
       const res = Array.isArray(r) ? r[0] : r;
-      cache.set(key, res ? (res.translation_text || key) : key);
+      const out = res ? (res.translation_text || key) : key;
+      cache.set(key, out);
+      success++;
+      if (i < 3 || i % 20 === 0 || i === total - 1) {
+        console.log(`[pft] seg ${i+1}/${total} (${(performance.now()-t0).toFixed(0)}ms):`,
+                    JSON.stringify(key.slice(0, 60)), '→', JSON.stringify(out.slice(0, 60)));
+      }
     } catch (err) {
-      console.error('[pft] Segment failed:', i, key.slice(0, 40), err);
-      cache.set(key, key);   // fallback: Original behalten
+      failed++;
+      console.error(`[pft] seg ${i+1}/${total} FAILED:`,
+                    JSON.stringify(key.slice(0, 80)), err);
+      cache.set(key, key);  // Original behalten
     }
   }
 
-  // 3. Cache zurück auf Original-Indices mappen
+  console.log('[pft] translateLocal DONE', {
+    unique: total, success, failed,
+    totalSec: ((performance.now() - T0) / 1000).toFixed(1)
+  });
+
+  // Zurück auf Original-Indices
   const out = new Array(texts.length).fill('');
   jobs.forEach(j => { out[j.index] = cache.get(j.key) || j.key; });
   return out;
