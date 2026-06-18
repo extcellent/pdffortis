@@ -479,6 +479,7 @@ const workerCode = `
           src_lang: srcLang, 
           tgt_lang: tgt,
           max_new_tokens: 256, // Erlaubt die Ausgabe ganzer Sätze
+          num_beams: 5,
           temperature: 0.1,    // Hält die Übersetzung präzise am Originaltext
           do_sample: false
         });
