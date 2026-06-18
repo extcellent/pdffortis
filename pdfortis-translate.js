@@ -515,21 +515,7 @@ const workerCode = `
         const cleanSrc = String(srcLang || '').toLowerCase().trim();
         const cleanTgt = String(tgt || '').toLowerCase().trim();
 
-        // 2-stelliges Kürzel ermitteln (Fallback auf en/de)
         // NEU — v3 braucht __xx__ FLORES-Format für m2m100:
-        const safeSrc = '__' + (langMap[cleanSrc] || 'en') + '__';
-        const safeTgt = '__' + (langMap[cleanTgt] || 'de') + '__';
-        
-        const r = await translator(chunk, { 
-          src_lang: safeSrc, 
-          tgt_lang: safeTgt,
-          max_new_tokens: 256, 
-          num_beams: 5,
-          do_sample: false
-        });
-        
-        // v3 gibt direkt ein Array von {translation_text: ...} zurück — gleich wie v2
-        self.postMessage({ type: 'translated', result: r, chunkId: data.chunkId });// NEU — v3 braucht __xx__ FLORES-Format für m2m100:
         const safeSrc = '__' + (langMap[cleanSrc] || 'en') + '__';
         const safeTgt = '__' + (langMap[cleanTgt] || 'de') + '__';
         
@@ -675,9 +661,8 @@ async function translateLocal(texts, src, tgt) {
 
       const arr = Array.isArray(workerResult) ? workerResult : [workerResult];
       chunk.forEach((srcStr, j) => {
-        // NEU — v3 gibt manchmal {generated_text: ...} statt translation_text:
         const res = arr[j];
-        const out = (res && (res.translation_text || res.generated_text)) || srcStr;
+        const out = res && res.translation_text ? res.translation_text : srcStr;
         cache.set(srcStr, out);
       });
     } catch (err) {
