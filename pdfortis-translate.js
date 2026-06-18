@@ -458,16 +458,6 @@ async function ensureLocal() {
     }
   }
 
-Ich hab mir deine aktuelle Datei angeschaut und das Problem genauer analysiert. Die Chunk-Änderung wurde zwar eingebaut, aber sie löst das eigentliche Problem nicht — hier ist warum:
-
-Warum es trotzdem hängt / keine % anzeigt:
-
-state.translator(chunkTexts, …) mit einem Array von 8 Strings wird vom m2m100-Pipeline in transformers.js intern oft NICHT als echter Batch verarbeitet — es blockiert die WASM-Threads trotzdem mehrere Sekunden am Stück. In der Zeit kommt der Browser nicht zum Rendern → keine % sichtbar.
-await new Promise(r => setTimeout(r, 0)) reicht NICHT um wirklich einen Repaint zu erzwingen, wenn direkt danach WASM für 3-10s blockt. Du brauchst requestAnimationFrame.
-Ein echter Vertrag hat oft 200+ Spans mit vielen Duplikaten ("der", "die", "Artikel", Firmenname etc.). Ohne Dedup übersetzt das Modell den gleichen Müll 30x.
-Wenn der Tab gewechselt wird, drosselt Chrome die WASM-Threads → Canvas wird nicht mehr neu gezeichnet → weiße Seite.
-Fix: nur translateLocal komplett ersetzen (an runTranslate nichts ändern, dein bestehender Fallback-Block ist okay):
-
 async function translateLocal(texts, src, tgt) {
   await ensureLocal();
   const srcLang = (src && src !== 'auto') ? src : 'en';
