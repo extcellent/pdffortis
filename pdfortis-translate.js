@@ -474,56 +474,56 @@ const workerCode = `
         if (!translator) throw new Error('Translator not initialized');
         const { chunk, srcLang, tgt } = data;
         
-        // Vollständiges Wörterbuch für das M2M100-Modell basierend auf deinen HTML-Werten
+        // Wörterbuch: Wandelt HTML-Dropdown-Namen exakt in die erlaubten 2-stelligen Kürzel um
         const langMap = {
-          'albanian': 'sqi_Latn', 'shqip': 'sqi_Latn',
-          'arabic': 'ara_Arab', 'العربية': 'ara_Arab',
-          'bulgarian': 'bul_Cyrl', 'български': 'bul_Cyrl',
-          'chinese': 'zho_Hans', '中文': 'zho_Hans',
-          'croatian': 'hrv_Latn', 'hrvatski': 'hrv_Latn',
-          'czech': 'ces_Latn', 'čeština': 'ces_Latn',
-          'danish': 'dan_Latn', 'dansk': 'dan_Latn',
-          'dutch': 'nld_Latn', 'nederlands': 'nld_Latn',
-          'english': 'eng_Latn', 'en': 'eng_Latn',
-          'estonian': 'est_Latn', 'eesti': 'est_Latn',
-          'finnish': 'fin_Latn', 'suomi': 'fin_Latn',
-          'french': 'fra_Latn', 'français': 'fra_Latn', 'fr': 'fra_Latn',
-          'german': 'deu_Latn', 'deutsch': 'deu_Latn', 'de': 'deu_Latn',
-          'greek': 'ell_Grek', 'ελληνικά': 'ell_Grek',
-          'hindi': 'hin_Deva', 'हिन्दी': 'hin_Deva',
-          'hungarian': 'hun_Latn', 'magyar': 'hun_Latn',
-          'italian': 'ita_Latn', 'italiano': 'ita_Latn',
-          'japanese': 'jpn_Jpan', '日本語': 'jpn_Jpan',
-          'korean': 'kor_Hang', '한국어': 'kor_Hang',
-          'latvian': 'lav_Latn', 'latviešu': 'lav_Latn',
-          'lithuanian': 'lit_Latn', 'lietuvių': 'lit_Latn',
-          'norwegian': 'nob_Latn', 'norsk': 'nob_Latn',
-          'polish': 'pol_Latn', 'polski': 'pol_Latn',
-          'portuguese': 'por_Latn', 'português': 'por_Latn',
-          'romanian': 'ron_Latn', 'română': 'ron_Latn',
-          'russian': 'rus_Cyrl', 'русский': 'rus_Cyrl',
-          'serbian': 'srp_Cyrl', 'српски': 'srp_Cyrl',
-          'slovak': 'slk_Latn', 'slovenčina': 'slk_Latn',
-          'slovenian': 'slv_Latn', 'slovenščina': 'slv_Latn',
-          'spanish': 'spa_Latn', 'español': 'spa_Latn', 'es': 'spa_Latn',
-          'swedish': 'swe_Latn', 'svenska': 'swe_Latn',
-          'turkish': 'tur_Latn', 'türkçe': 'tur_Latn',
-          'ukrainian': 'ukr_Cyrl', 'українська': 'ukr_Cyrl'
+          'albanian': 'sq', 'shqip': 'sq',
+          'arabic': 'ar', 'العربية': 'ar',
+          'bulgarian': 'bg', 'български': 'bg',
+          'chinese': 'zh', '中文': 'zh',
+          'croatian': 'hr', 'hrvatski': 'hr',
+          'czech': 'cs', 'čeština': 'cs',
+          'danish': 'da', 'dansk': 'da',
+          'dutch': 'nl', 'nederlands': 'nl',
+          'english': 'en', 'en': 'en',
+          'estonian': 'et', 'eesti': 'et',
+          'finnish': 'fi', 'suomi': 'fi',
+          'french': 'fr', 'français': 'fr', 'fr': 'fr',
+          'german': 'de', 'deutsch': 'de', 'de': 'de',
+          'greek': 'el', 'ελληνικά': 'el',
+          'hindi': 'hi', 'हिन्दी': 'hi',
+          'hungarian': 'hu', 'magyar': 'hu',
+          'italian': 'it', 'italiano': 'it',
+          'japanese': 'ja', '日本語': 'ja',
+          'korean': 'ko', '한국어': 'ko',
+          'latvian': 'lv', 'latviešu': 'lv',
+          'lithuanian': 'lt', 'lietuvių': 'lt',
+          'norwegian': 'no', 'norsk': 'no',
+          'polish': 'pl', 'polski': 'pl',
+          'portuguese': 'pt', 'português': 'pt',
+          'romanian': 'ro', 'română': 'ro',
+          'russian': 'ru', 'русский': 'ru',
+          'serbian': 'sr', 'српски': 'sr',
+          'slovak': 'sk', 'slovenčina': 'sk',
+          'slovenian': 'sl', 'slovenščina': 'sl',
+          'spanish': 'es', 'español': 'es', 'es': 'es',
+          'swedish': 'sv', 'svenska': 'sv',
+          'turkish': 'tr', 'türkçe': 'tr',
+          'ukrainian': 'uk', 'українська': 'uk'
         };
 
-        // Eingabe säubern (Kleinbuchstaben und Leerzeichen entfernen)
+        // Eingabe säubern
         const cleanSrc = String(srcLang || '').toLowerCase().trim();
         const cleanTgt = String(tgt || '').toLowerCase().trim();
 
-        // Richtige Kürzel ermitteln (Fallback auf Englisch/Deutsch, falls ein Wert unklar ist)
-        const safeSrc = langMap[cleanSrc] || 'eng_Latn';
-        const safeTgt = langMap[cleanTgt] || 'deu_Latn';
+        // 2-stelliges Kürzel ermitteln (Fallback auf en/de)
+        const safeSrc = langMap[cleanSrc] || 'en';
+        const safeTgt = langMap[cleanTgt] || 'de';
         
         const r = await translator(chunk, { 
           src_lang: safeSrc, 
           tgt_lang: safeTgt,
           max_new_tokens: 256, 
-          num_beams: 5,        // Bleibt aktiv, um falsche Wort-Halluzinationen zu verhindern
+          num_beams: 5,        // Verhindert verlässliche Wortdreher
           temperature: 1.0,
           do_sample: false
         });
