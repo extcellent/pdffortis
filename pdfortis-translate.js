@@ -477,9 +477,10 @@ async function ensureLocal() {
     throw e;
   } finally {
     state.localLoading = false;
-    refreshBadge();
+5    refreshBadge();
   }
 }
+
 
 
 async function translateLocal(texts, src, tgt) {
@@ -489,18 +490,16 @@ async function translateLocal(texts, src, tgt) {
   const T0 = performance.now();
   console.log('[pft] translateLocal START', { totalTexts: texts.length, src: srcLang, tgt });
 
-  const SEP = ' ||| ';                                   // Trenner zwischen Spans
-  const MAX_BATCH_CHARS = 400;                           // ~max chars je Modell-Call
-  const isAllCaps = s => /[A-Z]/.test(s) && !/[a-zäöüß]/.test(s);  // NEXORA, GmbH-AG etc.
+  const isAllCaps = s => /[A-Z]/.test(s) && !/[a-zäöüß]/.test(s);
 
-  // 1. Dedup + ALL-CAPS direkt 1:1 durchreichen (Firmennamen/Akronyme nicht übersetzen)
-  const cache = new Map();    // key -> translation (null = noch nicht erledigt)
+  // 1. Dedup + ALL-CAPS überspringen (Firmennamen/Akronyme)
+  const cache = new Map();
   const jobs = [];
   texts.forEach((t, index) => {
     const cleaned = (t || '').trim();
     if (cleaned.length < 2) return;
     if (isAllCaps(cleaned)) {
-      cache.set(cleaned, cleaned);        // direkt fertig, kein Modell-Call
+      cache.set(cleaned, cleaned);
       jobs.push({ index, key: cleaned });
       return;
     }
@@ -511,84 +510,65 @@ async function translateLocal(texts, src, tgt) {
 
   const todo = [];
   cache.forEach((v, k) => { if (v === null) todo.push(k); });
-  console.log('[pft] dedup', {
-    totalJobs: jobs.length, unique: cache.size,
-    toTranslate: todo.length, skippedCaps: cache.size - todo.length
-  });
+  console.log('[pft] dedup', { unique: cache.size, toTranslate: todo.length });
 
   if (todo.length === 0) {
-    const out0 = new Array(texts.length).fill('');
-    jobs.forEach(j => { out0[j.index] = cache.get(j.key) || j.key; });
-    return out0;
+    const o0 = new Array(texts.length).fill('');
+    jobs.forEach(j => { o0[j.index] = cache.get(j.key) || j.key; });
+    return o0;
   }
 
-  // 2. In Batches packen — mehrere Spans pro Modell-Call statt 1
-  const batches = [];
-  let cur = [], curLen = 0;
-  todo.forEach(k => {
-    const add = k.length + SEP.length;
-    if (curLen + add > MAX_BATCH_CHARS && cur.length) {
-      batches.push(cur); cur = []; curLen = 0;
-    }
-    cur.push(k); curLen += add;
-  });
-  if (cur.length) batches.push(cur);
-  console.log('[pft] batches built', {
-    count: batches.length,
-    avgSpansPerBatch: (todo.length / batches.length).toFixed(1)
-  });
-
+  // 2. Array-Chunks an den Translator — nutzt das interne Batching nativ,
+  //    keine Join/Split-Tricks mehr (die haben die 1-Satz-PDFs zerstört).
+  const CHUNK = 12;
   const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
-  let done = 0;
+  let done = 0, success = 0, failed = 0;
 
-  for (let bi = 0; bi < batches.length; bi++) {
-    const batch = batches[bi];
-    const joined = batch.join(SEP);
+  for (let i = 0; i < todo.length; i += CHUNK) {
+    const chunk = todo.slice(i, i + CHUNK);
 
     if (resultsBox && resultsBox.isConnected) {
       const pct = Math.round((done / todo.length) * 100);
       resultsBox.innerHTML =
         `<div class="pft-empty" style="grid-column:1 / -1">` +
-        `<span class="pft-spin"></span>Translating… ${pct}% ` +
-        `(batch ${bi + 1}/${batches.length} • ${done}/${todo.length} segments)</div>`;
+        `<span class="pft-spin"></span>Translating… ${pct}% (${done}/${todo.length} segments)</div>`;
     }
     await nextFrame();
     await new Promise(r => setTimeout(r, 0));
 
+    const ci = Math.floor(i / CHUNK) + 1;
+    const ctotal = Math.ceil(todo.length / CHUNK);
+    console.log(`[pft] chunk ${ci}/${ctotal} START (${chunk.length} items)`);
     const t0 = performance.now();
+
     try {
-      const r = await state.translator(joined, { src_lang: srcLang, tgt_lang: tgt });
-      const res = Array.isArray(r) ? r[0] : r;
-      const outText = res ? (res.translation_text || joined) : joined;
-      // Auf Trenner splitten (tolerant gegen Whitespace-Varianten des Modells)
-      const parts = outText.split(/\s*\|{2,}\s*/);
-      console.log(`[pft] batch ${bi+1}/${batches.length} (${(performance.now()-t0).toFixed(0)}ms)`,
-                  { spans: batch.length, parts: parts.length, sample: parts[0]?.slice(0,60) });
-      if (parts.length !== batch.length) {
-        console.warn(`[pft] split mismatch batch ${bi+1}: expected ${batch.length}, got ${parts.length} — fallback to single-mode`);
-        // Fallback: jeden Span einzeln (selten, aber sicher)
-        for (let i = 0; i < batch.length; i++) {
-          try {
-            const rr = await state.translator(batch[i], { src_lang: srcLang, tgt_lang: tgt });
-            const r2 = Array.isArray(rr) ? rr[0] : rr;
-            cache.set(batch[i], (r2 && r2.translation_text) || batch[i]);
-          } catch { cache.set(batch[i], batch[i]); }
-          await nextFrame();
-        }
-      } else {
-        batch.forEach((srcStr, i) => {
-          cache.set(srcStr, (parts[i] || srcStr).trim() || srcStr);
-        });
+      // chunk ist ein Array → translator gibt Array zurück
+      const r = await state.translator(chunk, { src_lang: srcLang, tgt_lang: tgt });
+      const arr = Array.isArray(r) ? r : [r];
+      const ms = (performance.now() - t0).toFixed(0);
+
+      if (arr.length !== chunk.length) {
+        console.warn(`[pft] chunk ${ci} length mismatch: got ${arr.length}, expected ${chunk.length}`);
       }
+
+      chunk.forEach((srcStr, j) => {
+        const res = arr[j];
+        const out = res && res.translation_text ? res.translation_text : srcStr;
+        cache.set(srcStr, out);
+      });
+      success += chunk.length;
+      console.log(`[pft] chunk ${ci}/${ctotal} done in ${ms}ms`,
+                  { sample: `${chunk[0]?.slice(0,40)} → ${arr[0]?.translation_text?.slice(0,40)}` });
     } catch (err) {
-      console.error(`[pft] batch ${bi+1} FAILED`, err);
-      batch.forEach(s => cache.set(s, s));
+      console.error(`[pft] chunk ${ci} FAILED`, err);
+      chunk.forEach(s => cache.set(s, s));
+      failed += chunk.length;
     }
-    done += batch.length;
+    done += chunk.length;
   }
 
   console.log('[pft] translateLocal DONE', {
-    batches: batches.length, unique: todo.length,
+    unique: todo.length, success, failed,
     totalSec: ((performance.now() - T0) / 1000).toFixed(1)
   });
 
