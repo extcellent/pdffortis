@@ -458,58 +458,66 @@ async function ensureLocal() {
     }
   }
 
+Ich hab mir deine aktuelle Datei angeschaut und das Problem genauer analysiert. Die Chunk-Änderung wurde zwar eingebaut, aber sie löst das eigentliche Problem nicht — hier ist warum:
+
+Warum es trotzdem hängt / keine % anzeigt:
+
+state.translator(chunkTexts, …) mit einem Array von 8 Strings wird vom m2m100-Pipeline in transformers.js intern oft NICHT als echter Batch verarbeitet — es blockiert die WASM-Threads trotzdem mehrere Sekunden am Stück. In der Zeit kommt der Browser nicht zum Rendern → keine % sichtbar.
+await new Promise(r => setTimeout(r, 0)) reicht NICHT um wirklich einen Repaint zu erzwingen, wenn direkt danach WASM für 3-10s blockt. Du brauchst requestAnimationFrame.
+Ein echter Vertrag hat oft 200+ Spans mit vielen Duplikaten ("der", "die", "Artikel", Firmenname etc.). Ohne Dedup übersetzt das Modell den gleichen Müll 30x.
+Wenn der Tab gewechselt wird, drosselt Chrome die WASM-Threads → Canvas wird nicht mehr neu gezeichnet → weiße Seite.
+Fix: nur translateLocal komplett ersetzen (an runTranslate nichts ändern, dein bestehender Fallback-Block ist okay):
+
 async function translateLocal(texts, src, tgt) {
   await ensureLocal();
   const srcLang = (src && src !== 'auto') ? src : 'en';
   const resultsBox = document.getElementById('pft-results');
 
-  // 1. Echte Texte filtern
-  const cleanItems = [];
+  // 1. Dedup: gleiche Strings nur 1x übersetzen (riesiger Speedup bei Verträgen)
+  const cache = new Map();          // key -> translation
+  const jobs = [];                  // {index, key}
   texts.forEach((t, index) => {
     const cleaned = (t || '').trim();
-    if (cleaned) {
-      const safeText = cleaned.length > 250 ? cleaned.substring(0, 250) : cleaned;
-      cleanItems.push({ text: safeText, index });
-    }
+    if (!cleaned) return;
+    const key = cleaned.length > 200 ? cleaned.substring(0, 200) : cleaned;
+    if (!cache.has(key)) cache.set(key, null);
+    jobs.push({ index, key });
   });
 
-  if (cleanItems.length === 0) return texts.map(() => '');
+  const uniqueKeys = [...cache.keys()];
+  const total = uniqueKeys.length;
+  if (total === 0) return texts.map(() => '');
 
-  // 2. In Chunks übersetzen (je 8 Spans), damit der Browser nicht einfriert
-  const CHUNK_SIZE = 8;
-  const translatedResults = new Array(cleanItems.length).fill('');
+  // 2. Einen Text NACH dem anderen — gibt Browser nach jedem Step echte Luft
+  const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
 
-  for (let i = 0; i < cleanItems.length; i += CHUNK_SIZE) {
-    const chunk = cleanItems.slice(i, i + CHUNK_SIZE);
-    const chunkTexts = chunk.map(c => c.text);
+  for (let i = 0; i < total; i++) {
+    const key = uniqueKeys[i];
 
-    // Progress-Anzeige
+    // Progress-UI VOR der Inferenz setzen + echten Repaint erzwingen
     if (resultsBox) {
-      const pct = Math.round((i / cleanItems.length) * 100);
-      resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Translating… ${pct}% (${i}/${cleanItems.length} segments)</div>`;
+      const pct = Math.round((i / total) * 100);
+      resultsBox.innerHTML =
+        `<div class="pft-empty" style="grid-column:1 / -1">` +
+        `<span class="pft-spin"></span>Translating… ${pct}% ` +
+        `(${i}/${total} unique segments)</div>`;
     }
-
-    // Kurze Pause damit der Browser UI-Updates rendern kann
-    await new Promise(r => setTimeout(r, 0));
+    await nextFrame();                              // Frame zeichnen lassen
+    await new Promise(r => setTimeout(r, 0));       // Microtask flushen
 
     try {
-      const r = await state.translator(chunkTexts, { src_lang: srcLang, tgt_lang: tgt });
-      const results = Array.isArray(r) ? r : [r];
-      results.forEach((res, j) => {
-        translatedResults[i + j] = res ? (res.translation_text || '') : chunkTexts[j];
-      });
+      const r = await state.translator(key, { src_lang: srcLang, tgt_lang: tgt });
+      const res = Array.isArray(r) ? r[0] : r;
+      cache.set(key, res ? (res.translation_text || key) : key);
     } catch (err) {
-      console.error('[pft] Chunk-Übersetzung fehlgeschlagen:', i, err);
-      chunk.forEach((_, j) => { translatedResults[i + j] = chunkTexts[j]; });
+      console.error('[pft] Segment failed:', i, key.slice(0, 40), err);
+      cache.set(key, key);   // fallback: Original behalten
     }
   }
 
-  // 3. Ergebnis-Array wieder aufbauen
+  // 3. Cache zurück auf Original-Indices mappen
   const out = new Array(texts.length).fill('');
-  cleanItems.forEach((item, i) => {
-    out[item.index] = translatedResults[i] || item.text;
-  });
-
+  jobs.forEach(j => { out[j.index] = cache.get(j.key) || j.key; });
   return out;
 }
 
