@@ -488,92 +488,74 @@ async function translateLocal(texts, src, tgt) {
   const srcLang = (src && src !== 'auto') ? src : 'en';
   const resultsBox = document.getElementById('pft-results');
   const T0 = performance.now();
-  console.log('[pft] translateLocal START', { totalTexts: texts.length, src: srcLang, tgt });
 
-  const isAllCaps = s => /[A-Z]/.test(s) && !/[a-zäöüß]/.test(s);
-
-  // 1. Dedup + ALL-CAPS überspringen (Firmennamen/Akronyme)
+  // 1. Filtern, Kürzen & Deduping (verhindert doppelte Arbeit)
+  const cleanItems = [];
   const cache = new Map();
-  const jobs = [];
+
   texts.forEach((t, index) => {
     const cleaned = (t || '').trim();
     if (cleaned.length < 2) return;
-    if (isAllCaps(cleaned)) {
-      cache.set(cleaned, cleaned);
-      jobs.push({ index, key: cleaned });
-      return;
+
+    // Zu lange Texte kürzen, um Abstürze zu vermeiden (wichtig bei Verträgen)
+    const safeText = cleaned.length > 250 ? cleaned.substring(0, 250) : cleaned;
+
+    if (!cache.has(safeText)) {
+      cache.set(safeText, null); // null bedeutet: muss noch übersetzt werden
     }
-    const key = cleaned.length > 220 ? cleaned.substring(0, 220) : cleaned;
-    if (!cache.has(key)) cache.set(key, null);
-    jobs.push({ index, key });
+    cleanItems.push({ text: safeText, index });
   });
 
-  const todo = [];
-  cache.forEach((v, k) => { if (v === null) todo.push(k); });
-  console.log('[pft] dedup', { unique: cache.size, toTranslate: todo.length });
+  const todo = Array.from(cache.keys());
 
   if (todo.length === 0) {
-    const o0 = new Array(texts.length).fill('');
-    jobs.forEach(j => { o0[j.index] = cache.get(j.key) || j.key; });
-    return o0;
+    return texts.map(() => '');
   }
 
-  // 2. Array-Chunks an den Translator — nutzt das interne Batching nativ,
-  //    keine Join/Split-Tricks mehr (die haben die 1-Satz-PDFs zerstört).
-  const CHUNK = 12;
-  const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
-  let done = 0, success = 0, failed = 0;
+  // 2. CHUNK-GRÖßE DRASTISCH REDUZIEREN
+  // Batch-Size 12 ist für Seq2Seq-Modelle im Browser zu viel. 
+  // 2 ist der Sweet-Spot für Geschwindigkeit ohne den Browser zum Absturz zu bringen.
+  const CHUNK = 2; 
+  let done = 0;
 
   for (let i = 0; i < todo.length; i += CHUNK) {
     const chunk = todo.slice(i, i + CHUNK);
 
+    // UI Update erzwingen & Event-Loop freigeben
     if (resultsBox && resultsBox.isConnected) {
       const pct = Math.round((done / todo.length) * 100);
       resultsBox.innerHTML =
         `<div class="pft-empty" style="grid-column:1 / -1">` +
-        `<span class="pft-spin"></span>Translating… ${pct}% (${done}/${todo.length} segments)</div>`;
+        `<span class="pft-spin"></span>Translating… ${pct}% (${done}/${todo.length})</div>`;
     }
-    await nextFrame();
-    await new Promise(r => setTimeout(r, 0));
-
-    const ci = Math.floor(i / CHUNK) + 1;
-    const ctotal = Math.ceil(todo.length / CHUNK);
-    console.log(`[pft] chunk ${ci}/${ctotal} START (${chunk.length} items)`);
-    const t0 = performance.now();
+    
+    // WICHTIG: Diese 20ms Pause zwingt den Browser, die %-Anzeige zu rendern, 
+    // bevor der nächste schwere Rechenschritt startet!
+    await new Promise(r => setTimeout(r, 20)); 
 
     try {
-      // chunk ist ein Array → translator gibt Array zurück
       const r = await state.translator(chunk, { src_lang: srcLang, tgt_lang: tgt });
       const arr = Array.isArray(r) ? r : [r];
-      const ms = (performance.now() - t0).toFixed(0);
-
-      if (arr.length !== chunk.length) {
-        console.warn(`[pft] chunk ${ci} length mismatch: got ${arr.length}, expected ${chunk.length}`);
-      }
 
       chunk.forEach((srcStr, j) => {
         const res = arr[j];
-        const out = res && res.translation_text ? res.translation_text : srcStr;
-        cache.set(srcStr, out);
+        cache.set(srcStr, res && res.translation_text ? res.translation_text : srcStr);
       });
-      success += chunk.length;
-      console.log(`[pft] chunk ${ci}/${ctotal} done in ${ms}ms`,
-                  { sample: `${chunk[0]?.slice(0,40)} → ${arr[0]?.translation_text?.slice(0,40)}` });
     } catch (err) {
-      console.error(`[pft] chunk ${ci} FAILED`, err);
-      chunk.forEach(s => cache.set(s, s));
-      failed += chunk.length;
+      console.error(`[pft] chunk failed`, err);
+      // Bei einem Fehler das Original behalten, damit der Rest weiterläuft
+      chunk.forEach(s => cache.set(s, s)); 
     }
     done += chunk.length;
   }
 
-  console.log('[pft] translateLocal DONE', {
-    unique: todo.length, success, failed,
-    totalSec: ((performance.now() - T0) / 1000).toFixed(1)
+  // 3. Ergebnisse exakt in die Original-Reihenfolge einfügen
+  const out = new Array(texts.length).fill('');
+  cleanItems.forEach(item => {
+    out[item.index] = cache.get(item.text) || item.text;
   });
 
-  const out = new Array(texts.length).fill('');
-  jobs.forEach(j => { out[j.index] = cache.get(j.key) || j.key; });
+  console.log(`[pft] translateLocal DONE in ${((performance.now() - T0) / 1000).toFixed(1)}s`);
   return out;
 }
 
