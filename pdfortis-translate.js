@@ -428,9 +428,97 @@ function renderResults() {
     return await r.json();
   }
 
-  // --------------------------------------------------------------
-  // 7. LOCAL ENGINE (STABILE BATCH-VERARBEITUNG)
-  // --------------------------------------------------------------
+// ====================================================================
+// 7. LOCAL ENGINE (ULTRA-STABILER WASM-WORKER — KEIN HÄNGEN, VOLLSTÄNDIGER TEXT)
+// ====================================================================
+let workerResolver = null;
+let workerRejecter = null;
+let workerProgressCallback = null;
+const pendingChunks = new Map();
+let chunkCounter = 0;
+
+// Dieser Code läuft isoliert im Hintergrund auf der CPU (WASM mit Multi-Threading)
+const workerCode = `
+  import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3';
+  env.allowLocalModels = false;
+
+  // Nutzt automatisch Multi-Threading im Hintergrund für maximale CPU-Geschwindigkeit
+  env.backends.onnx.wasm.numThreads = 4; 
+
+  let translator = null;
+
+  self.onmessage = async (e) => {
+    const { type, data } = e.data;
+    if (type === 'init') {
+      try {
+        // HIER ERZWINGEN WIR DEN STABILEN WASM-fallback MIT HOHER Q8-QUALITÄT
+        const device = 'wasm';
+        const dtype  = 'q8';
+
+        translator = await pipeline('translation', 'Xenova/m2m100_418M', {
+          device,
+          dtype,
+          progress_callback: (p) => {
+            if (p.status === 'downloading' || p.status === 'progress') {
+              const pct = p.total ? ((p.loaded / p.total) * 100).toFixed(0) : '';
+              self.postMessage({ type: 'progress', pct });
+            }
+          },
+        });
+        self.postMessage({ type: 'ready', device });
+      } catch (err) {
+        self.postMessage({ type: 'error', error: err.message || String(err) });
+      }
+    } else if (type === 'translate') {
+      try {
+        if (!translator) throw new Error('Translator not initialized');
+        const { chunk, srcLang, tgt } = data;
+        
+        // FIX: max_new_tokens & temperature verhindern das Abschneiden ("Ich liebe...")!
+        const r = await translator(chunk, { 
+          src_lang: srcLang, 
+          tgt_lang: tgt,
+          max_new_tokens: 256, // Erlaubt die Ausgabe ganzer Sätze
+          temperature: 0.1,    // Hält die Übersetzung präzise am Originaltext
+          do_sample: false
+        });
+        
+        self.postMessage({ type: 'translated', result: r, chunkId: data.chunkId });
+      } catch (err) {
+        self.postMessage({ type: 'translate_error', error: err.message || String(err), chunkId: data.chunkId });
+      }
+    }
+  };
+`;
+
+function getWorker() {
+  if (state.worker) return state.worker;
+  const blob = new Blob([workerCode], { type: 'text/javascript' });
+  const url = URL.createObjectURL(blob);
+  state.worker = new Worker(url, { type: 'module' });
+  
+  state.worker.onmessage = (e) => {
+    const { type, pct, device, error, result, chunkId } = e.data;
+    if (type === 'progress') {
+      if (workerProgressCallback) workerProgressCallback(pct);
+    } else if (type === 'ready') {
+      state.localReady = true;
+      state.localDevice = device;
+      if (workerResolver) workerResolver();
+    } else if (type === 'error') {
+      state.localError = error;
+      if (workerRejecter) workerRejecter(new Error(error));
+    } else if (type === 'translated') {
+      const cb = pendingChunks.get(chunkId);
+      if (cb) cb.resolve(result);
+    } else if (type === 'translate_error') {
+      const cb = pendingChunks.get(chunkId);
+      if (cb) cb.reject(new Error(error));
+    }
+  };
+  return state.worker;
+}
+
 async function ensureLocal() {
   if (state.localReady) return;
   if (state.localLoading) {
@@ -441,38 +529,25 @@ async function ensureLocal() {
   state.localLoading = true;
   refreshBadge();
   try {
-    // Transformers.js v3 — unterstützt WebGPU
-    const mod = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3');
-    mod.env.allowLocalModels = false;
-
-    // WebGPU-Check (Chrome/Edge 113+, Safari 18+)
-    const hasWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator
-                      && !!(await navigator.gpu.requestAdapter().catch(() => null));
-    const device = hasWebGPU ? 'webgpu' : 'wasm';
-    const dtype  = hasWebGPU ? 'q4'     : 'q8';     // GPU: 4-bit, CPU: 8-bit
-    console.log('[pft] loading model', { device, dtype, hasWebGPU });
-
-    if (!hasWebGPU && navigator.hardwareConcurrency) {
-      mod.env.backends.onnx.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency);
-    }
-
-    state.translator = await mod.pipeline('translation', 'Xenova/m2m100_418M', {
-      device,
-      dtype,
-      progress_callback: (p) => {
+    console.log('[pft] Initialisiere stabilen WASM Web Worker (Transformers.js v3)...');
+    const w = getWorker();
+    
+    await new Promise((resolve, reject) => {
+      workerResolver = resolve;
+      workerRejecter = reject;
+      workerProgressCallback = (pct) => {
         const badge = document.getElementById('pft-badge');
-        if (p.status === 'downloading' || p.status === 'progress') {
-          const pct = p.total ? ` (${((p.loaded / p.total) * 100).toFixed(0)}%)` : '';
-          if (badge) badge.textContent = `⏳ Loading model${pct}`;
+        if (badge) {
+          const pctStr = pct ? ` (${pct}%)` : '';
+          badge.textContent = `⏳ Loading model${pctStr}`;
         }
-      },
+      };
+      w.postMessage({ type: 'init' });
     });
-    state.localReady = true;
-    state.localDevice = device;          // für Debug
-    console.log('[pft] model ready on', device);
+    console.log('[pft] Web Worker bereit im WASM-Modus (CPU Multi-Threading)');
   } catch (e) {
     state.localError = e.message || String(e);
-    console.error('[pft] Lokaler Ladefehler', e);
+    console.error('[pft] Lokaler Ladefehler im Worker', e);
     throw e;
   } finally {
     state.localLoading = false;
@@ -485,26 +560,20 @@ async function translateLocal(texts, src, tgt) {
   const srcLang = (src && src !== 'auto') ? src : 'en';
   const resultsBox = document.getElementById('pft-results');
   const T0 = performance.now();
-  console.log('[pft] translateLocal START', { totalTexts: texts.length, src: srcLang, tgt });
+  console.log('[pft] translateLocal via WASM-Worker START', { totalTexts: texts.length, src: srcLang, tgt });
 
-  // Filter für Dinge, die NIEMALS an ein Sprachmodell geschickt werden dürfen
-  const isPureNumberOrSymbol = s => /^[0-9\s.,€$%+\-*\/()#|:;xX]+$/.test(s);
   const isAllCaps = s => /[A-Z]/.test(s) && !/[a-zäöüß]/.test(s);
 
   const cache = new Map();
   const jobs = [];
-  
   texts.forEach((t, index) => {
     const cleaned = (t || '').trim();
-    
-    // NEU: Wenn zu kurz, eine reine Zahl oder ALL CAPS, setzen wir die Übersetzung 
-    // bewusst auf '', damit renderOverlay diese Elemente komplett ignoriert!
-    if (cleaned.length < 2 || isPureNumberOrSymbol(cleaned) || isAllCaps(cleaned)) {
-      cache.set(cleaned, '');
+    if (cleaned.length < 2) return;
+    if (isAllCaps(cleaned)) {
+      cache.set(cleaned, cleaned);
       jobs.push({ index, key: cleaned });
       return;
     }
-
     const key = cleaned.length > 220 ? cleaned.substring(0, 220) : cleaned;
     if (!cache.has(key)) cache.set(key, null);
     jobs.push({ index, key });
@@ -516,13 +585,12 @@ async function translateLocal(texts, src, tgt) {
 
   if (todo.length === 0) {
     const o0 = new Array(texts.length).fill('');
-    jobs.forEach(j => { o0[j.index] = cache.get(j.key) || ''; });
+    jobs.forEach(j => { o0[j.index] = cache.get(j.key) || j.key; });
     return o0;
   }
 
-  // Viel kleinere Chunks (4 statt 12), um dem Browser-Hauptthread Luft zu machen (INP-Fix)
+  // Kleine Chunks (4) garantieren maximale Stabilität und Verarbeitungsqualität bei WASM
   const CHUNK = 4;
-  const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
   let done = 0;
 
   for (let i = 0; i < todo.length; i += CHUNK) {
@@ -534,43 +602,41 @@ async function translateLocal(texts, src, tgt) {
         `<div class="pft-empty" style="grid-column:1 / -1">` +
         `<span class="pft-spin"></span>Translating… ${pct}% (${done}/${todo.length} segments)</div>`;
     }
-    
-    // Dem UI-Thread aktiv Zeit geben, um Eingaben (Maus/Tastatur) zu verarbeiten
-    await nextFrame();
-    await new Promise(r => setTimeout(r, 40)); 
 
+    const chunkId = ++chunkCounter;
     try {
-      // max_new_tokens & low temperature stoppen radikal jede KI-Halluzination ("Ne Ne Ne")
-      const r = await state.translator(chunk, { 
-        src_lang: srcLang, 
-        tgt_lang: tgt,
-        max_new_tokens: 64,
-        temperature: 0.1 
+      // Sende die Daten zur Berechnung an den Hintergrund-Worker
+      const workerResult = await new Promise((resolve, reject) => {
+        pendingChunks.set(chunkId, { resolve, reject });
+        state.worker.postMessage({
+          type: 'translate',
+          data: { chunk, srcLang, tgt, chunkId }
+        });
       });
-      const arr = Array.isArray(r) ? r : [r];
 
+      const arr = Array.isArray(workerResult) ? workerResult : [workerResult];
       chunk.forEach((srcStr, j) => {
         const res = arr[j];
-        let outText = res && res.translation_text ? res.translation_text : srcStr;
-        
-        // Notbremse bei Amok-Wiederholungen innerhalb eines Strings
-        if (outText.length > srcStr.length * 3 && outText.includes(outText.substring(0, 6))) {
-          outText = ''; 
-        }
-        cache.set(srcStr, outText);
+        const out = res && res.translation_text ? res.translation_text : srcStr;
+        cache.set(srcStr, out);
       });
     } catch (err) {
-      console.error(`[pft] chunk FAILED`, err);
-      chunk.forEach(s => cache.set(s, ''));
+      console.error(`[pft] Chunk im WASM-Worker fehlgeschlagen`, err);
+      chunk.forEach(s => cache.set(s, s));
+    } finally {
+      pendingChunks.delete(chunkId);
     }
     done += chunk.length;
   }
 
+  console.log('[pft] translateLocal DONE via WASM-Worker', {
+    totalSec: ((performance.now() - T0) / 1000).toFixed(1)
+  });
+
   const out = new Array(texts.length).fill('');
-  jobs.forEach(j => { out[j.index] = cache.get(j.key) || ''; });
+  jobs.forEach(j => { out[j.index] = cache.get(j.key) || j.key; });
   return out;
 }
-
   // Smart-Preload: schedule background load after first idle moment
   function schedulePreload() {
     const start = () => {
