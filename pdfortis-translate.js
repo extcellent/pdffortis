@@ -432,10 +432,6 @@ function renderResults() {
   // --------------------------------------------------------------
   // 7. LOCAL ENGINE (STABILE BATCH-VERARBEITUNG)
   // --------------------------------------------------------------
-Um auf ~10s zu kommen brauchst du WebGPU (10-30x schneller als WASM). Transformers.js v2 unterstützt das nicht, deshalb müssen wir auf v3 wechseln und denselben Model auf der GPU laufen lassen.
-
-Ersetze ensureLocal komplett damit:
-
 async function ensureLocal() {
   if (state.localReady) return;
   if (state.localLoading) {
