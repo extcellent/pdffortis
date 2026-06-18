@@ -395,18 +395,17 @@
   }
 
 function renderResults() {
-    if (!state.lastResult) return;
-    
-    // FIX: Die Box muss auch in dieser Funktion kurz gegriffen werden
-    const resultsBox = document.getElementById('pft-results');
-    if (!resultsBox) return;
+  if (!state.lastResult) return;
+  
+  const resultsBox = document.getElementById('pft-results');
+  if (!resultsBox) return;
 
-    const items = state.lastResult.items;
-    const html = `
-      <div class="pft-col"><h4>Original</h4>${items.map(i => `<div class="pft-line">${escapeHtml(i.text)}</div>`).join('')}</div>
-      <div class="pft-col"><h4>Translation</h4>${items.map(i => `<div class="pft-line">${escapeHtml(i.trans)}</div>`).join('')}</div>`;
-    resultsBox.innerHTML = html;
-  }
+  const items = state.lastResult.items;
+  const html = `
+    <div class="pft-col"><h4>Original</h4>${items.map(i => `<div class="pft-line">${escapeHtml(i.text)}</div>`).join('')}</div>
+    <div class="pft-col"><h4>Translation</h4>${items.map(i => `<div class="pft-line">${escapeHtml(i.trans || i.text)}</div>`).join('')}</div>`;
+  resultsBox.innerHTML = html;
+}
 
   async function extractCurrentPage() {
     const fd = new FormData();
@@ -481,81 +480,94 @@ async function ensureLocal() {
   }
 }
 
-
-
 async function translateLocal(texts, src, tgt) {
   await ensureLocal();
   const srcLang = (src && src !== 'auto') ? src : 'en';
   const resultsBox = document.getElementById('pft-results');
   const T0 = performance.now();
+  console.log('[pft] translateLocal START', { totalTexts: texts.length, src: srcLang, tgt });
 
-  // 1. Filtern, Kürzen & Deduping (verhindert doppelte Arbeit)
-  const cleanItems = [];
+  // Filter für Dinge, die NIEMALS an ein Sprachmodell geschickt werden dürfen
+  const isPureNumberOrSymbol = s => /^[0-9\s.,€$%+\-*\/()#|:;xX]+$/.test(s);
+  const isAllCaps = s => /[A-Z]/.test(s) && !/[a-zäöüß]/.test(s);
+
   const cache = new Map();
-
+  const jobs = [];
+  
   texts.forEach((t, index) => {
     const cleaned = (t || '').trim();
-    if (cleaned.length < 2) return;
-
-    // Zu lange Texte kürzen, um Abstürze zu vermeiden (wichtig bei Verträgen)
-    const safeText = cleaned.length > 250 ? cleaned.substring(0, 250) : cleaned;
-
-    if (!cache.has(safeText)) {
-      cache.set(safeText, null); // null bedeutet: muss noch übersetzt werden
+    
+    // NEU: Wenn zu kurz, eine reine Zahl oder ALL CAPS, setzen wir die Übersetzung 
+    // bewusst auf '', damit renderOverlay diese Elemente komplett ignoriert!
+    if (cleaned.length < 2 || isPureNumberOrSymbol(cleaned) || isAllCaps(cleaned)) {
+      cache.set(cleaned, '');
+      jobs.push({ index, key: cleaned });
+      return;
     }
-    cleanItems.push({ text: safeText, index });
+
+    const key = cleaned.length > 220 ? cleaned.substring(0, 220) : cleaned;
+    if (!cache.has(key)) cache.set(key, null);
+    jobs.push({ index, key });
   });
 
-  const todo = Array.from(cache.keys());
+  const todo = [];
+  cache.forEach((v, k) => { if (v === null) todo.push(k); });
+  console.log('[pft] dedup', { unique: cache.size, toTranslate: todo.length });
 
   if (todo.length === 0) {
-    return texts.map(() => '');
+    const o0 = new Array(texts.length).fill('');
+    jobs.forEach(j => { o0[j.index] = cache.get(j.key) || ''; });
+    return o0;
   }
 
-  // 2. CHUNK-GRÖßE DRASTISCH REDUZIEREN
-  // Batch-Size 12 ist für Seq2Seq-Modelle im Browser zu viel. 
-  // 2 ist der Sweet-Spot für Geschwindigkeit ohne den Browser zum Absturz zu bringen.
-  const CHUNK = 2; 
+  // Viel kleinere Chunks (4 statt 12), um dem Browser-Hauptthread Luft zu machen (INP-Fix)
+  const CHUNK = 4;
+  const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
   let done = 0;
 
   for (let i = 0; i < todo.length; i += CHUNK) {
     const chunk = todo.slice(i, i + CHUNK);
 
-    // UI Update erzwingen & Event-Loop freigeben
     if (resultsBox && resultsBox.isConnected) {
       const pct = Math.round((done / todo.length) * 100);
       resultsBox.innerHTML =
         `<div class="pft-empty" style="grid-column:1 / -1">` +
-        `<span class="pft-spin"></span>Translating… ${pct}% (${done}/${todo.length})</div>`;
+        `<span class="pft-spin"></span>Translating… ${pct}% (${done}/${todo.length} segments)</div>`;
     }
     
-    // WICHTIG: Diese 20ms Pause zwingt den Browser, die %-Anzeige zu rendern, 
-    // bevor der nächste schwere Rechenschritt startet!
-    await new Promise(r => setTimeout(r, 20)); 
+    // Dem UI-Thread aktiv Zeit geben, um Eingaben (Maus/Tastatur) zu verarbeiten
+    await nextFrame();
+    await new Promise(r => setTimeout(r, 40)); 
 
     try {
-      const r = await state.translator(chunk, { src_lang: srcLang, tgt_lang: tgt });
+      // max_new_tokens & low temperature stoppen radikal jede KI-Halluzination ("Ne Ne Ne")
+      const r = await state.translator(chunk, { 
+        src_lang: srcLang, 
+        tgt_lang: tgt,
+        max_new_tokens: 64,
+        temperature: 0.1 
+      });
       const arr = Array.isArray(r) ? r : [r];
 
       chunk.forEach((srcStr, j) => {
         const res = arr[j];
-        cache.set(srcStr, res && res.translation_text ? res.translation_text : srcStr);
+        let outText = res && res.translation_text ? res.translation_text : srcStr;
+        
+        // Notbremse bei Amok-Wiederholungen innerhalb eines Strings
+        if (outText.length > srcStr.length * 3 && outText.includes(outText.substring(0, 6))) {
+          outText = ''; 
+        }
+        cache.set(srcStr, outText);
       });
     } catch (err) {
-      console.error(`[pft] chunk failed`, err);
-      // Bei einem Fehler das Original behalten, damit der Rest weiterläuft
-      chunk.forEach(s => cache.set(s, s)); 
+      console.error(`[pft] chunk FAILED`, err);
+      chunk.forEach(s => cache.set(s, ''));
     }
     done += chunk.length;
   }
 
-  // 3. Ergebnisse exakt in die Original-Reihenfolge einfügen
   const out = new Array(texts.length).fill('');
-  cleanItems.forEach(item => {
-    out[item.index] = cache.get(item.text) || item.text;
-  });
-
-  console.log(`[pft] translateLocal DONE in ${((performance.now() - T0) / 1000).toFixed(1)}s`);
+  jobs.forEach(j => { out[j.index] = cache.get(j.key) || ''; });
   return out;
 }
 
