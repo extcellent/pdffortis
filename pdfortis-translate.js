@@ -516,26 +516,32 @@ const workerCode = `
         const cleanTgt = String(tgt || '').toLowerCase().trim();
 
         // 2-stelliges Kürzel ermitteln (Fallback auf en/de)
-        const safeSrc = langMap[cleanSrc] || 'en';
-        const safeTgt = langMap[cleanTgt] || 'de';
-
-        const contextChunk = chunk.length < 15 ? (chunk + " .") : chunk;
+        // NEU — v3 braucht __xx__ FLORES-Format für m2m100:
+        const safeSrc = '__' + (langMap[cleanSrc] || 'en') + '__';
+        const safeTgt = '__' + (langMap[cleanTgt] || 'de') + '__';
         
         const r = await translator(chunk, { 
           src_lang: safeSrc, 
           tgt_lang: safeTgt,
           max_new_tokens: 256, 
-          num_beams: 5,        // Verhindert verlässliche Wortdreher
-          temperature: 0.1,
+          num_beams: 5,
           do_sample: false
         });
-
-        // Falls ein Punkt hinzugefügt wurde, entfernen wir ihn wieder aus dem Ergebnis
-        let resultText = r[0].translation_text;
-        if (chunk.length < 15 && resultText.endsWith('.')) {
-            resultText = resultText.slice(0, -1).trim();
-        }
         
+        // v3 gibt direkt ein Array von {translation_text: ...} zurück — gleich wie v2
+        self.postMessage({ type: 'translated', result: r, chunkId: data.chunkId });// NEU — v3 braucht __xx__ FLORES-Format für m2m100:
+        const safeSrc = '__' + (langMap[cleanSrc] || 'en') + '__';
+        const safeTgt = '__' + (langMap[cleanTgt] || 'de') + '__';
+        
+        const r = await translator(chunk, { 
+          src_lang: safeSrc, 
+          tgt_lang: safeTgt,
+          max_new_tokens: 256, 
+          num_beams: 5,
+          do_sample: false
+        });
+        
+        // v3 gibt direkt ein Array von {translation_text: ...} zurück — gleich wie v2
         self.postMessage({ type: 'translated', result: r, chunkId: data.chunkId });
       } catch (err) {
         self.postMessage({ type: 'translate_error', error: err.message || String(err), chunkId: data.chunkId });
@@ -669,8 +675,9 @@ async function translateLocal(texts, src, tgt) {
 
       const arr = Array.isArray(workerResult) ? workerResult : [workerResult];
       chunk.forEach((srcStr, j) => {
+        // NEU — v3 gibt manchmal {generated_text: ...} statt translation_text:
         const res = arr[j];
-        const out = res && res.translation_text ? res.translation_text : srcStr;
+        const out = (res && (res.translation_text || res.generated_text)) || srcStr;
         cache.set(srcStr, out);
       });
     } catch (err) {
