@@ -7,7 +7,7 @@
  *  - Auth Gate (guests: 1 free, registered users: unlimited)
  * --------------------------------------------------------------------
  * Requires in index.html:
- *   window.PDFORTIS_API = "https://your-render-url"; // optional, else same-origin
+ *   window.PDFORTIS_API = "https://your-render-url"; // optional, else samtre-origin
  *   <script src="/pdfortis-translate.js" defer></script>
  *
  * Hooks into existing PDFortis runtime:
@@ -472,6 +472,7 @@ async function ensureLocal() {
     }
   }
 
+
 async function translateLocal(texts, src, tgt) {
   await ensureLocal();
   const srcLang = (src && src !== 'auto') ? src : 'en';
@@ -479,70 +480,109 @@ async function translateLocal(texts, src, tgt) {
   const T0 = performance.now();
   console.log('[pft] translateLocal START', { totalTexts: texts.length, src: srcLang, tgt });
 
-  // 1. Dedup + Filter (zu kurze Strings können m2m100 crashen)
-  const cache = new Map();
+  const SEP = ' ||| ';                                   // Trenner zwischen Spans
+  const MAX_BATCH_CHARS = 400;                           // ~max chars je Modell-Call
+  const isAllCaps = s => /[A-Z]/.test(s) && !/[a-zäöüß]/.test(s);  // NEXORA, GmbH-AG etc.
+
+  // 1. Dedup + ALL-CAPS direkt 1:1 durchreichen (Firmennamen/Akronyme nicht übersetzen)
+  const cache = new Map();    // key -> translation (null = noch nicht erledigt)
   const jobs = [];
   texts.forEach((t, index) => {
     const cleaned = (t || '').trim();
-    if (cleaned.length < 2) return;                  // skip 1-char Schrott
-    const key = cleaned.length > 200 ? cleaned.substring(0, 200) : cleaned;
+    if (cleaned.length < 2) return;
+    if (isAllCaps(cleaned)) {
+      cache.set(cleaned, cleaned);        // direkt fertig, kein Modell-Call
+      jobs.push({ index, key: cleaned });
+      return;
+    }
+    const key = cleaned.length > 220 ? cleaned.substring(0, 220) : cleaned;
     if (!cache.has(key)) cache.set(key, null);
     jobs.push({ index, key });
   });
 
-  const uniqueKeys = [...cache.keys()];
-  const total = uniqueKeys.length;
-  console.log('[pft] dedup result', { totalJobs: jobs.length, unique: total });
+  const todo = [];
+  cache.forEach((v, k) => { if (v === null) todo.push(k); });
+  console.log('[pft] dedup', {
+    totalJobs: jobs.length, unique: cache.size,
+    toTranslate: todo.length, skippedCaps: cache.size - todo.length
+  });
 
-  if (total === 0) {
-    console.warn('[pft] nichts zu übersetzen');
-    return texts.map(() => '');
+  if (todo.length === 0) {
+    const out0 = new Array(texts.length).fill('');
+    jobs.forEach(j => { out0[j.index] = cache.get(j.key) || j.key; });
+    return out0;
   }
 
+  // 2. In Batches packen — mehrere Spans pro Modell-Call statt 1
+  const batches = [];
+  let cur = [], curLen = 0;
+  todo.forEach(k => {
+    const add = k.length + SEP.length;
+    if (curLen + add > MAX_BATCH_CHARS && cur.length) {
+      batches.push(cur); cur = []; curLen = 0;
+    }
+    cur.push(k); curLen += add;
+  });
+  if (cur.length) batches.push(cur);
+  console.log('[pft] batches built', {
+    count: batches.length,
+    avgSpansPerBatch: (todo.length / batches.length).toFixed(1)
+  });
+
   const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
-  let success = 0, failed = 0;
+  let done = 0;
 
-  for (let i = 0; i < total; i++) {
-    const key = uniqueKeys[i];
+  for (let bi = 0; bi < batches.length; bi++) {
+    const batch = batches[bi];
+    const joined = batch.join(SEP);
 
-    // Progress (immer schauen ob Box noch existiert!)
     if (resultsBox && resultsBox.isConnected) {
-      const pct = Math.round((i / total) * 100);
+      const pct = Math.round((done / todo.length) * 100);
       resultsBox.innerHTML =
         `<div class="pft-empty" style="grid-column:1 / -1">` +
         `<span class="pft-spin"></span>Translating… ${pct}% ` +
-        `(${i}/${total} unique • ok:${success} fail:${failed})</div>`;
-    } else {
-      console.warn('[pft] resultsBox weg! Modal wurde geschlossen?', { i, total });
+        `(batch ${bi + 1}/${batches.length} • ${done}/${todo.length} segments)</div>`;
     }
     await nextFrame();
     await new Promise(r => setTimeout(r, 0));
 
     const t0 = performance.now();
     try {
-      const r = await state.translator(key, { src_lang: srcLang, tgt_lang: tgt });
+      const r = await state.translator(joined, { src_lang: srcLang, tgt_lang: tgt });
       const res = Array.isArray(r) ? r[0] : r;
-      const out = res ? (res.translation_text || key) : key;
-      cache.set(key, out);
-      success++;
-      if (i < 3 || i % 20 === 0 || i === total - 1) {
-        console.log(`[pft] seg ${i+1}/${total} (${(performance.now()-t0).toFixed(0)}ms):`,
-                    JSON.stringify(key.slice(0, 60)), '→', JSON.stringify(out.slice(0, 60)));
+      const outText = res ? (res.translation_text || joined) : joined;
+      // Auf Trenner splitten (tolerant gegen Whitespace-Varianten des Modells)
+      const parts = outText.split(/\s*\|{2,}\s*/);
+      console.log(`[pft] batch ${bi+1}/${batches.length} (${(performance.now()-t0).toFixed(0)}ms)`,
+                  { spans: batch.length, parts: parts.length, sample: parts[0]?.slice(0,60) });
+      if (parts.length !== batch.length) {
+        console.warn(`[pft] split mismatch batch ${bi+1}: expected ${batch.length}, got ${parts.length} — fallback to single-mode`);
+        // Fallback: jeden Span einzeln (selten, aber sicher)
+        for (let i = 0; i < batch.length; i++) {
+          try {
+            const rr = await state.translator(batch[i], { src_lang: srcLang, tgt_lang: tgt });
+            const r2 = Array.isArray(rr) ? rr[0] : rr;
+            cache.set(batch[i], (r2 && r2.translation_text) || batch[i]);
+          } catch { cache.set(batch[i], batch[i]); }
+          await nextFrame();
+        }
+      } else {
+        batch.forEach((srcStr, i) => {
+          cache.set(srcStr, (parts[i] || srcStr).trim() || srcStr);
+        });
       }
     } catch (err) {
-      failed++;
-      console.error(`[pft] seg ${i+1}/${total} FAILED:`,
-                    JSON.stringify(key.slice(0, 80)), err);
-      cache.set(key, key);  // Original behalten
+      console.error(`[pft] batch ${bi+1} FAILED`, err);
+      batch.forEach(s => cache.set(s, s));
     }
+    done += batch.length;
   }
 
   console.log('[pft] translateLocal DONE', {
-    unique: total, success, failed,
+    batches: batches.length, unique: todo.length,
     totalSec: ((performance.now() - T0) / 1000).toFixed(1)
   });
 
-  // Zurück auf Original-Indices
   const out = new Array(texts.length).fill('');
   jobs.forEach(j => { out[j.index] = cache.get(j.key) || j.key; });
   return out;
