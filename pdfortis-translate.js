@@ -397,15 +397,35 @@
 
 function renderResults() {
   if (!state.lastResult) return;
-  
   const resultsBox = document.getElementById('pft-results');
   if (!resultsBox) return;
-
   const items = state.lastResult.items;
-  const html = `
-    <div class="pft-col"><h4>Original</h4>${items.map(i => `<div class="pft-line">${escapeHtml(i.text)}</div>`).join('')}</div>
-    <div class="pft-col"><h4>Translation</h4>${items.map(i => `<div class="pft-line">${escapeHtml(i.trans || i.text)}</div>`).join('')}</div>`;
-  resultsBox.innerHTML = html;
+
+  const origCol = document.createElement('div');
+  origCol.className = 'pft-col';
+  origCol.innerHTML = '<h4>Original</h4>';
+
+  const transCol = document.createElement('div');
+  transCol.className = 'pft-col';
+  transCol.innerHTML = '<h4>Translation</h4>';
+
+  items.forEach(i => {
+    const a = document.createElement('div');
+    a.className = 'pft-line';
+    a.textContent = i.text;
+    origCol.appendChild(a);
+
+    const b = document.createElement('div');
+    b.className = 'pft-line';
+    b.textContent = i.trans || i.text;
+    transCol.appendChild(b);
+  });
+
+  requestAnimationFrame(() => {
+    resultsBox.innerHTML = '';
+    resultsBox.appendChild(origCol);
+    resultsBox.appendChild(transCol);
+  });
 }
 
   async function extractCurrentPage() {
@@ -492,18 +512,17 @@ const workerCode = `
         const safeSrc = nllbMap[String(srcLang || '').toLowerCase().trim()] || 'eng_Latn';
         const safeTgt = nllbMap[String(tgt || '').toLowerCase().trim()] || 'deu_Latn';
 
-        const results = [];
-        for (const text of chunk) {
-          const r = await translator(text, {
+        // Ersetze die for-loop im Worker mit:
+        const results = await Promise.all(
+          chunk.map(text => translator(text, {
             src_lang: safeSrc,
             tgt_lang: safeTgt,
             max_new_tokens: 128,
             num_beams: 1,
             do_sample: false
-          });
-          results.push(r[0]);
-        }
-        self.postMessage({ type: 'translated', result: results, chunkId: data.chunkId });
+          }))
+        );
+        self.postMessage({ type: 'translated', result: results.map(r => r[0]), chunkId: data.chunkId });
       } catch (err) {
         self.postMessage({ type: 'translate_error', error: err.message || String(err), chunkId: data.chunkId });
       }
@@ -619,45 +638,42 @@ async function translateLocal(texts, src, tgt) {
     return o0;
   }
 
-  // Kleine Chunks (4) garantieren maximale Stabilität und Verarbeitungsqualität bei WASM
-  const CHUNK = 8;
-  let done = 0;
-
+  // In translateLocal — ersetze den for-loop (Zeile 626-661) mit:
+  const CHUNK = 4; // kleiner, aber parallel
+  const PARALLEL = Math.min(Math.floor((navigator.hardwareConcurrency || 2) / 2), 4);
+  
+  const chunks = [];
   for (let i = 0; i < todo.length; i += CHUNK) {
-    const chunk = todo.slice(i, i + CHUNK);
-
-    if (resultsBox && resultsBox.isConnected) {
+    chunks.push(todo.slice(i, i + CHUNK));
+  }
+  
+  // Verarbeite PARALLEL viele Chunks gleichzeitig
+  for (let i = 0; i < chunks.length; i += PARALLEL) {
+    const batch = chunks.slice(i, i + PARALLEL);
+    
+    if (resultsBox?.isConnected) {
       const pct = Math.round((done / todo.length) * 100);
-      resultsBox.innerHTML =
-        `<div class="pft-empty" style="grid-column:1 / -1">` +
-        `<span class="pft-spin"></span>Translating… ${pct}% (${done}/${todo.length} segments)</div>`;
+      resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Translating… ${pct}% (${done}/${todo.length} segments)</div>`;
     }
-
-    const chunkId = ++chunkCounter;
-    try {
-      // Sende die Daten zur Berechnung an den Hintergrund-Worker
-      const workerResult = await new Promise((resolve, reject) => {
+  
+    const batchResults = await Promise.all(batch.map(chunk => {
+      const chunkId = ++chunkCounter;
+      return new Promise((resolve, reject) => {
         pendingChunks.set(chunkId, { resolve, reject });
-        state.worker.postMessage({
-          type: 'translate',
-          data: { chunk, srcLang, tgt, chunkId }
-        });
-      });
-
-      const arr = Array.isArray(workerResult) ? workerResult : [workerResult];
+        state.worker.postMessage({ type: 'translate', data: { chunk, srcLang, tgt, chunkId } });
+      }).then(result => ({ chunk, result }))
+        .catch(() => ({ chunk, result: null }))
+        .finally(() => pendingChunks.delete(chunkId));
+    }));
+  
+    batchResults.forEach(({ chunk, result }) => {
+      const arr = Array.isArray(result) ? result : [result];
       chunk.forEach((srcStr, j) => {
-        const res = arr[j];
-        const out = res && res.translation_text ? res.translation_text : srcStr;
-        cache.set(srcStr, out);
+        cache.set(srcStr, arr[j]?.translation_text || srcStr);
       });
-    } catch (err) {
-      console.error(`[pft] Chunk im WASM-Worker fehlgeschlagen`, err);
-      chunk.forEach(s => cache.set(s, s));
-    } finally {
-      pendingChunks.delete(chunkId);
-    }
-    await new Promise(r => setTimeout(r, 0));
-    done += chunk.length;
+    });
+  
+    done += batch.reduce((s, c) => s + c.length, 0);
   }
 
   console.log('[pft] translateLocal DONE via WASM-Worker', {
