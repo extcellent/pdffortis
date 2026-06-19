@@ -2,7 +2,7 @@ self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
 self.addEventListener("fetch", function(event) {
   event.respondWith(
-    fetch(event.request).then(function(response) {
+    fetch(event.request.clone()).then(function(response) {
       if (!response || response.status === 0 || !response.body) return response;
       const newHeaders = new Headers(response.headers);
       newHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
@@ -12,6 +12,6 @@ self.addEventListener("fetch", function(event) {
         statusText: response.statusText,
         headers: newHeaders,
       });
-    }).catch(() => fetch(event.request))
+    }).catch(() => fetch(event.request.clone()))
   );
 });
