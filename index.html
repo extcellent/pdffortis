@@ -1846,6 +1846,39 @@ async function performDownload(){
       workBytes = await doc.save();
     }
 
+   // ── Schritt 2b: Translation Overlays via pdf-lib einbetten ──
+    const transOverlays = document.querySelectorAll('.pft-overlay-item');
+    if(transOverlays.length > 0){
+      const doc2 = await PDFLib.PDFDocument.load(workBytes);
+      const font2 = await doc2.embedFont(PDFLib.StandardFonts.Helvetica);
+      const canvas2 = document.getElementById('pdf-canvas');
+      const page2 = doc2.getPage((window.currentPageNum || 1) - 1);
+      const {width: pdfW2, height: pdfH2} = page2.getSize();
+      const scaleX2 = pdfW2 / canvas2.offsetWidth;
+      const scaleY2 = pdfH2 / canvas2.offsetHeight;
+
+      transOverlays.forEach(el => {
+        const text = el.textContent?.trim();
+        if(!text) return;
+        const x = parseFloat(el.style.left) || 0;
+        const y = parseFloat(el.style.top) || 0;
+        const h = parseFloat(el.style.height) || 12;
+        const fs = parseFloat(el.style.fontSize) || 10;
+        const colorRaw = el.style.color || 'rgb(0,0,0)';
+        const rgb2 = colorRaw.match(/\d+/g) || ['0','0','0'];
+        const pdfX2 = x * scaleX2;
+        const pdfY2 = pdfH2 - ((y + h) * scaleY2);
+        page2.drawText(text, {
+          x: pdfX2,
+          y: pdfY2,
+          size: Math.max(6, fs * scaleX2),
+          font: font2,
+          color: PDFLib.rgb(parseInt(rgb2[0])/255, parseInt(rgb2[1])/255, parseInt(rgb2[2])/255),
+        });
+      });
+      workBytes = await doc2.save();
+    } 
+    
     // ── Schritt 3: Download ──
     const blob = new Blob([workBytes],{type:'application/pdf'});
     const url = URL.createObjectURL(blob);
