@@ -646,6 +646,8 @@ async function translateLocal(texts, src, tgt) {
   for (let i = 0; i < todo.length; i += CHUNK) {
     chunks.push(todo.slice(i, i + CHUNK));
   }
+
+  let done = 0; // ← das fehlte
   
   // Verarbeite PARALLEL viele Chunks gleichzeitig
   for (let i = 0; i < chunks.length; i += PARALLEL) {
