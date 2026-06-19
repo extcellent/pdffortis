@@ -344,34 +344,93 @@ input,select,textarea{font-family:var(--font)}
 /* Overlay elements */
 .pdf-overlay{position:absolute;cursor:move;user-select:none}
   
-.pdf-text-box{
-  border:1.5px dashed #6366f1;
-  border-radius:4px;
-  padding:4px 8px;
-  font-size:14px;
-  min-width:100px;min-height:26px;
-  outline:none;
-  background:rgba(255,255,255,0.0);
-  resize:both;
-  overflow:visible;
-  line-height:1.5;
+/* ── Add-Text Box (pro) ── */
+.pf-tbox-wrap{
+  position:absolute;
+  z-index:30;
+  min-width:120px;
+  min-height:30px;
+  cursor:default;
+}
+.pf-tbox-toolbar{
+  position:absolute;
+  top:-38px;left:0;
+  display:flex;align-items:center;gap:3px;
+  background:#1e1e2e;
+  border-radius:7px;
+  padding:4px 6px;
+  box-shadow:0 4px 16px rgba(0,0,0,.35);
+  white-space:nowrap;
+  z-index:50;
+  opacity:0;pointer-events:none;
+  transition:opacity .15s;
+}
+.pf-tbox-wrap.selected .pf-tbox-toolbar{
+  opacity:1;pointer-events:all;
+}
+.pf-tb-btn{
+  background:none;border:none;color:#ccc;
+  font-size:12px;font-weight:700;
+  padding:3px 6px;border-radius:4px;cursor:pointer;
+  transition:background .1s,color .1s;
+  line-height:1;
+}
+.pf-tb-btn:hover,.pf-tb-btn.on{background:#6366f1;color:white}
+.pf-tb-sep{width:1px;height:18px;background:#444;margin:0 3px;flex-shrink:0}
+.pf-tb-select{
+  background:#2a2a3e;border:1px solid #444;color:#eee;
+  font-size:11px;border-radius:4px;padding:2px 4px;height:24px;cursor:pointer;
+}
+.pf-tb-color{
+  width:22px;height:22px;border-radius:4px;
+  border:2px solid #555;cursor:pointer;padding:0;
+  background:white;
+}
+.pf-tbox-drag{
+  position:absolute;
+  top:-38px;right:8px; /* rechts in toolbar */
+  width:20px;height:26px;
   cursor:move;
-  white-space:pre-wrap;
-  word-break:break-word;
+  display:flex;align-items:center;justify-content:center;
+  color:#666;font-size:13px;
   user-select:none;
 }
-.pdf-text-box.is-active{
+.pf-tbox-body{
+  width:100%;height:100%;
+  min-width:120px;min-height:30px;
+  outline:none;
+  border:1.5px dashed #6366f1;
+  border-radius:4px;
+  padding:5px 8px;
+  font-size:14px;
+  line-height:1.5;
+  color:#000;
+  background:rgba(255,255,255,0);
+  white-space:pre-wrap;
+  word-break:break-word;
   cursor:text;
-  user-select:text;
-  background:rgba(255,255,255,0.95);
-  box-shadow:0 0 0 3px rgba(99,102,241,0.15);
+  box-sizing:border-box;
+  font-family:Arial,sans-serif;
 }
-.pdf-text-box:focus{
-  border-color:#6366f1;
+.pf-tbox-wrap.selected .pf-tbox-body{
+  background:rgba(255,255,255,0.96);
   border-style:solid;
-  background:rgba(255,255,255,0.95);
-  box-shadow:0 0 0 3px rgba(99,102,241,0.15);
+  box-shadow:0 0 0 3px rgba(99,102,241,.18);
 }
+.pf-tbox-resize{
+  position:absolute;
+  right:-5px;bottom:-5px;
+  width:14px;height:14px;
+  background:#6366f1;
+  border:2px solid white;
+  border-radius:3px;
+  cursor:se-resize;
+  z-index:10;
+  opacity:0;
+  transition:opacity .15s;
+}
+.pf-tbox-wrap.selected .pf-tbox-resize{opacity:1}
+.pf-tbox-wrap.selected .pf-tbox-body{cursor:text}
 .pdf-img-overlay{border:2px dashed #93c5fd;border-radius:3px;max-width:240px}
 .overlay-delete{
   position:absolute;top:-10px;right:-10px;
@@ -1423,119 +1482,125 @@ function switchRTab(tab){
 function addTextBox(x,y){
   if(!pdfLibDoc){toast('Lade zuerst ein PDF','err');return}
   const ol=document.getElementById('overlay-layer');
-
-  const activeBox=ol.querySelector('.pdf-text-box.is-active');
-  if(activeBox){deactivateTextBox(activeBox.closest('.pdf-overlay'));return}
+  ol.querySelectorAll('.pf-tbox-wrap.selected').forEach(w=>pfTboxDeselect(w));
 
   const wrap=document.createElement('div');
-  wrap.className='pdf-overlay';
-  wrap.style.cssText=`position:absolute;left:${x}px;top:${y}px;z-index:10;`;
+  wrap.className='pf-tbox-wrap selected';
+  wrap.style.cssText=`position:absolute;left:${x}px;top:${y}px;width:180px;height:36px;z-index:30;min-width:120px;min-height:30px;`;
 
-  // Delete-Button
-  const del=document.createElement('button');
-  del.innerHTML='&times;';
-  del.style.cssText=`
-    position:absolute;top:-10px;right:-10px;
-    width:22px;height:22px;
-    background:#ef4444;color:white;
-    border:2px solid white;border-radius:50%;
-    font-size:14px;font-weight:700;
-    cursor:pointer;display:none;
-    align-items:center;justify-content:center;
-    line-height:1;z-index:20;
-    box-shadow:0 2px 6px rgba(0,0,0,.25);
-  `;
-  del.onclick=e=>{e.stopPropagation();wrap.remove()};
-  wrap.appendChild(del);
+  // Toolbar
+  const tb=document.createElement('div');
+  tb.className='pf-tbox-toolbar';
 
-  // Textfeld
-  const box=document.createElement('div');
-  box.contentEditable='true';
-  box.className='pdf-text-box is-active';
-  box.style.cssText=`
-    min-width:120px;min-height:28px;
-    font-size:${document.getElementById('font-size')?.value||'14'}px;
-    font-family:${document.getElementById('font-family')?.value||'Arial'};
-    color:${document.getElementById('text-color')?.value||'#000000'};
-  `;
-  box.setAttribute('spellcheck','false');
-  wrap.appendChild(box);
+  const fontSel=document.createElement('select');
+  fontSel.className='pf-tb-select';fontSel.style.width='90px';
+  ['Arial','Times New Roman','Courier New','Georgia','Verdana'].forEach(f=>{
+    const o=document.createElement('option');o.value=f;o.textContent=f;fontSel.appendChild(o);
+  });
 
-  // === DRAG: läuft über box UND wrap, aber nicht wenn aktiv editiert ===
-  let sx,sy,il,it,dragging=false,didDrag=false;
+  const sizeInp=document.createElement('input');
+  sizeInp.type='number';sizeInp.value='14';sizeInp.min='6';sizeInp.max='96';
+  sizeInp.className='pf-tb-select';sizeInp.style.width='44px';
 
-  function startDrag(e){
-    if(box.classList.contains('is-active'))return; // aktiv → Text-Cursor
-    if(e.target===del)return;
-    dragging=true; didDrag=false;
-    sx=e.clientX; sy=e.clientY;
-    il=parseInt(wrap.style.left)||0; it=parseInt(wrap.style.top)||0;
-    e.preventDefault();
-  }
-  wrap.addEventListener('mousedown', startDrag);
-  box.addEventListener('mousedown', startDrag);
+  const btnB=document.createElement('button');btnB.className='pf-tb-btn';btnB.innerHTML='<b>B</b>';
+  const btnI=document.createElement('button');btnI.className='pf-tb-btn';btnI.innerHTML='<i>I</i>';
+  const btnU=document.createElement('button');btnU.className='pf-tb-btn';btnU.innerHTML='<u>U</u>';
 
+  const colorPick=document.createElement('input');
+  colorPick.type='color';colorPick.value='#000000';colorPick.className='pf-tb-color';
+
+  const dragH=document.createElement('div');
+  dragH.className='pf-tbox-drag';dragH.innerHTML='⠿';dragH.title='Verschieben';
+
+  const delBtn=document.createElement('button');
+  delBtn.className='pf-tb-btn';delBtn.innerHTML='✕';delBtn.style.color='#f87171';
+
+  const s1=document.createElement('div');s1.className='pf-tb-sep';
+  const s2=document.createElement('div');s2.className='pf-tb-sep';
+  const s3=document.createElement('div');s3.className='pf-tb-sep';
+
+  tb.append(fontSel,s1,sizeInp,s2,btnB,btnI,btnU,s3,colorPick,dragH,delBtn);
+
+  // Body
+  const body=document.createElement('div');
+  body.contentEditable='true';
+  body.className='pf-tbox-body';
+  body.spellcheck=false;
+
+  // Resize Handle
+  const resH=document.createElement('div');
+  resH.className='pf-tbox-resize';
+
+  wrap.appendChild(tb);
+  wrap.appendChild(body);
+  wrap.appendChild(resH);
+  ol.appendChild(wrap);
+
+  // Drag
+  let dSx,dSy,dLx,dLy,dragging=false;
+  dragH.addEventListener('mousedown',e=>{
+    e.stopPropagation();e.preventDefault();
+    dragging=true;dSx=e.clientX;dSy=e.clientY;
+    dLx=parseInt(wrap.style.left)||0;dLy=parseInt(wrap.style.top)||0;
+  });
   document.addEventListener('mousemove',e=>{
     if(!dragging)return;
-    const dx=e.clientX-sx, dy=e.clientY-sy;
-    if(Math.abs(dx)>2||Math.abs(dy)>2) didDrag=true;
-    wrap.style.left=(il+dx)+'px';
-    wrap.style.top=(it+dy)+'px';
+    wrap.style.left=(dLx+e.clientX-dSx)+'px';
+    wrap.style.top=(dLy+e.clientY-dSy)+'px';
   });
   document.addEventListener('mouseup',()=>{dragging=false});
 
-  // Klick auf box (kein drag) → aktivieren zum Tippen
-  box.addEventListener('click',e=>{
-    if(didDrag){didDrag=false;return;}
-    box.contentEditable='true';
-    box.classList.add('is-active');
-    box.style.cursor='text';
-    box.style.userSelect='text';
-    box.focus();
+  // Resize
+  let rSx,rSy,rW,rH,resizing=false;
+  resH.addEventListener('mousedown',e=>{
+    e.stopPropagation();e.preventDefault();
+    resizing=true;rSx=e.clientX;rSy=e.clientY;
+    rW=wrap.offsetWidth;rH=wrap.offsetHeight;
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!resizing)return;
+    wrap.style.width=Math.max(80,rW+e.clientX-rSx)+'px';
+    wrap.style.height=Math.max(28,rH+e.clientY-rSy)+'px';
+  });
+  document.addEventListener('mouseup',()=>{resizing=false});
+
+  // Toolbar Aktionen
+  fontSel.addEventListener('change',()=>body.style.fontFamily=fontSel.value);
+  sizeInp.addEventListener('input',()=>body.style.fontSize=sizeInp.value+'px');
+  colorPick.addEventListener('input',()=>body.style.color=colorPick.value);
+
+  let bold=false,italic=false,underline=false;
+  btnB.addEventListener('click',()=>{bold=!bold;body.style.fontWeight=bold?'700':'400';btnB.classList.toggle('on',bold)});
+  btnI.addEventListener('click',()=>{italic=!italic;body.style.fontStyle=italic?'italic':'normal';btnI.classList.toggle('on',italic)});
+  btnU.addEventListener('click',()=>{underline=!underline;body.style.textDecoration=underline?'underline':'none';btnU.classList.toggle('on',underline)});
+  delBtn.addEventListener('click',e=>{e.stopPropagation();wrap.remove()});
+
+  // Selektion
+  wrap.addEventListener('mousedown',e=>{
+    if(e.target===dragH||e.target===resH||e.target.closest('.pf-tbox-toolbar'))return;
+    ol.querySelectorAll('.pf-tbox-wrap.selected').forEach(w=>{if(w!==wrap)pfTboxDeselect(w)});
+    wrap.classList.add('selected');
+    e.stopPropagation();
+  });
+  document.addEventListener('mousedown',e=>{
+    if(!wrap.contains(e.target))pfTboxDeselect(wrap);
   });
 
-  // Live-Farbe: wenn Nutzer im Add-Tab Farbe ändert, Box aktualisieren
-  const colorInput=document.getElementById('text-color');
-  function syncColor(){
-    if(box.classList.contains('is-active')){
-      box.style.color=colorInput?.value||'#000000';
-    }
-  }
-  colorInput?.addEventListener('input',syncColor);
-  colorInput?.addEventListener('change',syncColor);
-
-  // Hover → Delete zeigen/verstecken
-  wrap.addEventListener('mouseenter',()=>{if(!box.classList.contains('is-active'))del.style.display='flex'});
-  wrap.addEventListener('mouseleave',()=>del.style.display='none');
-
-  // Focus → aktiv
-  box.addEventListener('focus',()=>{
-    box.classList.add('is-active');
-    box.style.border='1.5px dashed #6366f1';
-  });
-
-  ol.appendChild(wrap);
-  setTimeout(()=>box.focus(),50);
+  setTimeout(()=>body.focus(),30);
 }
 
-function deactivateTextBox(wrap){
-  if(!wrap)return;
-  const box=wrap.querySelector('.pdf-text-box');
-  if(!box)return;
-  box.classList.remove('is-active');
-  // Leere Box → entfernen
-  if(!box.textContent.trim()){wrap.remove();return}
-  // Border entfernen → nur Text sichtbar
-  box.style.border='none';
-  box.style.padding='2px 4px';
-  box.contentEditable='false';
-  // Doppelklick zum erneuten Editieren
-  box.addEventListener('dblclick',()=>{
-    box.contentEditable='true';
-    box.classList.add('is-active');
-    box.style.border='1.5px dashed #6366f1';
-    box.focus();
-  },{once:false});
+function pfTboxDeselect(wrap){
+  if(!wrap||!wrap.classList.contains('pf-tbox-wrap'))return;
+  wrap.classList.remove('selected');
+  const body=wrap.querySelector('.pf-tbox-body');
+  if(!body)return;
+  body.contentEditable='false';
+  if(!body.textContent.trim()){wrap.remove();return}
+  body.addEventListener('dblclick',()=>{
+    body.contentEditable='true';
+    wrap.classList.add('selected');
+    body.focus();
+  },{once:true});
 }
   
 function addDateBox(){
