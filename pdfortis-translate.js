@@ -574,14 +574,16 @@ async function translateLocal(texts, src, tgt) {
   const T0 = performance.now();
   console.log('[pft] translateLocal via WASM-Worker START', { totalTexts: texts.length, src: srcLang, tgt });
 
-  const isAllCaps = s => /[A-Z]/.test(s) && !/[a-zäöüß]/.test(s);
+// NEU — filtert Nummern, reine Satzzeichen, sehr kurze Tokens die kein Modell braucht:
+  const isAllCaps  = s => /[A-Z]/.test(s) && !/[a-zäöüß]/.test(s);
+  const isSkippable = s => s.length < 2 || /^[\d\s.,;:!?()%€$£\-/\\]+$/.test(s);
 
   const cache = new Map();
   const jobs = [];
   texts.forEach((t, index) => {
     const cleaned = (t || '').trim();
-    if (cleaned.length < 2) return;
-    if (isAllCaps(cleaned)) {
+    if (isSkippable(cleaned)) return;          // Nummern, Satzzeichen → überspringen
+    if (isAllCaps(cleaned)) {                  // Abkürzungen → 1:1 kopieren
       cache.set(cleaned, cleaned);
       jobs.push({ index, key: cleaned });
       return;
@@ -602,7 +604,7 @@ async function translateLocal(texts, src, tgt) {
   }
 
   // Kleine Chunks (4) garantieren maximale Stabilität und Verarbeitungsqualität bei WASM
-  const CHUNK = 4;
+  const CHUNK = 8;
   let done = 0;
 
   for (let i = 0; i < todo.length; i += CHUNK) {
