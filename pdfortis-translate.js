@@ -487,15 +487,18 @@ const workerCode = `
         const safeSrc = nllbMap[String(srcLang || '').toLowerCase().trim()] || 'eng_Latn';
         const safeTgt = nllbMap[String(tgt || '').toLowerCase().trim()] || 'deu_Latn';
 
-        const r = await translator(chunk, {
-          src_lang: safeSrc,
-          tgt_lang: safeTgt,
-          max_new_tokens: 256,
-          num_beams: 4,
-          do_sample: false
-        });
-
-        self.postMessage({ type: 'translated', result: r, chunkId: data.chunkId });
+        const results = [];
+        for (const text of chunk) {
+          const r = await translator(text, {
+            src_lang: safeSrc,
+            tgt_lang: safeTgt,
+            max_new_tokens: 128,
+            num_beams: 1,
+            do_sample: false
+          });
+          results.push(r[0]);
+        }
+        self.postMessage({ type: 'translated', result: results, chunkId: data.chunkId });
       } catch (err) {
         self.postMessage({ type: 'translate_error', error: err.message || String(err), chunkId: data.chunkId });
       }
@@ -640,6 +643,7 @@ async function translateLocal(texts, src, tgt) {
     } finally {
       pendingChunks.delete(chunkId);
     }
+    await new Promise(r => setTimeout(r, 0));
     done += chunk.length;
   }
 
