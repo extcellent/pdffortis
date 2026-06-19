@@ -2,6 +2,13 @@
 <html lang="en">
 <head>
 <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/coi-serviceworker.js').then(reg => {
+      if (!crossOriginIsolated) location.reload();
+    });
+  }
+</script>
+<script>
   // Anti-Flicker: Auth-State VOR dem Rendern entscheiden + Daten merken
   (function(){
     try{
