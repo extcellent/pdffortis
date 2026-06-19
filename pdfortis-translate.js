@@ -530,32 +530,34 @@ const workerCode = `
   };
 `;
 
-function getWorker() {
-  if (state.worker) return state.worker;
+// Ersetze getWorker() mit einem Worker-Pool
+const workerPool = [];
+
+function getWorkerPool() {
+  const count = Math.min(navigator.hardwareConcurrency || 2, 4);
+  if (workerPool.length === count) return workerPool;
+  
   const blob = new Blob([workerCode], { type: 'text/javascript' });
   const url = URL.createObjectURL(blob);
-  state.worker = new Worker(url, { type: 'module' });
   
-  state.worker.onmessage = (e) => {
-    const { type, pct, device, error, result, chunkId } = e.data;
-    if (type === 'progress') {
-      if (workerProgressCallback) workerProgressCallback(pct);
-    } else if (type === 'ready') {
-      state.localReady = true;
-      state.localDevice = device;
-      if (workerResolver) workerResolver();
-    } else if (type === 'error') {
-      state.localError = error;
-      if (workerRejecter) workerRejecter(new Error(error));
-    } else if (type === 'translated') {
-      const cb = pendingChunks.get(chunkId);
-      if (cb) cb.resolve(result);
-    } else if (type === 'translate_error') {
-      const cb = pendingChunks.get(chunkId);
-      if (cb) cb.reject(new Error(error));
-    }
-  };
-  return state.worker;
+  for (let i = workerPool.length; i < count; i++) {
+    const w = new Worker(url, { type: 'module' });
+    w.busy = false;
+    w.onmessage = (e) => {
+      const { type, result, chunkId, error } = e.data;
+      if (type === 'translated') {
+        const cb = pendingChunks.get(chunkId);
+        if (cb) { cb.resolve(result); cb.worker.busy = false; }
+      } else if (type === 'translate_error') {
+        const cb = pendingChunks.get(chunkId);
+        if (cb) { cb.reject(new Error(error)); cb.worker.busy = false; }
+      } else if (type === 'ready') {
+        w.ready = true;
+      }
+    };
+    workerPool.push(w);
+  }
+  return workerPool;
 }
 
 async function ensureLocal() {
@@ -569,21 +571,23 @@ async function ensureLocal() {
   refreshBadge();
   try {
     console.log('[pft] Initialisiere stabilen WASM Web Worker (Transformers.js v3)...');
-    const w = getWorker();
-    
-    await new Promise((resolve, reject) => {
-      workerResolver = resolve;
-      workerRejecter = reject;
-      workerProgressCallback = (pct) => {
-        const badge = document.getElementById('pft-badge');
-        if (badge) {
-          const pctStr = pct ? ` (${pct}%)` : '';
-          badge.textContent = `⏳ Loading model${pctStr}`;
-        }
+  
+    const pool = getWorkerPool();
+    workerProgressCallback = (pct) => {
+      const badge = document.getElementById('pft-badge');
+      if (badge) badge.textContent = `⏳ Loading model${pct ? ` (${pct}%)` : ''}`;
+    };
+    await Promise.all(pool.map(w => new Promise((resolve, reject) => {
+      const orig = w.onmessage;
+      w.onmessage = (e) => {
+        if (e.data.type === 'ready') { w.ready = true; w.onmessage = orig; resolve(); }
+        else if (e.data.type === 'error') { w.onmessage = orig; reject(new Error(e.data.error)); }
+        else if (e.data.type === 'progress') { if (workerProgressCallback) workerProgressCallback(e.data.pct); }
+        else orig(e);
       };
       w.postMessage({ type: 'init' });
-    });
-    console.log('[pft] Web Worker bereit im WASM-Modus (CPU Multi-Threading)');
+    })));
+    console.log(`[pft] ${pool.length} Worker ready`);
   } catch (e) {
     state.localError = e.message || String(e);
     console.error('[pft] Lokaler Ladefehler im Worker', e);
@@ -638,45 +642,36 @@ async function translateLocal(texts, src, tgt) {
     return o0;
   }
 
-  // In translateLocal — ersetze den for-loop (Zeile 626-661) mit:
-  const CHUNK = 4; // kleiner, aber parallel
-  const PARALLEL = Math.min(Math.floor((navigator.hardwareConcurrency || 2) / 2), 4);
-  
-  const chunks = [];
+  const CHUNK = 4;
+  const allChunks = [];
   for (let i = 0; i < todo.length; i += CHUNK) {
-    chunks.push(todo.slice(i, i + CHUNK));
+    allChunks.push(todo.slice(i, i + CHUNK));
   }
-
-  let done = 0; // ← das fehlte
-  
-  // Verarbeite PARALLEL viele Chunks gleichzeitig
-  for (let i = 0; i < chunks.length; i += PARALLEL) {
-    const batch = chunks.slice(i, i + PARALLEL);
-    
-    if (resultsBox?.isConnected) {
-      const pct = Math.round((done / todo.length) * 100);
-      resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Translating… ${pct}% (${done}/${todo.length} segments)</div>`;
-    }
-  
-    const batchResults = await Promise.all(batch.map(chunk => {
-      const chunkId = ++chunkCounter;
-      return new Promise((resolve, reject) => {
-        pendingChunks.set(chunkId, { resolve, reject });
-        state.worker.postMessage({ type: 'translate', data: { chunk, srcLang, tgt, chunkId } });
-      }).then(result => ({ chunk, result }))
-        .catch(() => ({ chunk, result: null }))
-        .finally(() => pendingChunks.delete(chunkId));
-    }));
-  
-    batchResults.forEach(({ chunk, result }) => {
-      const arr = Array.isArray(result) ? result : [result];
-      chunk.forEach((srcStr, j) => {
-        cache.set(srcStr, arr[j]?.translation_text || srcStr);
-      });
+  const pool = getWorkerPool();
+  let doneCount = 0;
+  const results = await Promise.all(allChunks.map((chunk, idx) => {
+    const worker = pool[idx % pool.length];
+    const chunkId = ++chunkCounter;
+    return new Promise((resolve, reject) => {
+      pendingChunks.set(chunkId, { resolve, reject });
+      worker.postMessage({ type: 'translate', data: { chunk, srcLang, tgt, chunkId } });
+    }).then(result => {
+      doneCount += chunk.length;
+      if (resultsBox?.isConnected) {
+        const pct = Math.round((doneCount / todo.length) * 100);
+        resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Translating… ${pct}% (${doneCount}/${todo.length} segments)</div>`;
+      }
+      return { chunk, result };
+    }).catch(() => ({ chunk, result: null }))
+      .finally(() => pendingChunks.delete(chunkId));
+  }));
+  results.forEach(({ chunk, result }) => {
+    const arr = Array.isArray(result) ? result : [result];
+    chunk.forEach((srcStr, j) => {
+      cache.set(srcStr, arr[j]?.translation_text || srcStr);
     });
-  
-    done += batch.reduce((s, c) => s + c.length, 0);
-  }
+  });
+
 
   console.log('[pft] translateLocal DONE via WASM-Worker', {
     totalSec: ((performance.now() - T0) / 1000).toFixed(1)
