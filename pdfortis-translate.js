@@ -462,67 +462,119 @@ const workerCode = `
   import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3';
   env.allowLocalModels = false;
   env.backends.onnx.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 1, 4);
+
+  // Opus-MT: schnelle Modelle für häufige Sprachpaare (~10s)
+  // NLLB: Fallback für alle anderen Sprachen (~2min)
+  const OPUS_MODELS = {
+    'en-de': 'Xenova/opus-mt-en-de',
+    'de-en': 'Xenova/opus-mt-de-en',
+    'en-fr': 'Xenova/opus-mt-en-fr',
+    'fr-en': 'Xenova/opus-mt-fr-en',
+    'en-es': 'Xenova/opus-mt-en-es',
+    'es-en': 'Xenova/opus-mt-es-en',
+    'en-it': 'Xenova/opus-mt-en-it',
+    'it-en': 'Xenova/opus-mt-it-en',
+    'en-pt': 'Xenova/opus-mt-en-pt',
+    'pt-en': 'Xenova/opus-mt-ROMANCE-en',
+    'en-nl': 'Xenova/opus-mt-en-nl',
+    'nl-en': 'Xenova/opus-mt-nl-en',
+    'en-pl': 'Xenova/opus-mt-en-pl',
+    'pl-en': 'Xenova/opus-mt-pl-en',
+    'en-ru': 'Xenova/opus-mt-en-ru',
+    'ru-en': 'Xenova/opus-mt-ru-en',
+    'en-tr': 'Xenova/opus-mt-en-tr',
+    'tr-en': 'Xenova/opus-mt-tr-en',
+    'en-zh': 'Xenova/opus-mt-en-zh',
+    'zh-en': 'Xenova/opus-mt-zh-en',
+  };
+
+  const NLLB_MAP = {
+    'en': 'eng_Latn', 'de': 'deu_Latn', 'fr': 'fra_Latn',
+    'es': 'spa_Latn', 'it': 'ita_Latn', 'pt': 'por_Latn',
+    'nl': 'nld_Latn', 'pl': 'pol_Latn', 'ru': 'rus_Cyrl',
+    'uk': 'ukr_Cyrl', 'cs': 'ces_Latn', 'ro': 'ron_Latn',
+    'sv': 'swe_Latn', 'da': 'dan_Latn', 'fi': 'fin_Latn',
+    'el': 'ell_Grek', 'hu': 'hun_Latn', 'bg': 'bul_Cyrl',
+    'ar': 'arb_Arab', 'he': 'heb_Hebr', 'hi': 'hin_Deva',
+    'zh': 'zho_Hans', 'ja': 'jpn_Jpan', 'ko': 'kor_Hang',
+    'tr': 'tur_Latn', 'hr': 'hrv_Latn', 'sk': 'slk_Latn',
+    'sl': 'slv_Latn', 'no': 'nob_Latn', 'lt': 'lit_Latn',
+    'lv': 'lvs_Latn', 'et': 'est_Latn', 'sr': 'srp_Cyrl',
+    'sq': 'als_Latn'
+  };
+
   let translator = null;
+  let currentPair = null;
+
+  async function loadModel(srcLang, tgtLang) {
+    const pair = srcLang + '-' + tgtLang;
+    if (currentPair === pair && translator) return;
+
+    const opusModel = OPUS_MODELS[pair];
+    const isOpus = !!opusModel;
+    const modelId = opusModel || 'Xenova/nllb-200-distilled-600M';
+
+    self.postMessage({ type: 'model_loading', isOpus, pair });
+
+    translator = await pipeline('translation', modelId, {
+      device: 'wasm',
+      dtype: 'q8',
+      progress_callback: (p) => {
+        if (p.status === 'downloading' || p.status === 'progress') {
+          const pct = p.total ? ((p.loaded / p.total) * 100).toFixed(0) : '';
+          self.postMessage({ type: 'progress', pct });
+        }
+      },
+    });
+    currentPair = pair;
+  }
+
   self.onmessage = async (e) => {
     const { type, data } = e.data;
-    
+
     if (type === 'init') {
       try {
-        const isRealChrome = /Chrome\\/(\d+)/.test(navigator.userAgent) && !/Edg|OPR|YaBrowser/.test(navigator.userAgent);
-        const chromeVersion = isRealChrome ? parseInt(navigator.userAgent.match(/Chrome\\/(\\d+)/)[1]) : 0;
-        const device = (isRealChrome && chromeVersion >= 113 && navigator.gpu) ? 'webgpu' : 'wasm';
-
-        translator = await pipeline('translation', 'Xenova/nllb-200-distilled-600M', {
-          device,
-          dtype: device === 'webgpu' ? 'fp16' : 'q8',
-          progress_callback: (p) => {
-            if (p.status === 'downloading' || p.status === 'progress') {
-              const pct = p.total ? ((p.loaded / p.total) * 100).toFixed(0) : '';
-              self.postMessage({ type: 'progress', pct });
-            }
-          },
-        });
-    
-        self.postMessage({ type: 'ready', device });
+        // Beim Init laden wir EN→DE vor (häufigstes Paar, klein)
+        await loadModel('en', 'de');
+        self.postMessage({ type: 'ready', device: 'wasm' });
       } catch (err) {
         self.postMessage({ type: 'error', error: err.message || String(err) });
       }
+
     } else if (type === 'translate') {
       try {
-        if (!translator) throw new Error('Translator not initialized');
-        const { chunk, srcLang, tgt } = data;
+        const { chunk, srcLang, tgt, chunkId } = data;
+        await loadModel(srcLang, tgt);
 
-        // NLLB braucht dieses Format:
-        const nllbMap = {
-          'en': 'eng_Latn', 'de': 'deu_Latn', 'fr': 'fra_Latn',
-          'es': 'spa_Latn', 'it': 'ita_Latn', 'pt': 'por_Latn',
-          'nl': 'nld_Latn', 'pl': 'pol_Latn', 'ru': 'rus_Cyrl',
-          'uk': 'ukr_Cyrl', 'cs': 'ces_Latn', 'ro': 'ron_Latn',
-          'sv': 'swe_Latn', 'da': 'dan_Latn', 'fi': 'fin_Latn',
-          'el': 'ell_Grek', 'hu': 'hun_Latn', 'bg': 'bul_Cyrl',
-          'ar': 'arb_Arab', 'he': 'heb_Hebr', 'hi': 'hin_Deva',
-          'zh': 'zho_Hans', 'ja': 'jpn_Jpan', 'ko': 'kor_Hang',
-          'tr': 'tur_Latn', 'hr': 'hrv_Latn', 'sk': 'slk_Latn',
-          'sl': 'slv_Latn', 'no': 'nob_Latn', 'lt': 'lit_Latn',
-          'lv': 'lvs_Latn', 'et': 'est_Latn', 'sr': 'srp_Cyrl',
-          'sq': 'als_Latn'
-        };
-        
-        // NEU (direkt in nllbMap schauen):
-        const safeSrc = nllbMap[String(srcLang || '').toLowerCase().trim()] || 'eng_Latn';
-        const safeTgt = nllbMap[String(tgt || '').toLowerCase().trim()] || 'deu_Latn';
+        const pair = srcLang + '-' + tgt;
+        const isOpus = !!OPUS_MODELS[pair];
 
-        // Ersetze die for-loop im Worker mit:
-        const results = await Promise.all(
-          chunk.map(text => translator(text, {
-            src_lang: safeSrc,
-            tgt_lang: safeTgt,
-            max_new_tokens: 128,
-            num_beams: 1,
-            do_sample: false
-          }))
-        );
-        self.postMessage({ type: 'translated', result: results.map(r => r[0]), chunkId: data.chunkId });
+        let results;
+        if (isOpus) {
+          // Opus-MT: kein src_lang/tgt_lang nötig
+          results = await Promise.all(
+            chunk.map(text => translator(text, {
+              max_new_tokens: 128,
+              num_beams: 1,
+              do_sample: false
+            }))
+          );
+        } else {
+          // NLLB: braucht Sprachcodes
+          const safeSrc = NLLB_MAP[srcLang] || 'eng_Latn';
+          const safeTgt = NLLB_MAP[tgt] || 'deu_Latn';
+          results = await Promise.all(
+            chunk.map(text => translator(text, {
+              src_lang: safeSrc,
+              tgt_lang: safeTgt,
+              max_new_tokens: 128,
+              num_beams: 1,
+              do_sample: false
+            }))
+          );
+        }
+
+        self.postMessage({ type: 'translated', result: results.map(r => r[0]), chunkId });
       } catch (err) {
         self.postMessage({ type: 'translate_error', error: err.message || String(err), chunkId: data.chunkId });
       }
