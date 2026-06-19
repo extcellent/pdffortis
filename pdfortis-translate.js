@@ -448,9 +448,17 @@ const workerCode = `
     const { type, data } = e.data;
     if (type === 'init') {
       try {
+        let device = 'wasm';
+        if (navigator.gpu) {
+          try {
+            const adapter = await navigator.gpu.requestAdapter();
+            if (adapter) device = 'webgpu';
+          } catch(_) {}
+        }
+    
         translator = await pipeline('translation', 'Xenova/nllb-200-distilled-600M', {
-          device: 'wasm',
-          dtype: 'q8',
+          device,
+          dtype: device === 'webgpu' ? 'fp16' : 'q8',
           progress_callback: (p) => {
             if (p.status === 'downloading' || p.status === 'progress') {
               const pct = p.total ? ((p.loaded / p.total) * 100).toFixed(0) : '';
@@ -458,7 +466,7 @@ const workerCode = `
             }
           },
         });
-        self.postMessage({ type: 'ready', device: 'wasm' });
+        self.postMessage({ type: 'ready', device });
       } catch (err) {
         self.postMessage({ type: 'error', error: err.message || String(err) });
       }
@@ -579,7 +587,15 @@ async function translateLocal(texts, src, tgt) {
 
 // NEU — filtert Nummern, reine Satzzeichen, sehr kurze Tokens die kein Modell braucht:
   const isAllCaps  = s => /[A-Z]/.test(s) && !/[a-zäöüß]/.test(s);
-  const isSkippable = s => s.length < 2 || /^[\d\s.,;:!?()%€$£\-/\\]+$/.test(s);
+  const isSkippable = s =>
+  s.length < 2 ||
+  /^[\d\s.,;:!?()%€$£\-/\\]+$/.test(s) ||          // reine Zahlen/Satzzeichen
+  /^§/.test(s) ||                                    // §-Zeichen
+  /\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/.test(s) ||     // Datum 01.01.2024
+  /@/.test(s) ||                                     // E-Mail
+  /^(Dr|Prof|Mr|Mrs|Ms|Herr|Frau|Ing|Mag)\.?\s+[A-Z][a-z]/.test(s) || // Titel + Name
+  /^[A-Z][a-z]+ [A-Z][a-z]+$/.test(s) ||            // Vor- + Nachname
+  /^[A-Z][a-z]+ [A-Z][a-z]+ [A-Z][a-z]+$/.test(s); // Vor- + Mittel- + Nachname
 
   const cache = new Map();
   const jobs = [];
