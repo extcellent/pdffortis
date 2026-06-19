@@ -1482,22 +1482,20 @@ function switchRTab(tab){
 function addTextBox(x,y){
   if(!pdfLibDoc){toast('Lade zuerst ein PDF','err');return}
   const ol=document.getElementById('overlay-layer');
-  ol.querySelectorAll('.pf-tbox-wrap.selected').forEach(w=>pfTboxDeselect(w));
 
   const wrap=document.createElement('div');
   wrap.className='pf-tbox-wrap selected';
-  wrap.style.cssText=`position:absolute;left:${x}px;top:${y}px;width:180px;height:36px;z-index:30;min-width:120px;min-height:30px;`;
+  wrap.style.cssText=`position:absolute;left:${x}px;top:${y}px;width:200px;min-width:80px;min-height:28px;z-index:30;`;
 
-  // Toolbar
+  // ── TOOLBAR ──
   const tb=document.createElement('div');
   tb.className='pf-tbox-toolbar';
 
   const fontSel=document.createElement('select');
-  fontSel.className='pf-tb-select';fontSel.style.width='90px';
+  fontSel.className='pf-tb-select';fontSel.style.width='88px';
   ['Arial','Times New Roman','Courier New','Georgia','Verdana'].forEach(f=>{
     const o=document.createElement('option');o.value=f;o.textContent=f;fontSel.appendChild(o);
   });
-
   const sizeInp=document.createElement('input');
   sizeInp.type='number';sizeInp.value='14';sizeInp.min='6';sizeInp.max='96';
   sizeInp.className='pf-tb-select';sizeInp.style.width='44px';
@@ -1505,86 +1503,81 @@ function addTextBox(x,y){
   const btnB=document.createElement('button');btnB.className='pf-tb-btn';btnB.innerHTML='<b>B</b>';
   const btnI=document.createElement('button');btnI.className='pf-tb-btn';btnI.innerHTML='<i>I</i>';
   const btnU=document.createElement('button');btnU.className='pf-tb-btn';btnU.innerHTML='<u>U</u>';
-
   const colorPick=document.createElement('input');
   colorPick.type='color';colorPick.value='#000000';colorPick.className='pf-tb-color';
-
   const dragH=document.createElement('div');
   dragH.className='pf-tbox-drag';dragH.innerHTML='⠿';dragH.title='Verschieben';
-
   const delBtn=document.createElement('button');
   delBtn.className='pf-tb-btn';delBtn.innerHTML='✕';delBtn.style.color='#f87171';
 
-  const s1=document.createElement('div');s1.className='pf-tb-sep';
-  const s2=document.createElement('div');s2.className='pf-tb-sep';
-  const s3=document.createElement('div');s3.className='pf-tb-sep';
+  const mk=()=>{const d=document.createElement('div');d.className='pf-tb-sep';return d};
+  tb.append(fontSel,mk(),sizeInp,mk(),btnB,btnI,btnU,mk(),colorPick,dragH,delBtn);
 
-  tb.append(fontSel,s1,sizeInp,s2,btnB,btnI,btnU,s3,colorPick,dragH,delBtn);
-
-  // Body
+  // ── BODY ──
   const body=document.createElement('div');
   body.contentEditable='true';
   body.className='pf-tbox-body';
   body.spellcheck=false;
+  body.style.cssText='width:100%;min-height:28px;outline:none;border:1.5px dashed #6366f1;border-radius:4px;padding:5px 8px;font-size:14px;line-height:1.5;color:#000;background:rgba(255,255,255,0.96);white-space:pre-wrap;word-break:break-word;cursor:text;box-sizing:border-box;font-family:Arial,sans-serif;';
 
-  // Resize Handle
+  // ── RESIZE HANDLE ──
   const resH=document.createElement('div');
   resH.className='pf-tbox-resize';
+  resH.style.cssText='position:absolute;right:-5px;bottom:-5px;width:14px;height:14px;background:#6366f1;border:2px solid white;border-radius:3px;cursor:se-resize;z-index:10;';
 
   wrap.appendChild(tb);
   wrap.appendChild(body);
   wrap.appendChild(resH);
   ol.appendChild(wrap);
 
-  // Drag
+  // ── DRAG (nur über ⠿ Handle) ──
   let dSx,dSy,dLx,dLy,dragging=false;
   dragH.addEventListener('mousedown',e=>{
     e.stopPropagation();e.preventDefault();
-    dragging=true;dSx=e.clientX;dSy=e.clientY;
-    dLx=parseInt(wrap.style.left)||0;dLy=parseInt(wrap.style.top)||0;
+    dragging=true;
+    dSx=e.clientX;dSy=e.clientY;
+    dLx=parseInt(wrap.style.left)||0;
+    dLy=parseInt(wrap.style.top)||0;
+    const mv=e2=>{
+      if(!dragging)return;
+      wrap.style.left=(dLx+e2.clientX-dSx)+'px';
+      wrap.style.top=(dLy+e2.clientY-dSy)+'px';
+    };
+    const up=()=>{dragging=false;document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up)};
+    document.addEventListener('mousemove',mv);
+    document.addEventListener('mouseup',up);
   });
-  document.addEventListener('mousemove',e=>{
-    if(!dragging)return;
-    wrap.style.left=(dLx+e.clientX-dSx)+'px';
-    wrap.style.top=(dLy+e.clientY-dSy)+'px';
-  });
-  document.addEventListener('mouseup',()=>{dragging=false});
 
-  // Resize
+  // ── RESIZE ──
   let rSx,rSy,rW,rH,resizing=false;
   resH.addEventListener('mousedown',e=>{
     e.stopPropagation();e.preventDefault();
-    resizing=true;rSx=e.clientX;rSy=e.clientY;
+    resizing=true;
+    rSx=e.clientX;rSy=e.clientY;
     rW=wrap.offsetWidth;rH=wrap.offsetHeight;
+    const mv=e2=>{
+      if(!resizing)return;
+      wrap.style.width=Math.max(80,rW+e2.clientX-rSx)+'px';
+      wrap.style.height=Math.max(28,rH+e2.clientY-rSy)+'px';
+      body.style.height='100%';
+    };
+    const up=()=>{resizing=false;document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up)};
+    document.addEventListener('mousemove',mv);
+    document.addEventListener('mouseup',up);
   });
-  document.addEventListener('mousemove',e=>{
-    if(!resizing)return;
-    wrap.style.width=Math.max(80,rW+e.clientX-rSx)+'px';
-    wrap.style.height=Math.max(28,rH+e.clientY-rSy)+'px';
-  });
-  document.addEventListener('mouseup',()=>{resizing=false});
 
-  // Toolbar Aktionen
-  fontSel.addEventListener('change',()=>body.style.fontFamily=fontSel.value);
-  sizeInp.addEventListener('input',()=>body.style.fontSize=sizeInp.value+'px');
-  colorPick.addEventListener('input',()=>body.style.color=colorPick.value);
-
+  // ── TOOLBAR AKTIONEN ──
+  fontSel.addEventListener('change',()=>{body.style.fontFamily=fontSel.value});
+  sizeInp.addEventListener('input',()=>{body.style.fontSize=sizeInp.value+'px'});
+  colorPick.addEventListener('input',()=>{body.style.color=colorPick.value});
   let bold=false,italic=false,underline=false;
-  btnB.addEventListener('click',()=>{bold=!bold;body.style.fontWeight=bold?'700':'400';btnB.classList.toggle('on',bold)});
-  btnI.addEventListener('click',()=>{italic=!italic;body.style.fontStyle=italic?'italic':'normal';btnI.classList.toggle('on',italic)});
-  btnU.addEventListener('click',()=>{underline=!underline;body.style.textDecoration=underline?'underline':'none';btnU.classList.toggle('on',underline)});
+  btnB.addEventListener('click',e=>{e.stopPropagation();bold=!bold;body.style.fontWeight=bold?'700':'400';btnB.classList.toggle('on',bold)});
+  btnI.addEventListener('click',e=>{e.stopPropagation();italic=!italic;body.style.fontStyle=italic?'italic':'normal';btnI.classList.toggle('on',italic)});
+  btnU.addEventListener('click',e=>{e.stopPropagation();underline=!underline;body.style.textDecoration=underline?'underline':'none';btnU.classList.toggle('on',underline)});
   delBtn.addEventListener('click',e=>{e.stopPropagation();wrap.remove()});
 
-  // Selektion
-  wrap.addEventListener('mousedown',e=>{
-    if(e.target===dragH||e.target===resH||e.target.closest('.pf-tbox-toolbar'))return;
-    ol.querySelectorAll('.pf-tbox-wrap.selected').forEach(w=>{if(w!==wrap)pfTboxDeselect(w)});
-    wrap.classList.add('selected');
-    e.stopPropagation();
-  });
-  document.addEventListener('mousedown',e=>{
-    if(!wrap.contains(e.target))pfTboxDeselect(wrap);
-  });
+  // ── Klick innerhalb wrap → nicht nach außen bubblen (verhindert sofortiges neues addTextBox) ──
+  wrap.addEventListener('click',e=>e.stopPropagation());
 
   setTimeout(()=>body.focus(),30);
 }
@@ -1596,12 +1589,17 @@ function pfTboxDeselect(wrap){
   if(!body)return;
   body.contentEditable='false';
   if(!body.textContent.trim()){wrap.remove();return}
-  body.addEventListener('dblclick',()=>{
+  body.style.border='none';
+  body.style.background='transparent';
+  body.addEventListener('click',()=>{
     body.contentEditable='true';
     wrap.classList.add('selected');
+    body.style.border='1.5px dashed #6366f1';
+    body.style.background='rgba(255,255,255,0.96)';
     body.focus();
   },{once:true});
 }
+
   
 function addDateBox(){
   if(!pdfLibDoc){toast('Load a PDF first','err');return}
@@ -2428,21 +2426,18 @@ document.addEventListener('DOMContentLoaded',()=>{
   const ol=document.getElementById('overlay-layer');
   if(!ol)return;
 
-  // ── ADD TEXT: Klick auf leere Fläche ──
-let _wasDragging=false;
+
+// ── ADD TEXT: Klick auf leere Fläche ──
+  let _wasDragging=false;
   document.addEventListener('mousedown',()=>{_wasDragging=false});
   document.addEventListener('mousemove',()=>{_wasDragging=true},{passive:true});
-
   ol.addEventListener('click',function(e){
     if(editorMode!=='edit')return;
     if(currentTab!=='add')return;
     if(_wasDragging){_wasDragging=false;return}
-    if(e.target.classList.contains('pdf-text-box'))return;
-    if(e.target.classList.contains('pdf-overlay')){
-      deactivateTextBox(e.target);return;
-    }
-    const active=ol.querySelector('.pdf-text-box.is-active');
-    if(active){deactivateTextBox(active.closest('.pdf-overlay'));return}
+    if(e.target.closest('.pf-tbox-wrap'))return;
+    const active=document.querySelector('.pf-tbox-wrap.selected');
+    if(active){pfTboxDeselect(active);return}
     const rect=ol.getBoundingClientRect();
     addTextBox(e.clientX-rect.left,e.clientY-rect.top);
   });
