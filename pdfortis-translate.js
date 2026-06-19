@@ -588,6 +588,7 @@ async function ensureLocal() {
       w.postMessage({ type: 'init' });
     })));
     console.log(`[pft] ${pool.length} Worker ready`);
+    state.localReady = true;  // ← das fehlt!
   } catch (e) {
     state.localError = e.message || String(e);
     console.error('[pft] Lokaler Ladefehler im Worker', e);
