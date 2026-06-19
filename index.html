@@ -343,6 +343,7 @@ input,select,textarea{font-family:var(--font)}
 
 /* Overlay elements */
 .pdf-overlay{position:absolute;cursor:move;user-select:none}
+  
 .pdf-text-box{
   border:1.5px dashed #6366f1;
   border-radius:4px;
@@ -351,12 +352,19 @@ input,select,textarea{font-family:var(--font)}
   min-width:100px;min-height:26px;
   outline:none;
   background:rgba(255,255,255,0.0);
-  resize:none;
+  resize:both;
   overflow:visible;
   line-height:1.5;
-  cursor:text;
+  cursor:move;
   white-space:pre-wrap;
   word-break:break-word;
+  user-select:none;
+}
+.pdf-text-box.is-active{
+  cursor:text;
+  user-select:text;
+  background:rgba(255,255,255,0.95);
+  box-shadow:0 0 0 3px rgba(99,102,241,0.15);
 }
 .pdf-text-box:focus{
   border-color:#6366f1;
@@ -1416,8 +1424,6 @@ function addTextBox(x,y){
   if(!pdfLibDoc){toast('Lade zuerst ein PDF','err');return}
   const ol=document.getElementById('overlay-layer');
 
-  // Verhindere dass ein Klick auf leere Fläche sofort neues Box öffnet
-  // während gerade eine aktive Box existiert
   const activeBox=ol.querySelector('.pdf-text-box.is-active');
   if(activeBox){deactivateTextBox(activeBox.closest('.pdf-overlay'));return}
 
@@ -1451,36 +1457,58 @@ function addTextBox(x,y){
     font-size:${document.getElementById('font-size')?.value||'14'}px;
     font-family:${document.getElementById('font-family')?.value||'Arial'};
     color:${document.getElementById('text-color')?.value||'#000000'};
-    cursor:text;
-    border:1.5px dashed #6366f1;
-    border-radius:3px;
-    padding:2px 4px;
-    outline:none;
   `;
   box.setAttribute('spellcheck','false');
   wrap.appendChild(box);
 
-  // Drag — nur über Wrapper-Bereich außerhalb der Box
-  let sx,sy,il,it,dragging=false;
-  wrap.addEventListener('mousedown',e=>{
-    if(e.target===box||e.target===del)return;
-    dragging=true;
-    sx=e.clientX;sy=e.clientY;
-    il=parseInt(wrap.style.left)||0;it=parseInt(wrap.style.top)||0;
+  // === DRAG: läuft über box UND wrap, aber nicht wenn aktiv editiert ===
+  let sx,sy,il,it,dragging=false,didDrag=false;
+
+  function startDrag(e){
+    if(box.classList.contains('is-active'))return; // aktiv → Text-Cursor
+    if(e.target===del)return;
+    dragging=true; didDrag=false;
+    sx=e.clientX; sy=e.clientY;
+    il=parseInt(wrap.style.left)||0; it=parseInt(wrap.style.top)||0;
     e.preventDefault();
-  });
+  }
+  wrap.addEventListener('mousedown', startDrag);
+  box.addEventListener('mousedown', startDrag);
+
   document.addEventListener('mousemove',e=>{
     if(!dragging)return;
-    wrap.style.left=(il+e.clientX-sx)+'px';
-    wrap.style.top=(it+e.clientY-sy)+'px';
+    const dx=e.clientX-sx, dy=e.clientY-sy;
+    if(Math.abs(dx)>2||Math.abs(dy)>2) didDrag=true;
+    wrap.style.left=(il+dx)+'px';
+    wrap.style.top=(it+dy)+'px';
   });
   document.addEventListener('mouseup',()=>{dragging=false});
 
-  // Hover → Delete-Button zeigen
+  // Klick auf box (kein drag) → aktivieren zum Tippen
+  box.addEventListener('click',e=>{
+    if(didDrag){didDrag=false;return;}
+    box.contentEditable='true';
+    box.classList.add('is-active');
+    box.style.cursor='text';
+    box.style.userSelect='text';
+    box.focus();
+  });
+
+  // Live-Farbe: wenn Nutzer im Add-Tab Farbe ändert, Box aktualisieren
+  const colorInput=document.getElementById('text-color');
+  function syncColor(){
+    if(box.classList.contains('is-active')){
+      box.style.color=colorInput?.value||'#000000';
+    }
+  }
+  colorInput?.addEventListener('input',syncColor);
+  colorInput?.addEventListener('change',syncColor);
+
+  // Hover → Delete zeigen/verstecken
   wrap.addEventListener('mouseenter',()=>{if(!box.classList.contains('is-active'))del.style.display='flex'});
   wrap.addEventListener('mouseleave',()=>del.style.display='none');
 
-  // Klick auf Box → aktiv machen
+  // Focus → aktiv
   box.addEventListener('focus',()=>{
     box.classList.add('is-active');
     box.style.border='1.5px dashed #6366f1';
