@@ -547,10 +547,10 @@ function getWorkerPool() {
       const { type, result, chunkId, error } = e.data;
       if (type === 'translated') {
         const cb = pendingChunks.get(chunkId);
-        if (cb) { cb.resolve(result); cb.worker.busy = false; }
+        if (cb) cb.resolve(result);
       } else if (type === 'translate_error') {
         const cb = pendingChunks.get(chunkId);
-        if (cb) { cb.reject(new Error(error)); cb.worker.busy = false; }
+        if (cb) cb.reject(new Error(error));
       } else if (type === 'ready') {
         w.ready = true;
       }
