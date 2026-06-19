@@ -104,8 +104,9 @@
 
       /* inline-overlay layer atop existing #pdf-canvas */
       .pft-overlay{position:absolute;inset:0;pointer-events:none;z-index:5}
-      .pft-overlay-item{position:absolute;background:#fff;color:#0f172a;font-family:Inter,system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 1px;line-height:1;border-radius:1px;box-shadow:0 0 0 1px rgba(99,102,241,.18) inset}
-      .pft-overlay.wrap .pft-overlay-item{white-space:normal}
+      .pft-overlay-item{position:absolute;padding:0 1px;line-height:1;border-radius:0;overflow:hidden;white-space:nowrap;}
+      .pft-overlay.wrap .pft-overlay-item{white-space:normal;}
+
 
       .pft-auth-prompt{background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;font-size:13px;color:#78350f;display:flex;gap:10px;align-items:center;justify-content:space-between}
       .pft-auth-prompt button{background:#0b1220;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-weight:600;font-size:12px;cursor:pointer}
@@ -698,58 +699,108 @@ async function translateLocal(texts, src, tgt) {
     document.querySelectorAll('.pft-overlay').forEach(el => el.remove());
   }
 
-  function renderOverlay() {
-    removeOverlay();
-    if (!state.overlayOn || !state.lastResult) return;
-    if (state.lastResult.page !== (window.currentPageNum || 1)) return;
+function renderOverlay() {
+  removeOverlay();
+  if (!state.overlayOn || !state.lastResult) return;
+  if (state.lastResult.page !== (window.currentPageNum || 1)) return;
 
-    const canvas = document.getElementById('pdf-canvas');
-    const wrap = document.getElementById('canvas-wrap');
-    if (!canvas || !wrap) return;
+  const canvas = document.getElementById('pdf-canvas');
+  const wrap   = document.getElementById('canvas-wrap');
+  if (!canvas || !wrap) return;
 
-    const overlay = document.createElement('div');
-    overlay.className = 'pft-overlay' + (state.autoFit ? '' : ' wrap');
-    overlay.setAttribute('data-testid', 'translate-inline-overlay');
-    overlay.style.width = canvas.offsetWidth + 'px';
-    overlay.style.height = canvas.offsetHeight + 'px';
-    overlay.style.left = canvas.offsetLeft + 'px';
-    overlay.style.top = canvas.offsetTop + 'px';
+  const ctx = canvas.getContext('2d');
+  const dpr = canvas.width / canvas.offsetWidth || 1;
 
-    const scaleX = canvas.offsetWidth / state.lastResult.pageWidth;
-    const scaleY = canvas.offsetHeight / state.lastResult.pageHeight;
+  const overlay = document.createElement('div');
+  overlay.className = 'pft-overlay' + (state.autoFit ? '' : ' wrap');
+  overlay.setAttribute('data-testid', 'translate-inline-overlay');
+  overlay.style.cssText = `position:absolute;pointer-events:none;z-index:5;left:${canvas.offsetLeft}px;top:${canvas.offsetTop}px;width:${canvas.offsetWidth}px;height:${canvas.offsetHeight}px;`;
 
-    state.lastResult.items.forEach(it => {
-      if (!it.trans) return;
-      const el = document.createElement('div');
-      el.className = 'pft-overlay-item';
+  const scaleX = canvas.offsetWidth  / state.lastResult.pageWidth;
+  const scaleY = canvas.offsetHeight / state.lastResult.pageHeight;
 
-      el.style.boxShadow = 'none';       // Versteckt den Rahmen
-      el.style.overflow = 'visible';     // Schaltet das "..." Abschneiden ab
-      el.style.whiteSpace = 'normal';    // Erlaubt dem Text zu fließen
-      
-      const w = (it.x1 - it.x) * scaleX;
-      const h = (it.y1 - it.y) * scaleY;
-      el.style.left = (it.x * scaleX) + 'px';
-      el.style.top  = (it.y * scaleY) + 'px';
-      el.style.width = w + 'px';
-      el.style.height = h + 'px';
-      // base font size proportional to original
-      let fs = it.size * scaleY * 0.95;
-      if (state.autoFit) {
-        // shrink if translated text is much longer than original
-        const ratio = (it.text.length || 1) / Math.max(it.trans.length, 1);
-        if (ratio < 1) fs *= Math.max(0.65, ratio * 1.05);
+  state.lastResult.items.forEach(it => {
+    if (!it.trans) return;
+
+    const x = it.x * scaleX;
+    const y = it.y * scaleY;
+    const w = Math.max((it.x1 - it.x) * scaleX, 10);
+    const h = Math.max((it.y1 - it.y) * scaleY, 8);
+
+    // === Hintergrundfarbe samplen (exakt wie Edit-Tool) ===
+    let bgR = 255, bgG = 255, bgB = 255;
+    try {
+      const cx = Math.round(x * dpr);
+      const cy = Math.round(y * dpr);
+      const cw = Math.round(w * dpr);
+      const ch = Math.round(h * dpr);
+
+      const samples = [];
+      const pick = (px, py, weight) => {
+        if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) return;
+        const d = ctx.getImageData(px, py, 1, 1).data;
+        for (let i = 0; i < weight; i++) samples.push([d[0], d[1], d[2]]);
+      };
+      // Ecken außerhalb der Textbox samplen
+      for (let i = 1; i <= 2; i++) {
+        pick(cx - i,       cy - i,       2);
+        pick(cx + cw + i,  cy - i,       2);
+        pick(cx - i,       cy + ch + i,  2);
+        pick(cx + cw + i,  cy + ch + i,  2);
       }
-      el.style.fontSize = Math.max(6, fs) + 'px';
-      // colour from original (PDF stores 0xRRGGBB int)
-      const c = it.color | 0;
-      el.style.color = `rgb(${(c >> 16) & 255},${(c >> 8) & 255},${c & 255})`;
-      el.textContent = it.trans;
-      overlay.appendChild(el);
-    });
+      // Rand über/unter der Box
+      for (let xi = 0; xi < cw; xi += Math.max(1, Math.floor(cw / 6))) {
+        pick(cx + xi, cy - 2, 1);
+        pick(cx + xi, cy + ch + 2, 1);
+      }
 
-    wrap.appendChild(overlay);
-  }
+      if (samples.length) {
+        const buckets = {};
+        samples.forEach(s => {
+          const k = (s[0] >> 5) + ',' + (s[1] >> 5) + ',' + (s[2] >> 5);
+          if (!buckets[k]) buckets[k] = { n: 0, r: 0, g: 0, b: 0 };
+          buckets[k].n++; buckets[k].r += s[0]; buckets[k].g += s[1]; buckets[k].b += s[2];
+        });
+        let best = null;
+        for (const k in buckets) if (!best || buckets[k].n > best.n) best = buckets[k];
+        if (best) {
+          bgR = Math.round(best.r / best.n);
+          bgG = Math.round(best.g / best.n);
+          bgB = Math.round(best.b / best.n);
+        }
+      }
+    } catch(_) {}
+
+    // Textfarbe: Original-PDF-Farbe, Fallback: dunkel/hell je nach Hintergrund
+    const c = it.color | 0;
+    const pdfR = (c >> 16) & 255, pdfG = (c >> 8) & 255, pdfB = c & 255;
+    const luminance = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
+    const textColor = (pdfR === 0 && pdfG === 0 && pdfB === 0)
+      ? (luminance > 180 ? 'rgb(15,23,42)' : 'rgb(240,240,240)')
+      : `rgb(${pdfR},${pdfG},${pdfB})`;
+
+    let fs = it.size * scaleY * 0.95;
+    if (state.autoFit) {
+      const ratio = (it.text.length || 1) / Math.max(it.trans.length, 1);
+      if (ratio < 1) fs *= Math.max(0.65, ratio * 1.05);
+    }
+
+    const el = document.createElement('div');
+    el.className = 'pft-overlay-item';
+    el.style.cssText = `
+      left:${x}px;top:${y}px;width:${w}px;height:${h}px;
+      background:rgb(${bgR},${bgG},${bgB});
+      color:${textColor};
+      font-size:${Math.max(6, fs)}px;
+      font-family:${it.font || 'Arial,sans-serif'};
+      line-height:${h}px;
+    `;
+    el.textContent = it.trans;
+    overlay.appendChild(el);
+  });
+
+  wrap.appendChild(overlay);
+}
 
   // re-position overlay if window resizes / canvas re-renders
   window.addEventListener('resize', () => renderOverlay());
