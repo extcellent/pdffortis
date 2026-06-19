@@ -515,6 +515,7 @@ const workerCode = `
     const modelId = opusModel || 'Xenova/nllb-200-distilled-600M';
 
     self.postMessage({ type: 'model_loading', isOpus, pair });
+    console.log('[pft] Loading model:', modelId, 'for pair:', pair);
 
     translator = await pipeline('translation', modelId, {
       device: 'wasm',
