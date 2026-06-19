@@ -1862,15 +1862,28 @@ async function performDownload(){
         if(!text) return;
         const x = parseFloat(el.style.left) || 0;
         const y = parseFloat(el.style.top) || 0;
+        const w = parseFloat(el.style.width) || 100;
         const h = parseFloat(el.style.height) || 12;
         const fs = parseFloat(el.style.fontSize) || 10;
         const colorRaw = el.style.color || 'rgb(0,0,0)';
+        const bgRaw = el.style.background || el.style.backgroundColor || 'rgb(255,255,255)';
         const rgb2 = colorRaw.match(/\d+/g) || ['0','0','0'];
+        const bgRgb = bgRaw.match(/\d+/g) || ['255','255','255'];
         const pdfX2 = x * scaleX2;
         const pdfY2 = pdfH2 - ((y + h) * scaleY2);
-        page2.drawText(text, {
+
+        // Hintergrund-Rechteck zum Abdecken des Originals
+        page2.drawRectangle({
           x: pdfX2,
           y: pdfY2,
+          width: w * scaleX2,
+          height: h * scaleY2,
+          color: PDFLib.rgb(parseInt(bgRgb[0])/255, parseInt(bgRgb[1])/255, parseInt(bgRgb[2])/255),
+        });
+
+        page2.drawText(text, {
+          x: pdfX2,
+          y: pdfY2 + 1,
           size: Math.max(6, fs * scaleX2),
           font: font2,
           color: PDFLib.rgb(parseInt(rgb2[0])/255, parseInt(rgb2[1])/255, parseInt(rgb2[2])/255),
