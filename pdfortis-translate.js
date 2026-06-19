@@ -441,22 +441,17 @@ let chunkCounter = 0;
 const workerCode = `
   import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3';
   env.allowLocalModels = false;
-  env.backends.onnx.wasm.numThreads = 1;
-
+  env.backends.onnx.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 1, 4);
   let translator = null;
-
   self.onmessage = async (e) => {
     const { type, data } = e.data;
+    
     if (type === 'init') {
       try {
-        let device = 'wasm';
-        if (navigator.gpu) {
-          try {
-            const adapter = await navigator.gpu.requestAdapter();
-            if (adapter) device = 'webgpu';
-          } catch(_) {}
-        }
-    
+        const isRealChrome = /Chrome\\/(\d+)/.test(navigator.userAgent) && !/Edg|OPR|YaBrowser/.test(navigator.userAgent);
+        const chromeVersion = isRealChrome ? parseInt(navigator.userAgent.match(/Chrome\\/(\\d+)/)[1]) : 0;
+        const device = (isRealChrome && chromeVersion >= 113 && navigator.gpu) ? 'webgpu' : 'wasm';
+
         translator = await pipeline('translation', 'Xenova/nllb-200-distilled-600M', {
           device,
           dtype: device === 'webgpu' ? 'fp16' : 'q8',
@@ -467,6 +462,7 @@ const workerCode = `
             }
           },
         });
+    
         self.postMessage({ type: 'ready', device });
       } catch (err) {
         self.postMessage({ type: 'error', error: err.message || String(err) });
