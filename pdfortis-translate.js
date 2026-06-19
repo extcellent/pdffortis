@@ -104,7 +104,7 @@
 
       /* inline-overlay layer atop existing #pdf-canvas */
       .pft-overlay{position:absolute;inset:0;pointer-events:none;z-index:5}
-      .pft-overlay-item{position:absolute;padding:0 1px;line-height:1;border-radius:0;overflow:hidden;white-space:nowrap;}
+      .pft-overlay-item{position:absolute;padding:0 1px;line-height:1;border-radius:0;overflow:visible;white-space:nowrap;}
       .pft-overlay.wrap .pft-overlay-item{white-space:normal;}
 
 
