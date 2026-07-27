@@ -293,6 +293,8 @@ input,select,textarea{font-family:var(--font)}
 .rtab:hover{color:var(--blue)}
 .rtab.active{color:var(--blue);border-bottom-color:var(--blue);background:white;font-weight:600}
 .rtab.locked{opacity:.5;cursor:not-allowed}
+.rtab:disabled{opacity:.35;cursor:not-allowed}
+.rtab:disabled:hover{color:var(--gray-500)}
 
 .ribbon-panel{display:none;align-items:center;gap:4px;padding:7px 14px;min-height:56px;flex-wrap:wrap}
 .ribbon-panel.active{display:flex}
@@ -768,6 +770,14 @@ input,select,textarea{font-family:var(--font)}
         <svg width="13" height="13" fill="none" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="5" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="10" width="5" height="4" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="10" width="5" height="4" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
         <span data-i="tab_organize">Organize</span>
       </button>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:2px">
+        <button class="rtab undo-btn" onclick="undo()" title="Undo (Ctrl+Z)" disabled>
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M4 8h7a3 3 0 010 6H7M4 8l3-3M4 8l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="rtab redo-btn" onclick="redo()" title="Redo (Ctrl+Y)" disabled>
+          <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M12 8H5a3 3 0 000 6h4M12 8l-3-3M12 8l-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
     </div>
 
     <!-- Edit text panel -->
@@ -1080,6 +1090,67 @@ input,select,textarea{font-family:var(--font)}
 let pdfDoc=null, pdfLibDoc=null, pdfBytes=null;
 const API = 'https://pdffortis-api.onrender.com';
 let pendingEdits=[];
+
+// ═══════════════════════════════════════
+// UNDO / REDO
+// ═══════════════════════════════════════
+let historyStack = [];
+let historyIndex = -1;
+const MAX_HISTORY = 50;
+
+function pushHistory(action){
+  historyStack = historyStack.slice(0, historyIndex + 1);
+  historyStack.push(action);
+  if(historyStack.length > MAX_HISTORY) historyStack.shift();
+  historyIndex = historyStack.length - 1;
+  updateUndoRedoButtons();
+}
+
+async function undo(){
+  if(historyIndex < 0) return;
+  await historyStack[historyIndex].undo();
+  historyIndex--;
+  updateUndoRedoButtons();
+}
+
+async function redo(){
+  if(historyIndex >= historyStack.length - 1) return;
+  historyIndex++;
+  await historyStack[historyIndex].redo();
+  updateUndoRedoButtons();
+}
+
+function updateUndoRedoButtons(){
+  document.querySelectorAll('.undo-btn').forEach(b=>b.disabled = historyIndex < 0);
+  document.querySelectorAll('.redo-btn').forEach(b=>b.disabled = historyIndex >= historyStack.length - 1);
+}
+
+function redrawPageCanvas(n){
+  const canvas=document.getElementById('pdf-canvas');
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  const img=pageImages[n];
+  if(!img) return;
+  ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  (pageMasks[n]||[]).forEach(m=>{
+    if(m.data){ ctx.putImageData(m.data,m.x,m.y); }
+    else { ctx.fillStyle=m.bg; ctx.fillRect(m.x,m.y,m.w,m.h); }
+  });
+}
+
+document.addEventListener('keydown', e=>{
+  const ae = document.activeElement;
+  const inTextField = ae && (ae.isContentEditable || ae.tagName==='INPUT' || ae.tagName==='TEXTAREA');
+  const mod = e.ctrlKey || e.metaKey;
+  if(!mod) return;
+  const key = e.key.toLowerCase();
+  if(key==='z' && !e.shiftKey){
+    if(inTextField) return; // native Undo im Textfeld hat Vorrang
+    e.preventDefault(); undo();
+  }else if(key==='y' || (key==='z' && e.shiftKey)){
+    if(inTextField) return;
+    e.preventDefault(); redo();
+  }
+});
 let pageMasks={}; // {pageNum: [{x,y,w,h,bg}, ...]} – Vorschau-Masken pro Seite
 let pageImages={};
 let currentPage=1, totalPages=0, fileName='';
@@ -1536,6 +1607,7 @@ function addTextBox(x,y){
   wrap.appendChild(body);
   wrap.appendChild(resH);
   ol.appendChild(wrap);
+  pushHistory({undo:()=>wrap.remove(),redo:()=>ol.appendChild(wrap)});
 
   // ── DRAG (nur über ⠿ Handle) ──
   let dSx,dSy,dLx,dLy,dragging=false;
@@ -1550,7 +1622,16 @@ function addTextBox(x,y){
       wrap.style.left=(dLx+e2.clientX-dSx)+'px';
       wrap.style.top=(dLy+e2.clientY-dSy)+'px';
     };
-    const up=()=>{dragging=false;document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up)};
+    const up=()=>{
+      dragging=false;document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);
+      const nx=parseInt(wrap.style.left)||0, ny=parseInt(wrap.style.top)||0;
+      if(nx!==dLx||ny!==dLy){
+        pushHistory({
+          undo:()=>{wrap.style.left=dLx+'px';wrap.style.top=dLy+'px'},
+          redo:()=>{wrap.style.left=nx+'px';wrap.style.top=ny+'px'}
+        });
+      }
+    };
     document.addEventListener('mousemove',mv);
     document.addEventListener('mouseup',up);
   });
@@ -1568,7 +1649,16 @@ function addTextBox(x,y){
       wrap.style.height=Math.max(28,rH+e2.clientY-rSy)+'px';
       body.style.height='100%';
     };
-    const up=()=>{resizing=false;document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up)};
+    const up=()=>{
+      resizing=false;document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);
+      const nw=wrap.offsetWidth, nh=wrap.offsetHeight;
+      if(nw!==rW||nh!==rH){
+        pushHistory({
+          undo:()=>{wrap.style.width=rW+'px';wrap.style.height=rH+'px';body.style.height='100%'},
+          redo:()=>{wrap.style.width=nw+'px';wrap.style.height=nh+'px';body.style.height='100%'}
+        });
+      }
+    };
     document.addEventListener('mousemove',mv);
     document.addEventListener('mouseup',up);
   });
@@ -1581,7 +1671,11 @@ function addTextBox(x,y){
   btnB.addEventListener('click',e=>{e.stopPropagation();bold=!bold;body.style.fontWeight=bold?'700':'400';btnB.classList.toggle('on',bold)});
   btnI.addEventListener('click',e=>{e.stopPropagation();italic=!italic;body.style.fontStyle=italic?'italic':'normal';btnI.classList.toggle('on',italic)});
   btnU.addEventListener('click',e=>{e.stopPropagation();underline=!underline;body.style.textDecoration=underline?'underline':'none';btnU.classList.toggle('on',underline)});
-  delBtn.addEventListener('click',e=>{e.stopPropagation();wrap.remove()});
+  delBtn.addEventListener('click',e=>{
+    e.stopPropagation();
+    wrap.remove();
+    pushHistory({undo:()=>ol.appendChild(wrap),redo:()=>wrap.remove()});
+  });
 
   // ── Klick innerhalb wrap → nicht nach außen bubblen (verhindert sofortiges neues addTextBox) ──
   wrap.addEventListener('click',e=>e.stopPropagation());
@@ -1620,6 +1714,7 @@ function addDateBox(){
   addDelBtn(el);
   makeDraggable(el);
   ol.appendChild(el);
+  pushHistory({undo:()=>el.remove(),redo:()=>ol.appendChild(el)});
 }
 
 function addInitials(){
@@ -1634,6 +1729,7 @@ function addInitials(){
   addDelBtn(el);
   makeDraggable(el);
   ol.appendChild(el);
+  pushHistory({undo:()=>el.remove(),redo:()=>ol.appendChild(el)});
 }
 
 function addImageOverlay(){
@@ -1660,7 +1756,12 @@ function addImageOverlay(){
         line-height:1;z-index:20;
         box-shadow:0 2px 6px rgba(0,0,0,.25);
       `;
-      del.onclick=e=>{e.stopPropagation();wrap.remove()};
+      del.onclick=e=>{
+        e.stopPropagation();
+        const parent=wrap.parentNode;
+        wrap.remove();
+        pushHistory({undo:()=>parent.appendChild(wrap),redo:()=>wrap.remove()});
+      };
       wrap.appendChild(del);
       wrap.addEventListener('mouseenter',()=>del.style.display='flex');
       wrap.addEventListener('mouseleave',()=>del.style.display='none');
@@ -1685,9 +1786,21 @@ function addImageOverlay(){
         wrap.style.left=(il+e.clientX-sx)+'px';
         wrap.style.top=(it+e.clientY-sy)+'px';
       });
-      document.addEventListener('mouseup',()=>{dragging=false});
+      document.addEventListener('mouseup',()=>{
+        if(!dragging)return;
+        dragging=false;
+        const nl=parseInt(wrap.style.left)||0, nt=parseInt(wrap.style.top)||0;
+        if(nl!==il||nt!==it){
+          pushHistory({
+            undo:()=>{wrap.style.left=il+'px';wrap.style.top=it+'px'},
+            redo:()=>{wrap.style.left=nl+'px';wrap.style.top=nt+'px'}
+          });
+        }
+      });
 
-      document.getElementById('overlay-layer').appendChild(wrap);
+      const ol_ = document.getElementById('overlay-layer');
+      ol_.appendChild(wrap);
+      pushHistory({undo:()=>wrap.remove(),redo:()=>ol_.appendChild(wrap)});
     };rd.readAsDataURL(f);
   };inp.click();
 }
@@ -1695,7 +1808,12 @@ function addDelBtn(el){
   const btn=document.createElement('button');
   btn.className='overlay-delete';
   btn.innerHTML='&times;';
-  btn.onclick=e=>{e.stopPropagation();e.preventDefault();el.remove()};
+  btn.onclick=e=>{
+    e.stopPropagation();e.preventDefault();
+    const parent=el.parentNode;
+    el.remove();
+    pushHistory({undo:()=>parent.appendChild(el),redo:()=>el.remove()});
+  };
   // Position nur setzen wenn noch nicht gesetzt
   if(!el.style.position||el.style.position==='static'){
     el.style.position='absolute';
@@ -1730,7 +1848,16 @@ function makeDraggable(el){
     sx=e.clientX;sy=e.clientY;
     il=parseInt(el.style.left)||0;it=parseInt(el.style.top)||0;
     function mv(e){el.style.left=(il+e.clientX-sx)+'px';el.style.top=(it+e.clientY-sy)+'px'}
-    function up(){document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up)}
+    function up(){
+      document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);
+      const nl=parseInt(el.style.left)||0, nt=parseInt(el.style.top)||0;
+      if(nl!==il||nt!==it){
+        pushHistory({
+          undo:()=>{el.style.left=il+'px';el.style.top=it+'px'},
+          redo:()=>{el.style.left=nl+'px';el.style.top=nt+'px'}
+        });
+      }
+    }
     document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
     e.preventDefault();
   });
@@ -1762,11 +1889,16 @@ function loadSigImage(e){const f=e.target.files[0];if(!f)return;const r=new File
 
 function placeSig(src){
   const ol=document.getElementById('overlay-layer');
+  const wrap=document.createElement('div');
+  wrap.className='pdf-overlay';
+  wrap.style.cssText='position:absolute;left:80px;top:100px;width:180px;display:inline-block;';
   const img=document.createElement('img');
-  img.src=src;img.className='pdf-overlay pdf-img-overlay';
-  img.style.left='80px';img.style.top='100px';img.style.width='180px';
-  addDelBtn(img);makeDraggable(img);
-  ol.appendChild(img);
+  img.src=src;img.className='pdf-img-overlay';
+  img.style.cssText='display:block;width:100%;pointer-events:none;';
+  wrap.appendChild(img);
+  addDelBtn(wrap);makeDraggable(wrap);
+  ol.appendChild(wrap);
+  pushHistory({undo:()=>wrap.remove(),redo:()=>ol.appendChild(wrap)});
   setMode('edit');
   toast(lang==='de'?'Unterschrift eingefügt':'Signature inserted — drag to position');
 }
@@ -1795,17 +1927,41 @@ function switchSignTab(t){
 // ═══════════════════════════════════════
 async function rotatePage(){
   if(!pdfLibDoc){toast('No document loaded','err');return}
+  const rotatedPage=currentPage;
   const pages=pdfLibDoc.getPages();
   const p=pages[currentPage-1];
   p.setRotation(PDFLib.degrees((p.getRotation().angle+90)%360));
   await refreshDoc();
   toast(lang==='de'?'Seite gedreht':'Page rotated 90°');
+
+  pushHistory({
+    undo: async ()=>{
+      const pg=pdfLibDoc.getPages()[rotatedPage-1];
+      pg.setRotation(PDFLib.degrees((pg.getRotation().angle+270)%360));
+      currentPage=rotatedPage;
+      await refreshDoc();
+    },
+    redo: async ()=>{
+      const pg=pdfLibDoc.getPages()[rotatedPage-1];
+      pg.setRotation(PDFLib.degrees((pg.getRotation().angle+90)%360));
+      currentPage=rotatedPage;
+      await refreshDoc();
+    }
+  });
 }
 
 async function deletePage(){
   if(!pdfLibDoc||totalPages<=1){toast(lang==='de'?'Mindestens eine Seite':'At least one page required','err');return}
   if(!confirm(lang==='de'?`Seite ${currentPage} löschen?`:`Delete page ${currentPage}?`))return;
-  pdfLibDoc.removePage(currentPage-1);
+
+  const deletedIndex = currentPage - 1;
+  // Seite für Undo separat sichern, bevor sie entfernt wird
+  const holder = await PDFLib.PDFDocument.create();
+  const [copiedPage] = await holder.copyPages(pdfLibDoc, [deletedIndex]);
+  holder.addPage(copiedPage);
+  const holderBytes = await holder.save();
+
+  pdfLibDoc.removePage(deletedIndex);
   pdfBytes=await pdfLibDoc.save();
   pdfDoc=await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
   totalPages=pdfDoc.numPages;
@@ -1813,6 +1969,21 @@ async function deletePage(){
   await buildThumbs();
   await renderPage(currentPage);
   toast(lang==='de'?'Seite gelöscht':'Page deleted');
+
+  pushHistory({
+    undo: async ()=>{
+      const holderDoc = await PDFLib.PDFDocument.load(holderBytes);
+      const [restoredPage] = await pdfLibDoc.copyPages(holderDoc,[0]);
+      pdfLibDoc.insertPage(deletedIndex, restoredPage);
+      currentPage = deletedIndex+1;
+      await refreshDoc();
+    },
+    redo: async ()=>{
+      pdfLibDoc.removePage(deletedIndex);
+      currentPage = Math.min(deletedIndex+1, pdfLibDoc.getPageCount());
+      await refreshDoc();
+    }
+  });
 }
 
 function mergePDFs(){
@@ -2768,6 +2939,8 @@ async function closeInlineEditor(save=true){
   }
 
   // === Text wurde geändert ===
+  const _prevMaskRect = span._maskRect;
+
   // 1) Maske dauerhaft in pageMasks übernehmen → bleibt nach Re-Render erhalten
   if(span._maskRect){
     if(!pageMasks[pageNum]) pageMasks[pageNum]=[];
@@ -2802,9 +2975,39 @@ async function closeInlineEditor(save=true){
   const font  = span.dataset.pdfFont  || '';
   const flags = parseInt(span.dataset.pdfFlags||0,10);
   const idx = pendingEdits.findIndex(e => e.page===pageNum && e.x===x && e.y===y);
+  const prevEdit = idx > -1 ? {...pendingEdits[idx]} : null;
   const edit = {page:pageNum, x, y, x1, y1, size, color, font, flags, newText, spanOrigText:origText};
+  const editIdx = idx > -1 ? idx : pendingEdits.length;
   if(idx > -1) pendingEdits[idx] = edit;
   else pendingEdits.push(edit);
+
+  // 4) Undo/Redo registrieren
+  pushHistory({
+    undo:()=>{
+      if(_prevMaskRect){
+        const arr=pageMasks[pageNum]||[];
+        const mi=arr.indexOf(_prevMaskRect);
+        if(mi>-1) arr.splice(mi,1);
+      }
+      if(prevEdit) pendingEdits[editIdx]=prevEdit;
+      else pendingEdits.splice(editIdx,1);
+      span.textContent=origText;
+      span.classList.remove('is-edited');
+      span.style.color='transparent';
+      if(pageNum===currentPage) redrawPageCanvas(pageNum);
+    },
+    redo:()=>{
+      if(_prevMaskRect){
+        if(!pageMasks[pageNum]) pageMasks[pageNum]=[];
+        pageMasks[pageNum].push(_prevMaskRect);
+      }
+      pendingEdits[editIdx]=edit;
+      span.textContent=newText;
+      span.classList.add('is-edited');
+      span.style.color=span.dataset.cssColor||'black';
+      if(pageNum===currentPage) redrawPageCanvas(pageNum);
+    }
+  });
 }
    
 // ═══════════════════════════════════════
