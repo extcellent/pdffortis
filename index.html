@@ -1895,34 +1895,62 @@ async function performDownload(){
       pageMasks = {};
     }
 
-// ── Schritt 2: Add-Text Overlays via pdf-lib einbetten ──
+// ── Schritt 2: Add-Text & Bild-Overlays via pdf-lib einbetten ──
     const overlays = document.querySelectorAll('#overlay-layer .pdf-overlay, #overlay-layer .pf-tbox-wrap');
     if(overlays.length > 0){
       const doc = await PDFLib.PDFDocument.load(workBytes);
       const font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
       const liveCanvas = document.getElementById('pdf-canvas');
 
-      overlays.forEach(wrap => {
-        const box = wrap.querySelector('.pdf-text-box, [contenteditable]');
-        if(!box) return;
-        const text = box.innerText?.trim();
-        if(!text) return;
+      const dataURLToBytes = (dataURL) => {
+        const base64 = dataURL.split(',')[1];
+        const bin = atob(base64);
+        const bytes = new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+        return bytes;
+      };
 
-        // Welche Seite gehört zu dieser Box? (Fallback: aktuell offene Seite)
+      for(const wrap of overlays){
         const boxPage = parseInt(wrap.dataset.pfPage, 10) || currentPage;
         const page = doc.getPage(boxPage - 1);
         const {width: pdfW, height: pdfH} = page.getSize();
-
-        // Canvas-Maße zum Platzierungszeitpunkt dieser Box (Fallback: aktuelle Canvas)
         const canvasW = parseFloat(wrap.dataset.pfCanvasW) || liveCanvas.width;
         const canvasH = parseFloat(wrap.dataset.pfCanvasH) || liveCanvas.height;
         const scaleX = pdfW / canvasW;
         const scaleY = pdfH / canvasH;
 
+        // ── Bild-Overlay (Signatur oder hochgeladenes Bild) ──
+        const imgEl = wrap.tagName === 'IMG' ? wrap : wrap.querySelector('img');
+        if(imgEl){
+          try{
+            const isPng = imgEl.src.startsWith('data:image/png');
+            const bytes = dataURLToBytes(imgEl.src);
+            const embedded = isPng ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+
+            const dispW = imgEl.offsetWidth  || 180;
+            const dispH = imgEl.offsetHeight || 80;
+            const wrapLeft = parseFloat(wrap.style.left) || 0;
+            const wrapTop  = parseFloat(wrap.style.top)  || 0;
+
+            const pdfImgW = dispW * scaleX;
+            const pdfImgH = dispH * scaleY;
+            const pdfX = wrapLeft * scaleX;
+            const pdfY = pdfH - (wrapTop * scaleY) - pdfImgH;
+
+            page.drawImage(embedded, {x: pdfX, y: pdfY, width: pdfImgW, height: pdfImgH});
+          }catch(e){ console.warn('Image overlay embed failed', e); }
+          continue;
+        }
+
+        // ── Text-Box (Add Text / Date / Initials) ──
+        const box = wrap.querySelector('.pdf-text-box, [contenteditable]');
+        if(!box) continue;
+        const text = box.innerText?.trim();
+        if(!text) continue;
+
         const wrapLeft = parseFloat(wrap.style.left) || 0;
         const wrapTop  = parseFloat(wrap.style.top)  || 0;
 
-        // Canvas-Koordinaten → PDF-Koordinaten (Y umgekehrt)
         const pdfX = wrapLeft * scaleX;
         const pdfY = pdfH - (wrapTop * scaleY) - (parseFloat(getComputedStyle(box).fontSize) * scaleY);
 
@@ -1931,7 +1959,6 @@ async function performDownload(){
         const rgb = colorRaw.match(/\d+/g)||['0','0','0'];
         const color = PDFLib.rgb(parseInt(rgb[0])/255, parseInt(rgb[1])/255, parseInt(rgb[2])/255);
 
-        // Mehrzeiligen Text zeilenweise rendern
         const lines = text.split('\n');
         const lineH = fontSize * 1.3;
         lines.forEach((line, i) => {
@@ -1944,7 +1971,7 @@ async function performDownload(){
             color
           });
         });
-      });
+      }
 
       workBytes = await doc.save();
     }
