@@ -388,14 +388,16 @@ input,select,textarea{font-family:var(--font)}
   background:white;
 }
 .pf-tbox-drag{
-  position:absolute;
-  top:-38px;right:8px; /* rechts in toolbar */
   width:20px;height:26px;
   cursor:move;
   display:flex;align-items:center;justify-content:center;
-  color:#666;font-size:13px;
+  color:#ccc;font-size:14px;
   user-select:none;
+  border-radius:4px;
+  flex-shrink:0;
 }
+.pf-tbox-drag:hover{background:#6366f1;color:#fff}
+  
 .pf-tbox-body{
   width:100%;height:100%;
   min-width:120px;min-height:30px;
@@ -1483,9 +1485,13 @@ function switchRTab(tab){
 function addTextBox(x,y){
   if(!pdfLibDoc){toast('Lade zuerst ein PDF','err');return}
   const ol=document.getElementById('overlay-layer');
+  const canvas=document.getElementById('pdf-canvas');
 
   const wrap=document.createElement('div');
   wrap.className='pf-tbox-wrap selected';
+  wrap.dataset.pfPage=currentPage;
+  wrap.dataset.pfCanvasW=canvas.width;
+  wrap.dataset.pfCanvasH=canvas.height;
   wrap.style.cssText=`position:absolute;left:${x}px;top:${y}px;width:200px;min-width:80px;min-height:28px;z-index:30;`;
 
   // ── TOOLBAR ──
@@ -1889,24 +1895,29 @@ async function performDownload(){
       pageMasks = {};
     }
 
-    // ── Schritt 2: Add-Text Overlays via pdf-lib einbetten ──
-    const overlays = document.querySelectorAll('#overlay-layer .pdf-overlay');
+// ── Schritt 2: Add-Text Overlays via pdf-lib einbetten ──
+    const overlays = document.querySelectorAll('#overlay-layer .pdf-overlay, #overlay-layer .pf-tbox-wrap');
     if(overlays.length > 0){
       const doc = await PDFLib.PDFDocument.load(workBytes);
       const font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
-      const canvas = document.getElementById('pdf-canvas');
-      const ol = document.getElementById('overlay-layer');
-      const olRect = ol.getBoundingClientRect();
-      const page = doc.getPage(currentPage - 1);
-      const {width: pdfW, height: pdfH} = page.getSize();
-      const scaleX = pdfW / canvas.width;
-      const scaleY = pdfH / canvas.height;
+      const liveCanvas = document.getElementById('pdf-canvas');
 
       overlays.forEach(wrap => {
         const box = wrap.querySelector('.pdf-text-box, [contenteditable]');
         if(!box) return;
         const text = box.innerText?.trim();
         if(!text) return;
+
+        // Welche Seite gehört zu dieser Box? (Fallback: aktuell offene Seite)
+        const boxPage = parseInt(wrap.dataset.pfPage, 10) || currentPage;
+        const page = doc.getPage(boxPage - 1);
+        const {width: pdfW, height: pdfH} = page.getSize();
+
+        // Canvas-Maße zum Platzierungszeitpunkt dieser Box (Fallback: aktuelle Canvas)
+        const canvasW = parseFloat(wrap.dataset.pfCanvasW) || liveCanvas.width;
+        const canvasH = parseFloat(wrap.dataset.pfCanvasH) || liveCanvas.height;
+        const scaleX = pdfW / canvasW;
+        const scaleY = pdfH / canvasH;
 
         const wrapLeft = parseFloat(wrap.style.left) || 0;
         const wrapTop  = parseFloat(wrap.style.top)  || 0;
