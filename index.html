@@ -2497,6 +2497,14 @@ async function logout(){
   try{ await sbLogout(); }catch(e){}
   currentUser=null;
 
+  // ► Lokale Session- und Token-Daten entfernen (Token war an den Account gekoppelt)
+  localStorage.removeItem('pf_session');
+  localStorage.removeItem(LS_TOKDAT);
+  currentToken=null;
+  document.getElementById('token-label-bar').textContent=i18n[lang].token_btn;
+  document.getElementById('token-input-area')?.classList.remove('hidden');
+  document.getElementById('token-active-display')?.classList.add('hidden');
+  
   // ► Anti-Flicker-Klasse zurück auf anon
   document.documentElement.classList.remove('pf-authed');
   document.documentElement.classList.add('pf-anon');
