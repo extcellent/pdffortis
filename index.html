@@ -2609,12 +2609,17 @@ function showLimitModal(){
     setTimeout(tick,1000);
   })();
 }
+  
 function showNudge(){
   const nb=document.getElementById('nudge-bar');nb.classList.remove('hidden');
   setTimeout(()=>nb.classList.add('hidden'),8000);
 }
 function closeNudge(){document.getElementById('nudge-bar').classList.add('hidden')}
 
+function showSignLock(){
+  toast(lang==='de'?'Bitte zuerst einloggen':'Please sign in first','warn');
+  openAuth('signup');
+}  
 // ═══════════════════════════════════════
 // MODALS
 // ═══════════════════════════════════════
