@@ -1,0 +1,23 @@
+name: Keep Render Alive
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake and verify Render
+        run: |
+          for i in 1 2 3 4 5; do
+            RESPONSE=$(curl -s -H "Accept: application/json" https://pdffortis-api.onrender.com/ping)
+            echo "Attempt $i: $RESPONSE"
+            if echo "$RESPONSE" | grep -q '"ok"'; then
+              echo "Server is awake and responding correctly"
+              exit 0
+            fi
+            sleep 6
+          done
+          echo "Server did not respond correctly after 5 attempts"
+          exit 1
