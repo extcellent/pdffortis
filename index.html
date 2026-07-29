@@ -1238,13 +1238,7 @@ async function loadPDF(file){
   const buf=await file.arrayBuffer();
   pdfBytes=new Uint8Array(buf);
   pdfDoc=await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
-  // Seitenanzahl via Backend holen
-  const form=new FormData();
-  form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
-  form.append('page',0);
-  const res=await fetch(`${API}/extract`,{method:'POST',body:form});
-  const data=await res.json();
-  // Seitenanzahl: pdf-lib nur für totalPages
+  // Seitenanzahl: pdf-lib
   pdfLibDoc=await PDFLib.PDFDocument.load(pdfBytes);
   totalPages=pdfLibDoc.getPageCount();
   currentPage=1;
@@ -1373,11 +1367,7 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
   const ol=document.getElementById('overlay-layer');
   ol.querySelector('.pdf-text-layer')?.remove();
 
-  const form=new FormData();
-  form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
-  form.append('page',pageNum-1);
-  const res=await fetch(`${API}/extract`,{method:'POST',body:form});
-  const {items, pageWidth, pageHeight}=await res.json();
+  const {items, pageWidth, pageHeight}=await extractPageLocal(pdfDoc, pageNum-1);
 
   // imgWidth ist 2x (Matrix 2,2) → native PDF Breite
   const pdfNativeWidth=imgWidth/2;
