@@ -1237,6 +1237,7 @@ async function loadPDF(file){
   document.getElementById('editor-filename').textContent=fileName;
   const buf=await file.arrayBuffer();
   pdfBytes=new Uint8Array(buf);
+  pdfDoc=await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
   // Seitenanzahl via Backend holen
   const form=new FormData();
   form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
@@ -1474,19 +1475,9 @@ async function buildThumbs(){
     wrap.appendChild(num);
     panel.appendChild(wrap);
 
-    const form=new FormData();
-    form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
-    form.append('page',i-1);
-    const res=await fetch(`${API}/render`,{method:'POST',body:form});
-    const png=await res.blob();
-    const url=URL.createObjectURL(png);
-    const img=new Image();
-    img.onload=()=>{
-      tc.width=80;tc.height=80*(img.height/img.width);
-      tc.getContext('2d').drawImage(img,0,0,tc.width,tc.height);
-      URL.revokeObjectURL(url);
-    };
-    img.src=url;
+    const img=await renderPageLocal(pdfDoc, i-1);
+    tc.width=80;tc.height=80*(img.height/img.width);
+    tc.getContext('2d').drawImage(img,0,0,tc.width,tc.height);
   }
 }
 
