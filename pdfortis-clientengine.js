@@ -26,7 +26,21 @@ async function renderPageLocal(pdfDocLocal, pageIndex /* 0-basiert, wie /render 
 // ═══════════════════════════════════════
 // Schritt 2 (verbessert): Pixel-genauer Bbox- + Farb-Scan
 // ═══════════════════════════════════════
+const _pageCanvasCache = {};
 
+async function _getOrRenderCanvas(pdfDocLocal, pageIndex){
+  if(_pageCanvasCache[pageIndex]) return _pageCanvasCache[pageIndex];
+  const page = await pdfDocLocal.getPage(pageIndex + 1);
+  const viewport = page.getViewport({ scale: 2 });
+  const off = document.createElement('canvas');
+  off.width = viewport.width;
+  off.height = viewport.height;
+  const ctx = off.getContext('2d', { willReadFrequently: true });
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  const entry = { canvas: off, ctx };
+  _pageCanvasCache[pageIndex] = entry;
+  return entry;
+}
 function _scanTextBox(ctx, cx, cy, cw, ch){
   const W = ctx.canvas.width, H = ctx.canvas.height;
   cx = Math.max(0, cx); cy = Math.max(0, cy);
@@ -129,6 +143,7 @@ async function extractPageLocal(pdfDocLocal, pageIndex){
       flags: _deriveFlags(styleInfo.fontFamily)
     });
   }
+  
 
   return { items, pageWidth: viewport.width, pageHeight: viewport.height };
 }
