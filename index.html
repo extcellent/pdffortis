@@ -1339,18 +1339,8 @@ async function renderPage(n){
   const userEls=Array.from(ol.querySelectorAll('.pdf-overlay'));
 
   if(!pageImages[n]){
-    const form=new FormData();
-    form.append('pdf',new Blob([pdfBytes],{type:'application/pdf'}),'doc.pdf');
-    form.append('page',n-1);
-    const res=await fetch(`${API}/render`,{method:'POST',body:form});
-    const png=await res.blob();
-    const url=URL.createObjectURL(png);
-    await new Promise(resolve=>{
-      const img=new Image();
-      img.onload=()=>{pageImages[n]=img;URL.revokeObjectURL(url);resolve()};
-      img.src=url;
-    });
-  }
+      pageImages[n] = await renderPageLocal(pdfDoc, n-1);
+    }
 
   const img=pageImages[n];
   const vw=document.getElementById('canvas-area').clientWidth-48;
@@ -3041,6 +3031,7 @@ window.openAuthModal = () => document.getElementById('auth-modal')?.classList.re
 <script src="/supabase.js"></script>
 <script src="/auth-badge.js"></script>
 <script>window.PDFORTIS_API = "https://pdffortis-api.onrender.com";</script>
+<script src="/pdfortis-clientengine.js"></script>
 <script src="/pdfortis-translate.js" defer></script>
 </body>
 </html>
