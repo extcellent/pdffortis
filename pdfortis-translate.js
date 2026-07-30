@@ -340,25 +340,36 @@
       // 2. Übersetzen (nur noch lokal — kein Server mehr vorhanden)
       const srcLangForPair = (src && src !== 'auto') ? src : 'en';
       const pairKey = srcLangForPair + '-' + tgt;
-      if (lastTranslatedPair && lastTranslatedPair !== pairKey && workerPool.length) {
-        // Sprachpaar geändert → neues (oft viel größeres) Modell würde in den
-        // ALTEN Worker nachgeladen werden und dessen Speicher weiter aufblähen.
-        // Stattdessen: Worker jetzt sauber neu starten.
-        resetWorkerPool();
-      }
-      if (!state.localReady) {
-        resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Loading local model (one-time, ~250MB)…</div>`;
-        await ensureLocal();
-      }
-      // Progress-Anzeige wird ab hier in translateLocal selbst gesetzt
-      const translated = await translateLocal(texts, src, tgt);
-      const provider = 'local';
 
-      // Worker-Speicher periodisch freigeben (WASM-Memory wächst sonst
-      // unbegrenzt weiter und friert den Tab nach ein paar Übersetzungen ein).
-      translationsSinceReset++;
-      if (translationsSinceReset >= RECYCLE_AFTER_N_TRANSLATIONS) {
-        resetWorkerPool();
+      let translated, provider;
+      if (srcLangForPair === tgt) {
+        // Quelle == Ziel (z.B. Auto-detect → 'en' UND Zielsprache 'en'):
+        // Keine sinnlose 600MB-NLLB-Ladung starten, sondern Text 1:1 übernehmen.
+        console.warn('[pft] Quelle und Ziel identisch — Übersetzung übersprungen', pairKey);
+        translated = texts.slice();
+        provider = 'skipped (same language)';
+      } else {
+        if (lastTranslatedPair && lastTranslatedPair !== pairKey && workerPool.length) {
+          // Sprachpaar geändert → neues (oft viel größeres) Modell würde in den
+          // ALTEN Worker nachgeladen werden und dessen Speicher weiter aufblähen.
+          // Stattdessen: Worker jetzt sauber neu starten.
+          resetWorkerPool();
+        }
+        if (!state.localReady) {
+          resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Loading local model (one-time, ~250MB)…</div>`;
+          await ensureLocal();
+        }
+        // Progress-Anzeige wird ab hier in translateLocal selbst gesetzt
+        translated = await translateLocal(texts, src, tgt);
+        provider = 'local';
+        lastTranslatedPair = pairKey;
+
+        // Worker-Speicher periodisch freigeben (WASM-Memory wächst sonst
+        // unbegrenzt weiter und friert den Tab nach ein paar Übersetzungen ein).
+        translationsSinceReset++;
+        if (translationsSinceReset >= RECYCLE_AFTER_N_TRANSLATIONS) {
+          resetWorkerPool();
+        }
       }
 
       if (!isLoggedIn()) incGuestUsed();
@@ -487,29 +498,50 @@ const workerCode = `
 
   let translator = null;
   let currentPair = null;
+  let loadPromise = null;   // Lock gegen Race Condition: verhindert, dass mehrere
+  let loadPair = null;      // gleichzeitig eintreffende Chunks je einen eigenen,
+                             // parallelen pipeline()-Ladevorgang für dasselbe Modell starten.
 
   async function loadModel(srcLang, tgtLang) {
     const pair = srcLang + '-' + tgtLang;
     if (currentPair === pair && translator) return;
 
-    const opusModel = OPUS_MODELS[pair];
-    const isOpus = !!opusModel;
-    const modelId = opusModel || 'Xenova/nllb-200-distilled-600M';
+    // Lädt bereits genau dieses Paar? Dann NICHT nochmal laden, sondern
+    // auf den bereits laufenden Ladevorgang warten.
+    if (loadPromise && loadPair === pair) {
+      await loadPromise;
+      return;
+    }
 
-    self.postMessage({ type: 'model_loading', isOpus, pair });
-    console.log('[pft] Loading model:', modelId, 'for pair:', pair);
+    loadPair = pair;
+    loadPromise = (async () => {
+      const opusModel = OPUS_MODELS[pair];
+      const isOpus = !!opusModel;
+      const modelId = opusModel || 'Xenova/nllb-200-distilled-600M';
 
-    translator = await pipeline('translation', modelId, {
-      device: 'wasm',
-      dtype: 'q8',
-      progress_callback: (p) => {
-        if (p.status === 'downloading' || p.status === 'progress') {
-          const pct = p.total ? ((p.loaded / p.total) * 100).toFixed(0) : '';
-          self.postMessage({ type: 'progress', pct });
-        }
-      },
-    });
-    currentPair = pair;
+      self.postMessage({ type: 'model_loading', isOpus, pair });
+      console.log('[pft] Loading model:', modelId, 'for pair:', pair);
+
+      const t = await pipeline('translation', modelId, {
+        device: 'wasm',
+        dtype: 'q8',
+        progress_callback: (p) => {
+          if (p.status === 'downloading' || p.status === 'progress') {
+            const pct = p.total ? ((p.loaded / p.total) * 100).toFixed(0) : '';
+            self.postMessage({ type: 'progress', pct });
+          }
+        },
+      });
+      translator = t;
+      currentPair = pair;
+    })();
+
+    try {
+      await loadPromise;
+    } finally {
+      loadPromise = null;
+      loadPair = null;
+    }
   }
 
   self.onmessage = async (e) => {
