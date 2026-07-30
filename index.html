@@ -1119,6 +1119,53 @@ async function redo(){
   await historyStack[historyIndex].redo();
   updateUndoRedoButtons();
 }
+// ═══════════════════════════════════════
+// Draft-History für Inline-Text-Edits
+// → Undo wird sofort beim Tippen aktiv, nicht erst nach blur/Enter
+// ═══════════════════════════════════════
+document.addEventListener('input', function(e){
+  const span = e.target;
+  if(!span || !span.classList || !span.classList.contains('pdf-text-item')) return;
+  if(span.getAttribute('contenteditable') !== 'true') return;
+
+  const origText = span.dataset.originalText || '';
+  const currentText = span.textContent;
+
+  if(span.dataset._draftHistoryPushed !== '1'){
+    // Erster Input → Draft-History-Eintrag pushen
+    if(currentText === origText) return; // wirklich noch keine Änderung
+
+    const spanRef = span;
+    const pageNum = parseInt(span.dataset.pageNumber || currentPage, 10);
+    const x = parseFloat(span.dataset.pdfX);
+    const y = parseFloat(span.dataset.pdfY);
+
+    pushHistory({
+      undo: async () => {
+        spanRef.textContent = origText;
+        spanRef.dataset.editedText = origText;
+        spanRef.classList.remove('is-edited');
+        spanRef.style.color = 'transparent';
+        const idx = pendingEdits.findIndex(ed => ed.page===pageNum && ed.x===x && ed.y===y);
+        if(idx > -1) pendingEdits.splice(idx, 1);
+        if(pageNum === currentPage && typeof redrawPageCanvas === 'function') redrawPageCanvas(pageNum);
+        delete spanRef.dataset._draftHistoryPushed;
+      },
+      redo: async () => {
+        const finalText = spanRef.dataset._draftFinalText || spanRef.textContent;
+        spanRef.textContent = finalText;
+        spanRef.dataset.editedText = finalText;
+        spanRef.classList.add('is-edited');
+        spanRef.style.color = spanRef.dataset.cssColor || 'black';
+      }
+    });
+    span.dataset._draftHistoryPushed = '1';
+    span.dataset._draftFinalText = currentText;
+  } else {
+    // Folgeinputs → nur den Redo-Ziel-Text aktualisieren
+    span.dataset._draftFinalText = currentText;
+  }
+});
 
 function updateUndoRedoButtons(){
   document.querySelectorAll('.undo-btn').forEach(b=>b.disabled = historyIndex < 0);
@@ -3016,7 +3063,29 @@ async function closeInlineEditor(save=true){
   if(idx > -1) pendingEdits[idx] = edit;
   else pendingEdits.push(edit);
 
-  // 4) Undo/Redo registrieren
+  // 4) Undo/Redo registrieren — Draft aus Input-Listener übernehmen falls vorhanden
+  if(span.dataset._draftHistoryPushed === '1' && historyStack[historyIndex]){
+    // Draft-Entry existiert bereits — nur den Redo-Text auf finalen Wert setzen
+    span.dataset._draftFinalText = newText;
+    delete span.dataset._draftHistoryPushed;
+    // Redo-Closure aktualisieren, damit Redo den finalen edit-Zustand wiederherstellt
+    const _draftEntry = historyStack[historyIndex];
+    const _origUndo = _draftEntry.undo;
+    _draftEntry.undo = async () => {
+      await _origUndo();
+      // zusätzlich: pendingEdits sauber entfernen wie im vollen closeInlineEditor
+      const idx2 = pendingEdits.findIndex(ed => ed===edit);
+      if(idx2 > -1) pendingEdits.splice(idx2, 1);
+    };
+    _draftEntry.redo = async () => {
+      pendingEdits[editIdx]=edit;
+      span.textContent=newText;
+      span.classList.add('is-edited');
+      span.style.color=span.dataset.cssColor||'black';
+      if(pageNum===currentPage && typeof redrawPageCanvas==='function') redrawPageCanvas(pageNum);
+    };
+    updateUndoRedoButtons();
+  } else {
   pushHistory({
     undo:()=>{
       if(_prevMaskRect){
