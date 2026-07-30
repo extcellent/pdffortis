@@ -1,26 +1,27 @@
 /* ====================================================================
  * pdfortis-translate.js
  * Self-installing PDF translation module for PDFortis
- *  - Server-First (Azure → MyMemory → LibreTranslate via your backend)
- *  - Privacy-Fallback (Transformers.js / m2m100 ~250MB, runs in browser)
+ *  - 100% Client-Side (kein Render-/Backend-Server mehr nötig)
+ *  - Text-Extraktion über pdfortis-clientengine.js (extractPageLocal)
+ *  - Übersetzung über Transformers.js / m2m100 (~250MB, WASM-Worker im Browser)
  *  - Inline-Overlay Toggle + Side-by-Side modal
  *  - Auth Gate (guests: 1 free, registered users: unlimited)
  * --------------------------------------------------------------------
  * Requires in index.html:
- *   window.PDFORTIS_API = "https://your-render-url"; // optional, else samtre-origin
+ *   <script src="/pdfortis-clientengine.js"></script>          <!-- VOR diesem Script -->
  *   <script src="/pdfortis-translate.js" defer></script>
  *
  * Hooks into existing PDFortis runtime:
- *   - window.currentPDF      (Uint8Array of current PDF — already used by editor)
- *   - window.currentPageNum  (1-based active page)
- *   - window.pfGetSession()  (Supabase auth — already present)
+ *   - window.currentPDF          (Uint8Array of current PDF — already used by editor)
+ *   - window.currentPageNum      (1-based active page)
+ *   - window.currentPdfDocLocal  (pdf.js document object — NEU, für lokale Extraktion)
+ *   - window.pfGetSession()      (Supabase auth — already present)
  *   - #canvas-wrap , #overlay-layer , #pdf-canvas (existing IDs)
  *   - #editor-toolbar / .editor-bar (we attach our button to first found)
  * ==================================================================== */
 (function () {
   'use strict';
 
-  const API_BASE = (window.PDFORTIS_API || '').replace(/\/+$/, '');
   const LS_GUEST_KEY = 'pdfortis_guest_translations_used';
   const GUEST_LIMIT = 1;
 
@@ -28,7 +29,7 @@
   // 1. STATE
   // --------------------------------------------------------------
   const state = {
-    mode: 'server',          // 'server' | 'local'
+    mode: 'local',           // nur noch 'local' — kein Server mehr
     localReady: false,
     localLoading: false,
     localError: null,
@@ -150,7 +151,7 @@
       <div class="pft-modal" data-testid="translate-modal">
         <div class="pft-head">
           <h3>🌍 Translate this page</h3>
-          <span class="pft-badge" id="pft-badge" data-testid="translate-mode-badge">⚡ Server-Mode</span>
+          <span class="pft-badge" id="pft-badge" data-testid="translate-mode-badge">⏳ Preparing local model…</span>
           <button class="pft-close" id="pft-close" aria-label="Close">×</button>
         </div>
         <div class="pft-body">
@@ -261,7 +262,7 @@
       fab.classList.add('local');
       if (badge) { badge.className = 'pft-badge local'; badge.textContent = '🔒   Privacy-Mode (local)'; }
     } else {
-      if (badge) { badge.className = 'pft-badge'; badge.textContent = '⚡ Server-Mode'; }
+      if (badge) { badge.className = 'pft-badge'; badge.textContent = '⏳ Preparing local model…'; }
     }
   }
 
@@ -304,23 +305,8 @@
   }
 
 // --------------------------------------------------------------
-  // 6. TRANSLATION FLOW (OPTIMIERT MIT TIMEOUTS & PROGRESS)
+  // 6. TRANSLATION FLOW (100% lokal — kein Server-Fetch mehr)
   // --------------------------------------------------------------
-  async function fetchWithTimeout(url, options = {}) {
-    const { timeout = 20000 } = options; // 20 Sekunden Timeout
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-    try {
-      const response = await fetch(url, { ...options, signal: controller.signal });
-      clearTimeout(id);
-      return response;
-    } catch (e) {
-      clearTimeout(id);
-      if (e.name === 'AbortError') throw new Error('Server timeout');
-      throw e;
-    }
-  }
-
   async function runTranslate() {
     const gate = canTranslate();
     if (!gate.ok) {
@@ -351,25 +337,14 @@
       }
       const texts = items.map(i => i.text);
 
-      // 2. Engine auswählen
-      let translated = null, provider = '';
-      if (state.localReady) {
-        translated = await translateLocal(texts, src, tgt);
-        provider = 'local';
-      } else {
-        try {
-          const r = await translateServer(texts, src, tgt);
-          translated = r.translated;
-          provider = r.provider + ' (server)';
-        } catch (e) {
-          console.warn('[pft] Server failed or timeout, loading local mode:', e);
-          resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Server quota reached — loading local model (one-time, ~250MB)…</div>`;
-          await ensureLocal();
-          // Progress-Anzeige wird jetzt in translateLocal selbst gesetzt
-          translated = await translateLocal(texts, src, tgt);
-          provider = 'local';
-        }
+      // 2. Übersetzen (nur noch lokal — kein Server mehr vorhanden)
+      if (!state.localReady) {
+        resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Loading local model (one-time, ~250MB)…</div>`;
+        await ensureLocal();
       }
+      // Progress-Anzeige wird ab hier in translateLocal selbst gesetzt
+      const translated = await translateLocal(texts, src, tgt);
+      const provider = 'local';
 
       if (!isLoggedIn()) incGuestUsed();
 
@@ -428,25 +403,17 @@ function renderResults() {
   });
 }
 
+  // Extraktion läuft jetzt komplett lokal über pdfortis-clientengine.js
+  // (extractPageLocal muss vor diesem Script geladen sein, siehe index.html)
   async function extractCurrentPage() {
-    const fd = new FormData();
-    const file = new Blob([window.currentPDF], { type: 'application/pdf' });
-    fd.append('pdf', file, 'doc.pdf');
-    fd.append('page', String((window.currentPageNum || 1) - 1));
-    const r = await fetchWithTimeout(`${API_BASE}/extract`, { method: 'POST', body: fd });
-    if (!r.ok) throw new Error(`Extract failed (${r.status})`);
-    return await r.json();
-  }
-
-  async function translateServer(texts, source, target) {
-    const fd = new FormData();
-    fd.append('texts', JSON.stringify(texts));
-    fd.append('source', source);
-    fd.append('target', target);
-    const r = await fetchWithTimeout(`${API_BASE}/translate`, { method: 'POST', body: fd });
-    if (r.status === 503) throw new Error('all_server_exhausted');
-    if (!r.ok) throw new Error(`Server error ${r.status}`);
-    return await r.json();
+    if (typeof extractPageLocal !== 'function') {
+      throw new Error('pdfortis-clientengine.js nicht geladen (extractPageLocal fehlt)');
+    }
+    if (!window.currentPdfDocLocal) {
+      throw new Error('PDF not loaded');
+    }
+    const pageIndex = (window.currentPageNum || 1) - 1;
+    return await extractPageLocal(window.currentPdfDocLocal, pageIndex);
   }
 
 // ====================================================================
@@ -739,7 +706,7 @@ async function translateLocal(texts, src, tgt) {
   function schedulePreload() {
     const start = () => {
       if (state.localReady || state.localLoading) return;
-      ensureLocal().catch(() => {/* silent — server still works */});
+      ensureLocal().catch(() => {/* silent — retried on demand in runTranslate() */});
     };
     // Wait until user is in editor and idle for 4s, then preload silently
     let triggered = false;
