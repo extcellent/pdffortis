@@ -168,10 +168,13 @@ async function editBatchLocal(pdfBytes, edits){
     const pageHeight = page.getHeight();
 
     // Koordinaten-Umrechnung: unser System = oben-links/y-runter → pdf-lib = unten-links/y-hoch
+    // Extra Puffer NUR fürs Deck-Rechteck (nicht für Klickbox/Textposition), damit
+    // Unterlängen (g, q, y) des ALTEN Textes sicher komplett verdeckt werden
+    const bottomPad = (edit.y1 - edit.y) * 0.12;
     const rectX = edit.x;
-    const rectY = pageHeight - edit.y1;
+    const rectY = pageHeight - (edit.y1 + bottomPad);
     const rectW = edit.x1 - edit.x;
-    const rectH = edit.y1 - edit.y;
+    const rectH = (edit.y1 + bottomPad) - edit.y;
 
     // Rechteck in EXAKT der Vorschau-Hintergrundfarbe (nicht weiß)
     const [bgR,bgG,bgB] = _rgbStringToFloats(edit.bgColor);
