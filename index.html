@@ -3127,12 +3127,12 @@ window.addEventListener('load',()=>{
 // ── expose for pdfortis-translate.js ──────────────────────────
 Object.defineProperty(window, 'currentPDF',     { get: () => pdfBytes });
 Object.defineProperty(window, 'currentPageNum', { get: () => currentPage });
+Object.defineProperty(window, 'currentPdfDocLocal', { get: () => pdfDoc });   // NEU
 window.openAuthModal = () => document.getElementById('auth-modal')?.classList.remove('hidden');
 
 </script>
 <script src="/supabase.js"></script>
 <script src="/auth-badge.js"></script>
-<script>window.PDFORTIS_API = "https://pdffortis-api.onrender.com";</script>
 <script src="/pdfortis-clientengine.js"></script>
 <script src="/pdfortis-translate.js" defer></script>
 </body>
