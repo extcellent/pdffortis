@@ -338,6 +338,14 @@
       const texts = items.map(i => i.text);
 
       // 2. Übersetzen (nur noch lokal — kein Server mehr vorhanden)
+      const srcLangForPair = (src && src !== 'auto') ? src : 'en';
+      const pairKey = srcLangForPair + '-' + tgt;
+      if (lastTranslatedPair && lastTranslatedPair !== pairKey && workerPool.length) {
+        // Sprachpaar geändert → neues (oft viel größeres) Modell würde in den
+        // ALTEN Worker nachgeladen werden und dessen Speicher weiter aufblähen.
+        // Stattdessen: Worker jetzt sauber neu starten.
+        resetWorkerPool();
+      }
       if (!state.localReady) {
         resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Loading local model (one-time, ~250MB)…</div>`;
         await ensureLocal();
@@ -345,6 +353,13 @@
       // Progress-Anzeige wird ab hier in translateLocal selbst gesetzt
       const translated = await translateLocal(texts, src, tgt);
       const provider = 'local';
+
+      // Worker-Speicher periodisch freigeben (WASM-Memory wächst sonst
+      // unbegrenzt weiter und friert den Tab nach ein paar Übersetzungen ein).
+      translationsSinceReset++;
+      if (translationsSinceReset >= RECYCLE_AFTER_N_TRANSLATIONS) {
+        resetWorkerPool();
+      }
 
       if (!isLoggedIn()) incGuestUsed();
 
@@ -553,8 +568,26 @@ const workerCode = `
 // Ersetze getWorker() mit einem Worker-Pool
 const workerPool = [];
 
+// Zählt abgeschlossene Übersetzungen, um den Worker periodisch zu recyceln.
+// Grund: WASM-Linear-Memory kann NICHT wieder freigegeben werden, solange
+// der Worker lebt — auch nicht durch Neuzuweisen von `translator` im Worker.
+// Nur ein echtes worker.terminate() + neuer Worker gibt den Speicher zurück.
+let translationsSinceReset = 0;
+let lastTranslatedPair = null;
+const RECYCLE_AFTER_N_TRANSLATIONS = 3;
+
+function resetWorkerPool() {
+  workerPool.forEach(w => { try { w.terminate(); } catch(_) {} });
+  workerPool.length = 0;
+  state.localReady = false;
+  translationsSinceReset = 0;
+  console.log('[pft] Worker recycelt (Speicher freigegeben)');
+}
+
 function getWorkerPool() {
-  const count = Math.min(navigator.hardwareConcurrency || 2, 4);
+  const count = 1; // NUR 1 Worker — WASM-Speicher wächst nur, schrumpft nie;
+                    // mehrere Worker mit je eigenem Modell (~100-600MB) summieren
+                    // sich sonst auf und lassen den Tab nach ein paar Übersetzungen einfrieren.
   if (workerPool.length === count) return workerPool;
   
   const blob = new Blob([workerCode], { type: 'text/javascript' });
@@ -741,6 +774,19 @@ function renderOverlay() {
   const ctx = canvas.getContext('2d');
   const dpr = canvas.width / canvas.offsetWidth || 1;
 
+  // EINMAL die komplette Canvas-Pixelmatrix holen statt pro Item einzeln
+  // per ctx.getImageData() (das hat pro Aufruf spürbaren Overhead und blockiert
+  // bei textreichen Seiten den Main-Thread über hunderte Items hinweg).
+  let fullImageData = null;
+  try { fullImageData = ctx.getImageData(0, 0, canvas.width, canvas.height); } catch(_) {}
+  const fw = canvas.width, fh = canvas.height;
+  const getPixel = (px, py) => {
+    if (!fullImageData || px < 0 || py < 0 || px >= fw || py >= fh) return null;
+    const idx = (py * fw + px) * 4;
+    const d = fullImageData.data;
+    return [d[idx], d[idx+1], d[idx+2]];
+  };
+
   const overlay = document.createElement('div');
   overlay.className = 'pft-overlay' + (state.autoFit ? '' : ' wrap');
   overlay.setAttribute('data-testid', 'translate-inline-overlay');
@@ -767,9 +813,9 @@ function renderOverlay() {
 
       const samples = [];
       const pick = (px, py, weight) => {
-        if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) return;
-        const d = ctx.getImageData(px, py, 1, 1).data;
-        for (let i = 0; i < weight; i++) samples.push([d[0], d[1], d[2]]);
+        const d = getPixel(px, py);
+        if (!d) return;
+        for (let i = 0; i < weight; i++) samples.push(d);
       };
       // Ecken außerhalb der Textbox samplen
       for (let i = 1; i <= 2; i++) {
