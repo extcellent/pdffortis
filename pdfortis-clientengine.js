@@ -114,3 +114,87 @@ async function extractPageLocal(pdfDocLocal, pageIndex){
 
   return { items, pageWidth: viewport.width, pageHeight: viewport.height };
 }
+
+// ═══════════════════════════════════════
+// Schritt 3: /edit-batch → editBatchLocal()
+// ═══════════════════════════════════════
+
+function _rgbStringToFloats(str){
+  if(!str) return [1,1,1]; // Fallback: weiß
+  const m = str.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  if(!m) return [1,1,1];
+  return [parseInt(m[1])/255, parseInt(m[2])/255, parseInt(m[3])/255];
+}
+
+function _intColorToFloats(colorInt){
+  const r=(colorInt>>16)&255, g=(colorInt>>8)&255, b=colorInt&255;
+  return [r/255, g/255, b/255];
+}
+
+function _pickStandardFont(flags, fontName){
+  const fn=(fontName||'').toLowerCase();
+  const isBold   = !!(flags & 16) || fn.includes('bold');
+  const isItalic = !!(flags & 2)  || fn.includes('italic') || fn.includes('oblique');
+  const isMono   = !!(flags & 8)  || fn.includes('mono') || fn.includes('courier');
+  const isSerif  = !!(flags & 4)  || fn.includes('times') || fn.includes('serif') || fn.includes('roman');
+
+  const { StandardFonts } = PDFLib;
+  if(isMono){
+    if(isBold && isItalic) return StandardFonts.CourierBoldOblique;
+    if(isItalic) return StandardFonts.CourierOblique;
+    if(isBold) return StandardFonts.CourierBold;
+    return StandardFonts.Courier;
+  }
+  if(isSerif){
+    if(isBold && isItalic) return StandardFonts.TimesRomanBoldItalic;
+    if(isItalic) return StandardFonts.TimesRomanItalic;
+    if(isBold) return StandardFonts.TimesRomanBold;
+    return StandardFonts.TimesRoman;
+  }
+  if(isBold && isItalic) return StandardFonts.HelveticaBoldOblique;
+  if(isItalic) return StandardFonts.HelveticaOblique;
+  if(isBold) return StandardFonts.HelveticaBold;
+  return StandardFonts.Helvetica;
+}
+
+async function editBatchLocal(pdfBytes, edits){
+  const doc = await PDFLib.PDFDocument.load(pdfBytes);
+  const pages = doc.getPages();
+  const fontCache = {};
+
+  for(const edit of edits){
+    const page = pages[edit.page - 1];
+    if(!page) continue;
+    const pageHeight = page.getHeight();
+
+    // Koordinaten-Umrechnung: unser System = oben-links/y-runter → pdf-lib = unten-links/y-hoch
+    const rectX = edit.x;
+    const rectY = pageHeight - edit.y1;
+    const rectW = edit.x1 - edit.x;
+    const rectH = edit.y1 - edit.y;
+
+    // Rechteck in EXAKT der Vorschau-Hintergrundfarbe (nicht weiß)
+    const [bgR,bgG,bgB] = _rgbStringToFloats(edit.bgColor);
+    page.drawRectangle({
+      x: rectX, y: rectY, width: rectW, height: rectH,
+      color: PDFLib.rgb(bgR,bgG,bgB),
+    });
+
+    if(edit.newText && edit.newText.trim()){
+      const stdFont = _pickStandardFont(edit.flags, edit.font);
+      if(!fontCache[stdFont]) fontCache[stdFont] = await doc.embedFont(stdFont);
+      const font = fontCache[stdFont];
+
+      const [tr,tg,tb] = _intColorToFloats(edit.color || 0);
+      const baselineY = pageHeight - edit.y1 + (edit.y1 - edit.y) * 0.15;
+
+      page.drawText(edit.newText, {
+        x: edit.x, y: baselineY,
+        size: edit.size || 12,
+        font, color: PDFLib.rgb(tr,tg,tb),
+      });
+    }
+  }
+
+  return await doc.save();
+}
