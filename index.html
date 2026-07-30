@@ -1393,11 +1393,17 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
   layer.style.cssText='position:absolute;inset:0;overflow:hidden;pointer-events:none;';
 
   items.forEach(item=>{
+    // Prüfen, ob für diese Textposition schon eine gespeicherte (noch nicht heruntergeladene) Änderung existiert
+    const existingEdit = pendingEdits.find(e =>
+      e.page===pageNum && Math.abs(e.x-item.x)<1 && Math.abs(e.y-item.y)<1
+    );
+
     const span=document.createElement('span');
     span.className='pdf-text-item';
-    span.textContent=item.text;
-    span.dataset.originalText=item.text;
-    span.dataset.editedText=item.text;
+    span.textContent = existingEdit ? existingEdit.newText : item.text;
+    span.dataset.originalText = existingEdit ? existingEdit.spanOrigText : item.text;
+    span.dataset.editedText   = existingEdit ? existingEdit.newText : item.text;
+    
     span.dataset.pageNumber=pageNum;
     span.dataset.pdfX=item.x;
     span.dataset.pdfY=item.y;
@@ -1447,10 +1453,17 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
       pointer-events:${editActive?'all':'none'};
     `;
     // Original-Farbe für später speichern
+  // Original-Farbe für später speichern
     span.dataset.cssColor=rgb;
     span.dataset.cssFamily=family;
     span.dataset.cssWeight=weight;
-    span.dataset.cssStyle=style;
+    span.dataset.cssStyle=style;    
+
+    if(existingEdit){
+      span.style.color = rgb;         // sichtbar statt transparent
+      span.classList.add('is-edited');
+    }
+
     layer.appendChild(span);
   });
 
@@ -2038,6 +2051,13 @@ async function performDownload(){
       pendingEdits = [];
       pageImages = {};
       pageMasks = {};
+
+      // Bearbeitete Version wird die neue Arbeitsgrundlage — unsichtbar für den Nutzer,
+      // aber jetzt sind PDF-Bytes/Textlayer/Masken wieder konsistent zueinander
+      pdfBytes = workBytes;
+      pdfDoc = await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
+      pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
+      await renderPage(currentPage);
     }
 
 // ── Schritt 2: Add-Text & Bild-Overlays via pdf-lib einbetten ──
