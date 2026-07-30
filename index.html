@@ -1340,10 +1340,17 @@ async function renderPage(n){
   const img=pageImages[n];
   const vw=document.getElementById('canvas-area').clientWidth-48;
   const scale=Math.min(1,vw/img.width);
-  canvas.width=img.width*scale;
-  canvas.height=img.height*scale;
-  ol.style.width=canvas.width+'px';
-  ol.style.height=canvas.height+'px';
+
+  // Backing-Store bleibt IMMER nativ (fix) — nur die CSS-Anzeigegröße
+  // passt sich Viewport/Zoom an. So bleiben Pixel-Masken immer korrekt,
+  // egal bei welchem Browser-Zoom.
+  canvas.width=img.width;
+  canvas.height=img.height;
+  canvas.style.width=(img.width*scale)+'px';
+  canvas.style.height=(img.height*scale)+'px';
+
+  ol.style.width=canvas.style.width;
+  ol.style.height=canvas.style.height;
   ol.innerHTML='';
   userEls.forEach(el=>ol.appendChild(el));
   const _ctx=canvas.getContext('2d',{willReadFrequently:true});
@@ -1357,7 +1364,7 @@ async function renderPage(n){
       _ctx.fillRect(m.x,m.y,m.w,m.h);
     }
   });
-  loadTextItems(n,img.width,canvas.width);
+  loadTextItems(n, img.width, img.width*scale);
 
   document.getElementById('page-info-txt').textContent=`${n} / ${totalPages}`;
   document.querySelectorAll('.thumb-item').forEach((t,i)=>t.classList.toggle('active',i===n-1));
