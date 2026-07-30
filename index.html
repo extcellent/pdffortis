@@ -1135,6 +1135,15 @@ function redrawPageCanvas(n){
     if(m.data){ ctx.putImageData(m.data,m.x,m.y); }
     else { ctx.fillStyle=m.bg; ctx.fillRect(m.x,m.y,m.w,m.h); }
   });
+  // Falls gerade ein ANDERER Span offen/in Bearbeitung ist (noch nicht committed),
+  // dessen temporäre Maske erneut auftragen — sonst blitzt dessen alter Text
+  // hier kurz wieder auf und erzeugt Doppeltext mit dem noch offenen Span
+  const activeSpan = window.activeInlineSpan;
+  if(activeSpan && activeSpan._maskRect && parseInt(activeSpan.dataset.pageNumber,10)===n){
+    const m = activeSpan._maskRect;
+    if(m.data){ ctx.putImageData(m.data,m.x,m.y); }
+    else { ctx.fillStyle=m.bg; ctx.fillRect(m.x,m.y,m.w,m.h); }
+  }
 }
 
 document.addEventListener('keydown', e=>{
