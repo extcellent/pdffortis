@@ -95,9 +95,9 @@ async function extractPageLocal(pdfDocLocal, pageIndex){
       const tx = pdfjsLib.Util.transform(viewport.transform, it.transform);
       const fontHeight = Math.hypot(tx[2], tx[3]);
       const x  = tx[4];
-      const y  = tx[5] - fontHeight*0.8;   // Ascent
-      const x1 = tx[4] + (it.width || fontHeight*0.5*it.str.length);
-      const y1 = tx[5] + fontHeight*0.2;   // Descent
+      const y  = tx[5] - fontHeight*0.85;   // Ascent
+      const x1 = tx[4] + (it.width || fontHeight*0.5*it.str.length) + fontHeight*0.17;;
+      const y1 = tx[5] + fontHeight*0.16;   // Descent
 
       // Nur die Farbe braucht Pixel-Sampling (einzige Info, die pdf.js nicht rausgibt)
       const color = _sampleColorInBox(ctx, x*2, y*2, (x1-x)*2, (y1-y)*2);
