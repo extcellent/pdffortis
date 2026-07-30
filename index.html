@@ -1384,6 +1384,8 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
   ol.querySelector('.pdf-text-layer')?.remove();
 
   const {items, pageWidth, pageHeight}=await extractPageLocal(pdfDoc, pageNum-1);
+  window._pfItemCounts = window._pfItemCounts || {};
+  window._pfItemCounts[pageNum] = items.length;
 
   // imgWidth ist 2x (Matrix 2,2) → native PDF Breite
   const pdfNativeWidth=imgWidth/2;
@@ -1401,7 +1403,7 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
   layer.className='pdf-text-layer';
   layer.style.cssText='position:absolute;inset:0;overflow:hidden;pointer-events:none;';
 
-  items.forEach(item=>{
+  items.forEach((item, itemIdx) => {
     // Prüfen, ob für diese Textposition schon eine gespeicherte (noch nicht heruntergeladene) Änderung existiert
     const existingEdit = pendingEdits.find(e =>
       e.page===pageNum && Math.abs(e.x-item.x)<1 && Math.abs(e.y-item.y)<1
@@ -1412,6 +1414,9 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
     span.textContent = existingEdit ? existingEdit.newText : item.text;
     span.dataset.originalText = existingEdit ? existingEdit.spanOrigText : item.text;
     span.dataset.editedText   = existingEdit ? existingEdit.newText : item.text;
+
+    //neu
+    span.dataset.pdfItemIndex = itemIdx;
     
     span.dataset.pageNumber=pageNum;
     span.dataset.pdfX=item.x;
@@ -2993,7 +2998,20 @@ async function closeInlineEditor(save=true){
   const idx = pendingEdits.findIndex(e => e.page===pageNum && e.x===x && e.y===y);
   const prevEdit = idx > -1 ? {...pendingEdits[idx]} : null;
   const bgColor = _prevMaskRect ? _prevMaskRect.bg : null; // exakte Hintergrundfarbe aus der Vorschau
-  const edit = {page:pageNum, x, y, x1, y1, size, color, font, flags, newText, spanOrigText:origText, bgColor};
+  const itemIndex = parseInt(span.dataset.pdfItemIndex, 10);
+  const edit = {
+      page:pageNum,
+      x, y, x1, y1,
+      size,
+      color,
+      font,
+      flags,
+      newText,
+      spanOrigText:origText,
+      bgColor,
+      originalItemIndices: isNaN(itemIndex) ? [] : [itemIndex],
+      pdfJsTotalItemsCount: (window._pfItemCounts || {})[pageNum] || 0
+  };
   const editIdx = idx > -1 ? idx : pendingEdits.length;
   if(idx > -1) pendingEdits[idx] = edit;
   else pendingEdits.push(edit);
