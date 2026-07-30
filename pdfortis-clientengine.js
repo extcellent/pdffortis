@@ -157,47 +157,141 @@ function _pickStandardFont(flags, fontName){
   return StandardFonts.Helvetica;
 }
 
-async function editBatchLocal(pdfBytes, edits){
-  const doc = await PDFLib.PDFDocument.load(pdfBytes);
-  const pages = doc.getPages();
-  const fontCache = {};
+// Bestehende Signatur, ergänzt um die neuen Daten aus der UI
+export async function editBatchLocal(pdfDoc, pageIndex, edits, pdfJsTotalItemsCount) {
+    const pages = pdfDoc.getPages();
+    const page = pages[pageIndex];
 
-  for(const edit of edits){
-    const page = pages[edit.page - 1];
-    if(!page) continue;
-    const pageHeight = page.getHeight();
-
-    // Koordinaten-Umrechnung: unser System = oben-links/y-runter → pdf-lib = unten-links/y-hoch
-    // Extra Puffer NUR fürs Deck-Rechteck (nicht für Klickbox/Textposition), damit
-    // Unterlängen (g, q, y) des ALTEN Textes sicher komplett verdeckt werden
-    const bottomPad = (edit.y1 - edit.y) * 0.12;
-    const rectX = edit.x;
-    const rectY = pageHeight - (edit.y1 + bottomPad);
-    const rectW = edit.x1 - edit.x;
-    const rectH = (edit.y1 + bottomPad) - edit.y;
-
-    // Rechteck in EXAKT der Vorschau-Hintergrundfarbe (nicht weiß)
-    const [bgR,bgG,bgB] = _rgbStringToFloats(edit.bgColor);
-    page.drawRectangle({
-      x: rectX, y: rectY, width: rectW, height: rectH,
-      color: PDFLib.rgb(bgR,bgG,bgB),
+    // 1. Sammle alle Indices, die auf dieser Seite gelöscht werden sollen
+    let allIndicesToRemove = [];
+    edits.forEach(edit => {
+        if (edit.originalItemIndices && Array.isArray(edit.originalItemIndices)) {
+            allIndicesToRemove.push(...edit.originalItemIndices);
+        }
     });
 
-    if(edit.newText && edit.newText.trim()){
-      const stdFont = _pickStandardFont(edit.flags, edit.font);
-      if(!fontCache[stdFont]) fontCache[stdFont] = await doc.embedFont(stdFont);
-      const font = fontCache[stdFont];
-
-      const [tr,tg,tb] = _intColorToFloats(edit.color || 0);
-      const baselineY = pageHeight - edit.y1 + (edit.y1 - edit.y) * 0.15;
-
-      page.drawText(edit.newText, {
-        x: edit.x, y: baselineY,
-        size: edit.size || 12,
-        font, color: PDFLib.rgb(tr,tg,tb),
-      });
+    // 2. Führe die Surgery durch (alter Text wird gelöscht)
+    let surgerySuccessful = false;
+    if (allIndicesToRemove.length > 0) {
+        surgerySuccessful = surgicallyRemoveTextOperators(
+            pdfDoc, 
+            page, 
+            allIndicesToRemove, 
+            pdfJsTotalItemsCount // WICHTIG: Die Gesamtzahl der Items aus dem extractPageLocal Aufruf
+        );
     }
-  }
 
-  return await doc.save();
+    // 3. Neuen Text zeichnen
+    for (const edit of edits) {
+        // Wenn Surgery fehlgeschlagen ist ODER paranoidCover an ist, male das Rechteck
+        const needsCoverRect = !surgerySuccessful || edit.paranoidCover;
+
+        if (needsCoverRect) {
+            // DEINE BESTEHENDE LOGIK FÜR DAS ABDECK-RECHTECK
+            page.drawRectangle({
+                x: edit.rect.x,
+                y: edit.rect.y,
+                width: edit.rect.width,
+                height: edit.rect.height,
+                color: edit.backgroundColor || rgb(1, 1, 1), // Weiß oder Hintergrund
+            });
+        }
+
+        // DEINE BESTEHENDE LOGIK FÜR DEN NEUEN TEXT
+        page.drawText(edit.newText, {
+            x: edit.rect.x,
+            y: edit.rect.y,
+            font: edit.font,
+            size: edit.fontSize,
+            color: edit.textColor || rgb(0, 0, 0),
+        });
+    }
+
+    return pdfDoc;
+}
+
+import { PDFName, decodePDFRawStream, PDFArray, PDFRawStream } from 'pdf-lib';
+
+/**
+ * Holt den dekodierten Content-Stream als String.
+ */
+function getDecodedContentStream(page) {
+    const contents = page.node.get(PDFName.of('Contents'));
+    if (!contents) return '';
+
+    let streams = [];
+    if (contents instanceof PDFArray) {
+        for (let idx = 0; idx < contents.size(); idx++) {
+            streams.push(contents.lookup(idx));
+        }
+    } else {
+        streams.push(contents);
+    }
+
+    let fullText = '';
+    for (const stream of streams) {
+        if (stream instanceof PDFRawStream) {
+            const decoded = decodePDFRawStream(stream).decode();
+            fullText += new TextDecoder('utf-8').decode(decoded) + '\n';
+        }
+    }
+    return fullText;
+}
+
+/**
+ * Zählt Text-Operatoren (Tj, TJ, ', ") im Stream und gibt deren Start/End-Positionen im String zurück.
+ * So matchen wir die Indizes aus pdf.js.
+ */
+function mapPdfJsItemsToOps(streamString) {
+    const textOpsPositions = [];
+    // Regex findet PostScript Text-Operatoren: (Text) Tj, [ (Text) 120 (Text) ] TJ, etc.
+    // Dies ist eine Näherung, die für 99% der von pdf.js extrahierten standard Texte funktioniert.
+    const textOpRegex = /(?:<[\dA-Fa-f]*>|\([^()]*\)|\[.*?\])\s*(Tj|TJ|'|")/g;
+    
+    let match;
+    while ((match = textOpRegex.exec(streamString)) !== null) {
+        textOpsPositions.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            matchStr: match[0],
+            operator: match[1]
+        });
+    }
+    return textOpsPositions;
+}
+
+/**
+ * Operiert am Herzen des PDF-Streams: Ersetzt die Text-Operatoren an den gegebenen Indizes durch leere Strings.
+ */
+function surgicallyRemoveTextOperators(pdfDoc, page, itemIndicesToRemove, expectedTotalItems) {
+    const streamString = getDecodedContentStream(page);
+    if (!streamString) return false; // Fallback
+
+    const textOps = mapPdfJsItemsToOps(streamString);
+
+    // Alignment-Check (Safety Net)
+    if (textOps.length !== expectedTotalItems) {
+        console.warn(`[PDFortis Surgery] Alignment Check fehlgeschlagen! pdf.js Items: ${expectedTotalItems}, gefundene Ops: ${textOps.length}. Falle auf Overlay-Methode zurück.`);
+        return false;
+    }
+
+    // Sortiere Indizes absteigend, damit sich die String-Offsets beim Ersetzen nicht verschieben!
+    const sortedIndices = [...itemIndicesToRemove].sort((a, b) => b - a);
+    
+    let newStreamString = streamString;
+    for (const index of sortedIndices) {
+        if (index < 0 || index >= textOps.length) continue;
+        
+        const op = textOps[index];
+        // Ersetze den Operator durch Whitespace (no-op), damit Font-States etc. intakt bleiben
+        const blankSpace = ' '.repeat(op.end - op.start);
+        newStreamString = newStreamString.substring(0, op.start) + blankSpace + newStreamString.substring(op.end);
+    }
+
+    // Neuen Stream in die Seite schreiben
+    const newStream = pdfDoc.context.flateStream(new TextEncoder().encode(newStreamString));
+    const newStreamRef = pdfDoc.context.register(newStream);
+    
+    page.node.set(PDFName.of('Contents'), newStreamRef);
+    return true; // Surgery erfolgreich
 }
