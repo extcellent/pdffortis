@@ -158,86 +158,46 @@ function _pickStandardFont(flags, fontName){
 }
 
 async function editBatchLocal(pdfBytes, edits){
-  // Edits nach Seite gruppieren
-  const editsByPage = {};
+  const doc = await PDFLib.PDFDocument.load(pdfBytes);
+  const pages = doc.getPages();
+  const fontCache = {};
+
   for(const edit of edits){
-    (editsByPage[edit.page] = editsByPage[edit.page] || []).push(edit);
-  }
+    const page = pages[edit.page - 1];
+    if(!page) continue;
+    const pageHeight = page.getHeight();
 
-  const srcDoc   = await PDFLib.PDFDocument.load(pdfBytes);
-  const srcJsDoc = await pdfjsLib.getDocument({ data: pdfBytes.slice() }).promise;
-  const pageCount = srcDoc.getPageCount();
-  const outDoc = await PDFLib.PDFDocument.create();
+    // Koordinaten-Umrechnung: unser System = oben-links/y-runter → pdf-lib = unten-links/y-hoch
+    // Extra Puffer NUR fürs Deck-Rechteck (nicht für Klickbox/Textposition), damit
+    // Unterlängen (g, q, y) des ALTEN Textes sicher komplett verdeckt werden
+    const bottomPad = (edit.y1 - edit.y) * 0.12;
+    const rectX = edit.x;
+    const rectY = pageHeight - (edit.y1 + bottomPad);
+    const rectW = edit.x1 - edit.x;
+    const rectH = (edit.y1 + bottomPad) - edit.y;
 
-  for(let i = 0; i < pageCount; i++){
-    const pageNum = i + 1;
-    const pageEdits = editsByPage[pageNum];
-
-    if(!pageEdits){
-      // Unveränderte Seite: 1:1 kopieren → Text bleibt echt (kopierbar/durchsuchbar)
-      const [copied] = await outDoc.copyPages(srcDoc, [i]);
-      outDoc.addPage(copied);
-      continue;
-    }
-
-    // Seite MIT Edits: komplett als Rasterbild neu aufbauen.
-    // Dadurch bleibt KEIN alter Text-Vektor im Content-Stream übrig,
-    // der später wieder "auftauchen" / klickbar sein könnte.
-    const srcPage = srcDoc.getPage(i);
-    const { width: pdfW, height: pdfH } = srcPage.getSize();
-
-    const jsPage = await srcJsDoc.getPage(pageNum);
-    const scale = 2;
-    const viewport = jsPage.getViewport({ scale });
-    const off = document.createElement('canvas');
-    off.width = viewport.width;
-    off.height = viewport.height;
-    const ctx = off.getContext('2d');
-    await jsPage.render({ canvasContext: ctx, viewport }).promise;
-
-    for(const edit of pageEdits){
-      const bottomPad = (edit.y1 - edit.y) * 0.12;
-      const rx = edit.x * scale;
-      const ry = edit.y * scale;
-      const rw = (edit.x1 - edit.x) * scale;
-      const rh = (edit.y1 - edit.y + bottomPad) * scale;
-
-      const [bgR,bgG,bgB] = _rgbStringToFloats(edit.bgColor).map(v=>Math.round(v*255));
-      ctx.fillStyle = `rgb(${bgR},${bgG},${bgB})`;
-      ctx.fillRect(rx, ry, rw, rh);
-
-      if(edit.newText && edit.newText.trim()){
-        const [tr,tg,tb] = _intColorToFloats(edit.color || 0).map(v=>Math.round(v*255));
-        const fl = edit.flags || 0;
-        const fn = (edit.font || '').toLowerCase();
-        const isBold   = !!(fl & 16) || fn.includes('bold');
-        const isItalic = !!(fl & 2)  || fn.includes('italic') || fn.includes('oblique');
-        const isMono   = !!(fl & 8)  || fn.includes('mono') || fn.includes('courier');
-        const isSerif  = !!(fl & 4)  || fn.includes('times') || fn.includes('serif') || fn.includes('roman');
-        const family = isMono ? '"Courier New",monospace' : isSerif ? '"Times New Roman",serif' : 'Arial,Helvetica,sans-serif';
-
-        ctx.fillStyle = `rgb(${tr},${tg},${tb})`;
-        ctx.font = `${isItalic?'italic ':''}${isBold?'bold ':''}${(edit.size||12)*scale}px ${family}`;
-        ctx.textBaseline = 'alphabetic';
-        const baselineY = (edit.y1 - (edit.y1 - edit.y) * 0.19) * scale;
-        ctx.fillText(edit.newText, edit.x * scale, baselineY);
-      }
-    }
-
-    const pngBytes = await new Promise((resolve, reject) => {
-      off.toBlob(blob => {
-        if(!blob) return reject(new Error('toBlob failed'));
-        const fr = new FileReader();
-        fr.onload = () => resolve(new Uint8Array(fr.result));
-        fr.onerror = reject;
-        fr.readAsArrayBuffer(blob);
-      }, 'image/png');
+    // Rechteck in EXAKT der Vorschau-Hintergrundfarbe (nicht weiß)
+    const [bgR,bgG,bgB] = _rgbStringToFloats(edit.bgColor);
+    page.drawRectangle({
+      x: rectX, y: rectY, width: rectW, height: rectH,
+      color: PDFLib.rgb(bgR,bgG,bgB),
     });
 
-    const pngImage = await outDoc.embedPng(pngBytes);
-    const newPage = outDoc.addPage([pdfW, pdfH]);
-    newPage.drawImage(pngImage, { x: 0, y: 0, width: pdfW, height: pdfH });
+    if(edit.newText && edit.newText.trim()){
+      const stdFont = _pickStandardFont(edit.flags, edit.font);
+      if(!fontCache[stdFont]) fontCache[stdFont] = await doc.embedFont(stdFont);
+      const font = fontCache[stdFont];
+
+      const [tr,tg,tb] = _intColorToFloats(edit.color || 0);
+      const baselineY = pageHeight - edit.y1 + (edit.y1 - edit.y) * 0.15;
+
+      page.drawText(edit.newText, {
+        x: edit.x, y: baselineY,
+        size: edit.size || 12,
+        font, color: PDFLib.rgb(tr,tg,tb),
+      });
+    }
   }
 
-  return await outDoc.save();
+  return await doc.save();
 }
