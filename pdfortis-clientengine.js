@@ -117,9 +117,10 @@ async function extractPageLocal(pdfDocLocal, pageIndex){
     if(!it.str || !it.str.trim()) continue;
     const tx = pdfjsLib.Util.transform(viewport.transform, it.transform);
     const fontHeight = Math.hypot(tx[2], tx[3]);
-    const roughX = tx[4], roughY = tx[5] - fontHeight*1.15;
-    const roughW = (it.width || fontHeight*0.5*it.str.length) + fontHeight*0.15;
-    const roughH = fontHeight*1.5; // Puffer für Unter-/Oberlängen (g,y,ä)
+    const roughX = tx[4] - fontHeight*0.2;
+    const roughY = tx[5] - fontHeight*1.5;   // deutlich mehr Platz nach oben (Umlaute, Akzente)
+    const roughW = (it.width || fontHeight*0.5*it.str.length) + fontHeight*0.5;
+    const roughH = fontHeight*2.2;           // deutlich mehr Platz für Ober-/Unterlängen
 
     // Scan auf 2x-Canvas → Region *2
     const box = _scanTextBox(ctx, roughX*2, roughY*2, roughW*2, roughH*2);
@@ -129,8 +130,9 @@ async function extractPageLocal(pdfDocLocal, pageIndex){
       x = box.x/2; y = box.y/2; x1 = (box.x+box.w)/2; y1 = (box.y+box.h)/2;
       color = (box.fg[0]<<16)|(box.fg[1]<<8)|box.fg[2];
     }else{
-      // Fallback auf Metrik-Schätzung, falls z.B. reiner Whitespace-Treffer
-      x=roughX; y=roughY; x1=roughX+roughW; y1=roughY+roughH; color=0x000000;
+      // Fallback: engere Metrik-Schätzung statt des überbreiten Suchfensters
+      x=tx[4]; y=tx[5]-fontHeight*1.0; x1=tx[4]+(it.width||fontHeight*0.5*it.str.length); y1=tx[5]+fontHeight*0.3;
+      color=0x000000;
     }
 
     const styleInfo = textContent.styles[it.fontName] || {};
