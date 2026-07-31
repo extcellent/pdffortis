@@ -884,7 +884,7 @@ function renderOverlay() {
     const pdfR = (c >> 16) & 255, pdfG = (c >> 8) & 255, pdfB = c & 255;
     const luminance = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
     const textColor = (pdfR === 0 && pdfG === 0 && pdfB === 0)
-      ? (luminance > 180 ? 'rgb(15,23,42)' : 'rgb(240,240,240)')
+      ? (luminance > 120 ? 'rgb(15,23,42)' : 'rgb(240,240,240)')
       : `rgb(${pdfR},${pdfG},${pdfB})`;
 
     let fs = it.size * scaleY * 0.95;
@@ -912,12 +912,26 @@ function renderOverlay() {
 
   // re-position overlay if window resizes / canvas re-renders
   window.addEventListener('resize', () => renderOverlay());
+
+  // Overlay beim Klick aufs PDF (z.B. um "Edit Text" zu benutzen) kurz ausblenden.
+  // pointer-events:none lässt Klicks zwar technisch durch, aber der deckende
+  // Overlay-Hintergrund verdeckt visuell alles, was darunter beim Editieren passiert
+  // (Cursor, Eingabe) — sieht dann aus wie "nicht mehr editierbar".
+  let overlaySuppressUntil = 0;
+  document.addEventListener('mousedown', (e) => {
+    const canvas = document.getElementById('pdf-canvas');
+    if (canvas && (e.target === canvas || canvas.contains(e.target))) {
+      removeOverlay();
+      overlaySuppressUntil = Date.now() + 2000; // kurze Schonfrist fürs Editieren
+    }
+  }, true);
+
   // when user changes page, drop overlay (it belongs to old page)
   const pageWatcher = setInterval(() => {
     if (!state.lastResult) return;
     if (state.lastResult.page !== (window.currentPageNum || 1)) {
       removeOverlay();
-    } else if (state.overlayOn && !document.querySelector('.pft-overlay')) {
+    } else if (state.overlayOn && !document.querySelector('.pft-overlay') && Date.now() > overlaySuppressUntil) {
       renderOverlay();
     }
   }, 600);
