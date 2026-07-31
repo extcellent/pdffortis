@@ -700,24 +700,37 @@ async function translateLocal(texts, src, tgt) {
   const T0 = performance.now();
   console.log('[pft] translateLocal via WASM-Worker START', { totalTexts: texts.length, src: srcLang, tgt });
 
-// NEU — filtert Nummern, reine Satzzeichen, sehr kurze Tokens die kein Modell braucht:
+// NEU — filtert Nummern, reine Satzzeichen, Daten/Zeiträume, sehr kurze Tokens die kein Modell braucht:
   const isAllCaps  = s => /[A-Z]/.test(s) && !/[a-zäöüß]/.test(s);
+
+  // Datum / Zeitraum-Muster — deckt jetzt auch ab:
+  //   "05/2015"            (Monat/Jahr, nur 2 Gruppen)
+  //   "05/2015 – 09/2018"  (Zeitraum mit Halbgeviertstrich –, nicht nur "-")
+  //   "2005 – 2014"        (reiner Jahres-Zeitraum)
+  //   "01.01.2024"         (volles Datum, wie bisher)
+  const DATE_RANGE = /^\d{1,4}([./]\d{1,4}){0,2}(\s*[-–—]\s*\d{1,4}([./]\d{1,4}){0,2})?$/;
+
   const isSkippable = s =>
   s.length < 2 ||
-  /^[\d\s.,;:!?()%€$£\-/\\]+$/.test(s) ||          // reine Zahlen/Satzzeichen
+  /^[\d\s.,;:!?()%€$£\-–—/\\]+$/.test(s) ||          // reine Zahlen/Satzzeichen (jetzt inkl. – und —)
+  DATE_RANGE.test(s) ||                              // Datum / Zeitraum, siehe oben
   /^§/.test(s) ||                                    // §-Zeichen
-  /\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/.test(s) ||     // Datum 01.01.2024
   /@/.test(s) ||                                     // E-Mail
-  /^(Dr|Prof|Mr|Mrs|Ms|Herr|Frau|Ing|Mag)\.?\s+[A-Z][a-z]/.test(s) || // Titel + Name
-  /^[A-Z][a-z]+ [A-Z][a-z]+$/.test(s) ||            // Vor- + Nachname
-  /^[A-Z][a-z]+ [A-Z][a-z]+ [A-Z][a-z]+$/.test(s); // Vor- + Mittel- + Nachname
+  /^(Dr|Prof|Mr|Mrs|Ms|Herr|Frau|Ing|Mag)\.?\s+[A-Z][a-z]/.test(s); // Titel + Name
+  // Hinweis: die bisherigen pauschalen "Vorname Nachname" / "Vor- Mittel- Nachname"
+  // Muster wurden entfernt — sie matchten JEDE zwei-/dreiwortige Title-Case-Phrase
+  // (z.B. "Handwerkliches Geschick", "Schnelle Auffassungsgabe") und verhinderten
+  // so fälschlich deren Übersetzung.
 
   const cache = new Map();
   const jobs = [];
   texts.forEach((t, index) => {
     const cleaned = (t || '').trim();
-    if (isSkippable(cleaned)) return;          // Nummern, Satzzeichen → überspringen
-    if (isAllCaps(cleaned)) {                  // Abkürzungen → 1:1 kopieren
+    if (isSkippable(cleaned) || isAllCaps(cleaned)) {
+      // Nummern, Daten, Satzzeichen, Abkürzungen → 1:1 übernehmen statt übersetzen.
+      // WICHTIG: trotzdem in `jobs` aufnehmen, sonst bleibt der Ausgabe-Slot leer
+      // (out[] ist mit '' vorbefüllt) und der Text verschwindet komplett aus
+      // Vorschau UND Download, statt einfach unübersetzt sichtbar zu bleiben.
       cache.set(cleaned, cleaned);
       jobs.push({ index, key: cleaned });
       return;
@@ -979,6 +992,8 @@ function renderOverlay() {
     window.PFTranslate = {
       open: openModal,
       run: runTranslate,
+      renderOverlay,
+      removeOverlay,
       state,
     };
   }
