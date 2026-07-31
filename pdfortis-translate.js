@@ -515,7 +515,19 @@
         }
 
         const extracted = await extractPageLocal(window.currentPdfDocLocal, pageNum - 1);
-        const items = extracted.items || [];
+  
+        function stripDotLeaders(text) {
+          return text
+            .replace(/[.\s]{3,}$/g, '')
+            .replace(/^[.\s]{3,}/g, '')
+            .trim();
+        }
+        
+        const items = (extracted.items || [])
+          .map(it => ({ ...it, text: stripDotLeaders(it.text) }))
+          .filter(it => it.text.length > 0);
+
+        
         console.log('[pft] extracted', { page: pageNum, items: items.length, w: extracted.pageWidth, h: extracted.pageHeight });
 
         if (!items.length) {
