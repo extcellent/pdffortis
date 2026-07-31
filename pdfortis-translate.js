@@ -379,6 +379,12 @@
     return Math.abs(ar - br) + Math.abs(ag - bg) + Math.abs(ab - bb);
   }
 
+  function _avgColor(colors) {        
+    let r = 0, g = 0, b = 0;
+    colors.forEach(c => { r += (c >> 16) & 255; g += (c >> 8) & 255; b += c & 255; });
+    const n = colors.length || 1;
+    return (Math.round(r / n) << 16) | (Math.round(g / n) << 8) | Math.round(b / n);
+  }
   
   function groupItemsIntoParagraphs(items) {
     const blocks = [];
@@ -399,7 +405,7 @@
         size: first.size,
         font: first.font,
         flags: first.flags,
-        color: first.color,
+        color: _avgColor(currentIdxs.map(i => items[i].color)),   // ← GEÄNDERT (statt first.color)
       });
     };
 
