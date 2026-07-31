@@ -2203,6 +2203,14 @@ async function performDownload(){
     }
 
    // ── Schritt 2b: Translation Overlays via pdf-lib einbetten ──
+    const pft = window.PFTranslate;
+    const overlayWasOff = !!pft && !pft.state.overlayOn && !!pft.state.lastResult
+      && pft.state.lastResult.page === (window.currentPageNum || 1);
+    // Overlay kurz erzwingen, falls der "Inline"-Toggle gerade aus ist —
+    // sonst gibt querySelectorAll unten 0 Treffer und die Übersetzung
+    // landet nie im Download, obwohl sie erfolgreich generiert wurde.
+    if (overlayWasOff) { pft.state.overlayOn = true; pft.renderOverlay(); }
+
     const transOverlays = document.querySelectorAll('.pft-overlay-item');
     if(transOverlays.length > 0){
       const doc2 = await PDFLib.PDFDocument.load(workBytes);
@@ -2247,6 +2255,8 @@ async function performDownload(){
       });
       workBytes = await doc2.save();
     } 
+    // Overlay-Zustand zurücksetzen, falls wir ihn nur für den Export erzwungen haben
+    if (overlayWasOff) { pft.state.overlayOn = false; pft.removeOverlay(); }
     
     // ── Schritt 3: Download ──
     const blob = new Blob([workBytes],{type:'application/pdf'});
