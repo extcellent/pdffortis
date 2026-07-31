@@ -430,6 +430,33 @@
     return blocks;
   }
 
+  
+  function mergeBrokenSentences(blocks) {
+    const out = [];
+    for (const b of blocks) {
+      const prev = out[out.length - 1];
+      if (prev) {
+        const prevEndsMidSentence = !/[.!?:]\s*$/.test(prev.text.trim());
+        const sameFontSize = prev.font === b.font && Math.abs(prev.size - b.size) < 1;
+        // NEU: nur mergen wenn räumlich in derselben Spalte UND direkt untereinander
+        const xMatch = Math.abs(prev.x - b.x) <= Math.max(PARA_X_TOLERANCE_MIN, prev.size * 0.5);
+        const gap = b.y - prev.y1; // Abstand von Unterkante prev bis Oberkante b
+        const gapPlausible = gap >= 0 && gap <= prev.size * PARA_LINE_GAP_MAX * 2.2; // etwas großzügiger als normales Zeilen-Grouping, deckt Absatz-Leerzeile ab
+  
+        if (prevEndsMidSentence && sameFontSize && xMatch && gapPlausible) {
+          prev.itemIndices.push(...b.itemIndices);
+          prev.text += ' ' + b.text;
+          prev.x = Math.min(prev.x, b.x);
+          prev.x1 = Math.max(prev.x1, b.x1);
+          prev.y1 = b.y1;
+          continue;
+        }
+      }
+      out.push({ ...b });
+    }
+    return out;
+  }
+
   // Verteilt den übersetzten Block-Text grob proportional (nach Zeichen-
   // anteil der Original-Zeile am Gesamtblock) auf die einzelnen Original-
   // Zeilen zurück. Nur kosmetisch für die Zeilen-Ansicht (renderResults/
@@ -521,7 +548,7 @@
         // zusammenhängender Text an die Übersetzung übergeben (Kontext
         // bleibt erhalten statt einzelner, mitten im Satz abgeschnittener
         // Zeilenfragmente).
-        const blocks = groupItemsIntoParagraphs(items);
+        const blocks = mergeBrokenSentences(groupItemsIntoParagraphs(items));
         const blockTexts = blocks.map(b => b.text);
         const { translated, provider } = await translatePageTexts(blockTexts, src, tgt, resultsBox);
 
