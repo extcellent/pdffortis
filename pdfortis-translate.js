@@ -365,10 +365,21 @@
   //      wenn die reine Größen-Schwelle sie noch durchlassen würde
   //   4. ähnliche linke X-Startposition (linksbündiger Fließtext)
   // ────────────────────────────────────────────────────────────────
-  const PARA_LINE_GAP_MAX = 1.4;      // gap <= size * dieser Faktor
-  const PARA_REF_GAP_TOLERANCE = 1.15; // gap <= referenceGap * dieser Faktor
+  const PARA_LINE_GAP_MAX = 1.65;      // gap <= size * dieser Faktor
+  const PARA_REF_GAP_TOLERANCE = 1.3; // gap <= referenceGap * dieser Faktor
   const PARA_X_TOLERANCE_MIN = 4;     // pt, Mindest-Toleranz für X-Start
+  const PARA_COLOR_TOLERANCE = 40;     // Manhattan-Distanz RGB; Überschrift-Akzentfarbe vs. Fließtext liegt i.d.R. weit drüber
 
+  // Farbabstand mit Toleranz (statt exaktem Vergleich) — Farbsampling pro
+  // Zeile hat leichtes Rauschen (Anti-Aliasing), auch innerhalb eines
+  // einfarbigen Absatzes. Grobe Manhattan-Distanz über RGB reicht.
+  function _colorDelta(a, b) {
+    const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+    const br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
+    return Math.abs(ar - br) + Math.abs(ag - bg) + Math.abs(ab - bb);
+  }
+
+  
   function groupItemsIntoParagraphs(items) {
     const blocks = [];
     let currentIdxs = null;
@@ -400,12 +411,13 @@
 
       const fontMatch = prev.font === cur.font && prev.flags === cur.flags;
       const sizeMatch = Math.abs(prev.size - cur.size) <= Math.max(0.4, prev.size * 0.08);
+      const colorMatch = _colorDelta(prev.color, cur.color) <= PARA_COLOR_TOLERANCE;
       const gap = cur.y - prev.y;
       const gapPlausible = gap > 0 && gap <= prev.size * PARA_LINE_GAP_MAX;
       const gapConsistent = referenceGap === null || gap <= referenceGap * PARA_REF_GAP_TOLERANCE;
       const xMatch = Math.abs(prev.x - cur.x) <= Math.max(PARA_X_TOLERANCE_MIN, prev.size * 0.35);
 
-      if (fontMatch && sizeMatch && gapPlausible && gapConsistent && xMatch) {
+      if (fontMatch && sizeMatch && colorMatch && gapPlausible && gapConsistent && xMatch) {
         currentIdxs.push(i);
         referenceGap = referenceGap === null ? gap : (referenceGap * 0.7 + gap * 0.3);
       } else {
