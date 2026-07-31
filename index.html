@@ -2220,11 +2220,22 @@ async function performDownload(){
             x: pdfX2, y: pdfY2, width: it.w * scaleX2, height: it.h * scaleY2,
             color: PDFLib.rgb(it.bg[0]/255, it.bg[1]/255, it.bg[2]/255),
           });
-          page2.drawText(it.text, {
-            x: pdfX2, y: pdfY2 + it.h * scaleY2 * 0.15,
-            size: Math.max(6, it.fontSize * scaleY2),
-            font: font2,
-            color: PDFLib.rgb(it.color[0]/255, it.color[1]/255, it.color[2]/255),
+          // it.lines: Array bereits umgebrochener Zeilen (buildDownloadOverlayData()
+          // liefert seit der Absatz-Gruppierung mehrzeiligen Text). PDFLib bricht
+          // \n nicht selbst um -> zeilenweise zeichnen, von oben nach unten.
+          const lines = it.lines && it.lines.length ? it.lines : [it.text];
+          const lineHeightPdf = (it.lineHeight || it.fontSize * 1.18) * scaleY2;
+          const fontSizePdf = Math.max(6, it.fontSize * scaleY2);
+          let lineY = pdfY2 + it.h * scaleY2 - lineHeightPdf * 0.85;
+          lines.forEach(lineText => {
+            if (lineY < pdfY2) return; // Absatz überläuft nach unten -> abschneiden statt Nachbartext zu überschreiben
+            page2.drawText(lineText, {
+              x: pdfX2, y: lineY,
+              size: fontSizePdf,
+              font: font2,
+              color: PDFLib.rgb(it.color[0]/255, it.color[1]/255, it.color[2]/255),
+            });
+            lineY -= lineHeightPdf;
           });
         });
       }
