@@ -788,22 +788,54 @@ async function translateLocal(texts, src, tgt) {
   }
   const pool = getWorkerPool();
   let doneCount = 0;
-  const results = await Promise.all(allChunks.map((chunk, idx) => {
+  // Übersetzt einen einzelnen Chunk (1..N Texte) über den Worker.
+  async function translateChunk(chunk, idx) {
     const worker = pool[idx % pool.length];
     const chunkId = ++chunkCounter;
-    return new Promise((resolve, reject) => {
-      pendingChunks.set(chunkId, { resolve, reject });
-      worker.postMessage({ type: 'translate', data: { chunk, srcLang, tgt, chunkId } });
-    }).then(result => {
+    try {
+      const result = await new Promise((resolve, reject) => {
+        pendingChunks.set(chunkId, { resolve, reject });
+        worker.postMessage({ type: 'translate', data: { chunk, srcLang, tgt, chunkId } });
+      });
+      return { chunk, result };
+    } catch (err) {
+      console.warn('[pft] Chunk-Übersetzung fehlgeschlagen, retry einzeln', chunk, err);
+      // Fallback: statt den GANZEN Chunk (bis zu 8 Texte) unübersetzt zu lassen,
+      // jeden Text einzeln (Batchgröße 1) neu versuchen — das umgeht das
+      // Tensor-Shape-Problem, das offenbar durch gemischte Batch-Längen entsteht.
+      const singleResults = [];
+      for (const text of chunk) {
+        const singleId = ++chunkCounter;
+        try {
+          const r = await new Promise((resolve, reject) => {
+            pendingChunks.set(singleId, { resolve, reject });
+            worker.postMessage({ type: 'translate', data: { chunk: [text], srcLang, tgt, chunkId: singleId } });
+          });
+          const arr = Array.isArray(r) ? r : [r];
+          singleResults.push(arr[0]);
+        } catch (err2) {
+          console.warn('[pft] Einzel-Übersetzung ebenfalls fehlgeschlagen, behalte Original', text, err2);
+          singleResults.push(null); // → fällt unten auf Original zurück
+        } finally {
+          pendingChunks.delete(singleId);
+        }
+      }
+      return { chunk, result: singleResults };
+    } finally {
+      pendingChunks.delete(chunkId);
+    }
+  }
+
+  const results = await Promise.all(allChunks.map((chunk, idx) =>
+    translateChunk(chunk, idx).then(r => {
       doneCount += chunk.length;
       if (resultsBox?.isConnected) {
         const pct = Math.round((doneCount / todo.length) * 100);
         resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Translating… ${pct}% (${doneCount}/${todo.length} segments)</div>`;
       }
-      return { chunk, result };
-    }).catch(() => ({ chunk, result: null }))
-      .finally(() => pendingChunks.delete(chunkId));
-  }));
+      return r;
+    })
+  ));
   results.forEach(({ chunk, result }) => {
     const arr = Array.isArray(result) ? result : [result];
     chunk.forEach((srcStr, j) => {
