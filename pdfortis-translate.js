@@ -430,24 +430,7 @@
     closeCurrent();
     return blocks;
   }
-  function mergeBrokenSentences(blocks) {
-  const out = [];
-  for (const b of blocks) {
-    const prev = out[out.length - 1];
-    const prevEndsMidSentence = prev && !/[.!?:]\s*$/.test(prev.text.trim());
-    const sameFontSize = prev && prev.font === b.font && Math.abs(prev.size - b.size) < 1;
-    if (prev && prevEndsMidSentence && sameFontSize) {
-      prev.itemIndices.push(...b.itemIndices);
-      prev.text += ' ' + b.text;
-      prev.x = Math.min(prev.x, b.x);
-      prev.x1 = Math.max(prev.x1, b.x1);
-      prev.y1 = b.y1;
-    } else {
-      out.push({ ...b });
-    }
-  }
-  return out;
-}
+
 
   // Verteilt den übersetzten Block-Text grob proportional (nach Zeichen-
   // anteil der Original-Zeile am Gesamtblock) auf die einzelnen Original-
@@ -536,11 +519,8 @@
           continue;
         }
 
-        // NEU: Zeilen zu Absätzen gruppieren, dann pro Absatz EIN
-        // zusammenhängender Text an die Übersetzung übergeben (Kontext
-        // bleibt erhalten statt einzelner, mitten im Satz abgeschnittener
-        // Zeilenfragmente).
-        const blocks = mergeBrokenSentences(groupItemsIntoParagraphs(items));
+
+        const blocks = groupItemsIntoParagraphs(items);
         const blockTexts = blocks.map(b => b.text);
         const { translated, provider } = await translatePageTexts(blockTexts, src, tgt, resultsBox);
 
