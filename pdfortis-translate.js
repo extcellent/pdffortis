@@ -363,7 +363,23 @@
     const resultsBox = document.getElementById('pft-results');
     resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Extracting & translating…</div>`;
 
-    state.translating = true;
+  state.translating = true;
+
+    // Ungespeicherte Edit-Text-Änderungen vor der Übersetzung einbetten —
+    // sonst liest extractPageLocal() noch window.currentPdfDocLocal (=pdfDoc)
+    // in der alten, unbearbeiteten Version (Edits werden sonst erst beim
+    // Download in performDownload() Schritt 1 gebacken).
+    if (typeof pendingEdits !== 'undefined' && pendingEdits.length > 0 && typeof editBatchLocal === 'function') {
+      try {
+        const workBytes = await editBatchLocal(pdfBytes, pendingEdits);
+        pendingEdits.length = 0;
+        pdfBytes = workBytes;
+        pdfDoc = await pdfjsLib.getDocument({ data: pdfBytes.slice() }).promise;
+        pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
+      } catch (e) {
+        console.warn('[pft] konnte pendingEdits vor Übersetzung nicht einbetten', e);
+      }
+    }
 
     try {
       if (typeof extractPageLocal !== 'function') throw new Error('pdfortis-clientengine.js nicht geladen (extractPageLocal fehlt)');
@@ -970,9 +986,13 @@ function renderOverlay() {
 
   // Beim Seitenwechsel: Overlay der neuen Seite anzeigen, falls dafür bereits
   // eine Übersetzung in resultsByPage vorliegt — sonst Overlay entfernen.
+  // Solange der Edit-Text-Editor aktiv ist (window.activeInlineSpan gesetzt),
+  // NIE das Overlay zurückrendern — sonst deckt es den Editor bei längeren
+  // Edits wieder zu, sobald die feste 2s-Schonfrist abgelaufen ist.
   const pageWatcher = setInterval(() => {
     const res = currentPageResult();
     if (!res) { removeOverlay(); return; }
+    if (window.activeInlineSpan) { removeOverlay(); return; }
     if (state.overlayOn && !document.querySelector('.pft-overlay') && Date.now() > overlaySuppressUntil) {
       renderOverlay();
     }
