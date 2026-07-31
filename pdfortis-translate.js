@@ -528,7 +528,6 @@
         }
 
         const extracted = await extractPageLocal(window.currentPdfDocLocal, pageNum - 1);
-        const items = extracted.items || [];
         const items = (extracted.items || []).filter(it => !DECORATIVE_RE.test(it.text));
         console.log('[pft] extracted', { page: pageNum, items: items.length, w: extracted.pageWidth, h: extracted.pageHeight });
 
