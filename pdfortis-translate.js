@@ -34,10 +34,11 @@
     localLoading: false,
     localError: null,
     translator: null,        // Transformers.js pipeline
-    lastResult: null,        // { items:[{orig,trans,...}], page, source, target, provider }
+    resultsByPage: {},       // { [pageNum]: { items:[{orig,trans,...}], page, pageWidth, pageHeight, source, target, provider } }
     overlayOn: false,
     autoFit: true,           // pro-mode: auto-shrink + small overflow tolerance
   };
+  function currentPageResult() { return state.resultsByPage[window.currentPageNum || 1] || null; }
 
   // --------------------------------------------------------------
   // 2. LANGUAGES (m2m100 codes; identical to ISO-639-1 for these)
@@ -161,6 +162,15 @@
             <label style="font-size:12px;color:#64748b;font-weight:600">To</label>
             <select class="pft-sel" id="pft-tgt" data-testid="translate-tgt"></select>
             <button class="pft-go" id="pft-run" data-testid="translate-run-btn">Translate page</button>
+          </div>
+          <div class="pft-row" data-testid="translate-scope-row" style="gap:14px">
+            <label style="font-size:12px;color:#64748b;font-weight:600">Umfang</label>
+            <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer">
+              <input type="radio" name="pft-scope" value="current" id="pft-scope-current" checked/> Nur diese Seite
+            </label>
+            <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer">
+              <input type="radio" name="pft-scope" value="all" id="pft-scope-all"/> Alle Seiten
+            </label>
           </div>
           <div class="pft-row" style="gap:18px">
             <label class="pft-toggle" data-testid="translate-inline-toggle">
@@ -307,6 +317,35 @@
 // --------------------------------------------------------------
   // 6. TRANSLATION FLOW (100% lokal — kein Server-Fetch mehr)
   // --------------------------------------------------------------
+  // Übersetzt ein Array von Texten für EIN Sprachpaar (Modell-Load, Same-Language-
+  // Skip, Worker-Recycling) — ausgelagert, damit sowohl "nur diese Seite" als
+  // auch "alle Seiten" dieselbe Logik pro Seite wiederverwenden können.
+  async function translatePageTexts(texts, src, tgt, resultsBox) {
+    const srcLangForPair = (src && src !== 'auto') ? src : 'en';
+    const pairKey = srcLangForPair + '-' + tgt;
+
+    if (srcLangForPair === tgt) {
+      console.warn('[pft] Quelle und Ziel identisch — Übersetzung übersprungen', pairKey);
+      return { translated: texts.slice(), provider: 'skipped (same language)' };
+    }
+
+    if (lastTranslatedPair && lastTranslatedPair !== pairKey && workerPool.length) {
+      resetWorkerPool();
+    }
+    if (!state.localReady) {
+      if (resultsBox) resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Loading local model (one-time, ~250MB)…</div>`;
+      await ensureLocal();
+    }
+    const translated = await translateLocal(texts, src, tgt);
+    lastTranslatedPair = pairKey;
+
+    translationsSinceReset++;
+    if (translationsSinceReset >= RECYCLE_AFTER_N_TRANSLATIONS) {
+      resetWorkerPool();
+    }
+    return { translated, provider: 'local' };
+  }
+
   async function runTranslate() {
     const gate = canTranslate();
     if (!gate.ok) {
@@ -316,71 +355,54 @@
     }
     const src = document.getElementById('pft-src').value;
     const tgt = document.getElementById('pft-tgt').value;
+    const scope = document.querySelector('input[name="pft-scope"]:checked')?.value || 'current';
     const btn = document.getElementById('pft-run');
     btn.disabled = true;
     btn.innerHTML = `<span class="pft-spin"></span>Working…`;
-    
+
     const resultsBox = document.getElementById('pft-results');
     resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Extracting & translating…</div>`;
 
     state.translating = true;
-    
+
     try {
-      // 1. Text extrahieren (mit Timeout)
-      const extracted = await extractCurrentPage();
-      const items = extracted.items || [];
-      console.log('[pft] extracted', { items: items.length, w: extracted.pageWidth, h: extracted.pageHeight });
+      if (typeof extractPageLocal !== 'function') throw new Error('pdfortis-clientengine.js nicht geladen (extractPageLocal fehlt)');
+      if (!window.currentPdfDocLocal) throw new Error('PDF not loaded');
+      const totalPages = window.currentPdfDocLocal.numPages || 1;
+      const pagesToProcess = scope === 'all'
+        ? Array.from({ length: totalPages }, (_, i) => i + 1)
+        : [window.currentPageNum || 1];
 
-      if (!items.length) {
-        resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1">No selectable text found on this page.</div>`;
-        return;
-      }
-      const texts = items.map(i => i.text);
-
-      // 2. Übersetzen (nur noch lokal — kein Server mehr vorhanden)
-      const srcLangForPair = (src && src !== 'auto') ? src : 'en';
-      const pairKey = srcLangForPair + '-' + tgt;
-
-      let translated, provider;
-      if (srcLangForPair === tgt) {
-        // Quelle == Ziel (z.B. Auto-detect → 'en' UND Zielsprache 'en'):
-        // Keine sinnlose 600MB-NLLB-Ladung starten, sondern Text 1:1 übernehmen.
-        console.warn('[pft] Quelle und Ziel identisch — Übersetzung übersprungen', pairKey);
-        translated = texts.slice();
-        provider = 'skipped (same language)';
-      } else {
-        if (lastTranslatedPair && lastTranslatedPair !== pairKey && workerPool.length) {
-          // Sprachpaar geändert → neues (oft viel größeres) Modell würde in den
-          // ALTEN Worker nachgeladen werden und dessen Speicher weiter aufblähen.
-          // Stattdessen: Worker jetzt sauber neu starten.
-          resetWorkerPool();
+      let anyTranslated = false;
+      for (let p = 0; p < pagesToProcess.length; p++) {
+        const pageNum = pagesToProcess[p];
+        if (pagesToProcess.length > 1) {
+          resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Page ${pageNum}/${totalPages} — extracting…</div>`;
         }
-        if (!state.localReady) {
-          resultsBox.innerHTML = `<div class="pft-empty" style="grid-column:1 / -1"><span class="pft-spin"></span>Loading local model (one-time, ~250MB)…</div>`;
-          await ensureLocal();
-        }
-        // Progress-Anzeige wird ab hier in translateLocal selbst gesetzt
-        translated = await translateLocal(texts, src, tgt);
-        provider = 'local';
-        lastTranslatedPair = pairKey;
 
-        // Worker-Speicher periodisch freigeben (WASM-Memory wächst sonst
-        // unbegrenzt weiter und friert den Tab nach ein paar Übersetzungen ein).
-        translationsSinceReset++;
-        if (translationsSinceReset >= RECYCLE_AFTER_N_TRANSLATIONS) {
-          resetWorkerPool();
+        const extracted = await extractPageLocal(window.currentPdfDocLocal, pageNum - 1);
+        const items = extracted.items || [];
+        console.log('[pft] extracted', { page: pageNum, items: items.length, w: extracted.pageWidth, h: extracted.pageHeight });
+
+        if (!items.length) {
+          state.resultsByPage[pageNum] = { page: pageNum, pageWidth: extracted.pageWidth, pageHeight: extracted.pageHeight, items: [], source: src, target: tgt, provider: 'empty' };
+          continue;
         }
+
+        const texts = items.map(i => i.text);
+        const { translated, provider } = await translatePageTexts(texts, src, tgt, resultsBox);
+
+        state.resultsByPage[pageNum] = {
+          page: pageNum,
+          pageWidth: extracted.pageWidth,
+          pageHeight: extracted.pageHeight,
+          items: items.map((it, idx) => ({ ...it, trans: translated[idx] || '' })),
+          source: src, target: tgt, provider,
+        };
+        anyTranslated = true;
       }
 
-      if (!isLoggedIn()) incGuestUsed();
-
-      state.lastResult = {
-        page: window.currentPageNum || 1,
-        pageWidth: extracted.pageWidth,
-        pageHeight: extracted.pageHeight,
-        items: items.map((it, idx) => ({ ...it, trans: translated[idx] || '' })),
-        source: src, target: tgt, provider,
-      };
+      if (anyTranslated && !isLoggedIn()) incGuestUsed();
 
       renderResults();
       renderOverlay();
@@ -397,10 +419,11 @@
   }
 
 function renderResults() {
-  if (!state.lastResult) return;
+  const res = currentPageResult();
+  if (!res) return;
   const resultsBox = document.getElementById('pft-results');
   if (!resultsBox) return;
-  const items = state.lastResult.items;
+  const items = res.items;
 
   const origCol = document.createElement('div');
   origCol.className = 'pft-col';
@@ -431,16 +454,8 @@ function renderResults() {
 
   // Extraktion läuft jetzt komplett lokal über pdfortis-clientengine.js
   // (extractPageLocal muss vor diesem Script geladen sein, siehe index.html)
-  async function extractCurrentPage() {
-    if (typeof extractPageLocal !== 'function') {
-      throw new Error('pdfortis-clientengine.js nicht geladen (extractPageLocal fehlt)');
-    }
-    if (!window.currentPdfDocLocal) {
-      throw new Error('PDF not loaded');
-    }
-    const pageIndex = (window.currentPageNum || 1) - 1;
-    return await extractPageLocal(window.currentPdfDocLocal, pageIndex);
-  }
+  // — wird jetzt direkt in runTranslate() pro Seite aufgerufen (extractPageLocal
+  // ist global aus clientengine.js verfügbar).
 
 // ====================================================================
 // 7. LOCAL ENGINE (ULTRA-STABILER WASM-WORKER — KEIN HÄNGEN, VOLLSTÄNDIGER TEXT)
@@ -818,8 +833,8 @@ async function translateLocal(texts, src, tgt) {
 
 function renderOverlay() {
   removeOverlay();
-  if (!state.overlayOn || !state.lastResult) return;
-  if (state.lastResult.page !== (window.currentPageNum || 1)) return;
+  const res = currentPageResult();
+  if (!state.overlayOn || !res) return;
 
   const canvas = document.getElementById('pdf-canvas');
   const wrap   = document.getElementById('canvas-wrap');
@@ -846,16 +861,21 @@ function renderOverlay() {
   overlay.setAttribute('data-testid', 'translate-inline-overlay');
   overlay.style.cssText = `position:absolute;pointer-events:none;z-index:5;left:${canvas.offsetLeft}px;top:${canvas.offsetTop}px;width:${canvas.offsetWidth}px;height:${canvas.offsetHeight}px;`;
 
-  const scaleX = canvas.offsetWidth  / state.lastResult.pageWidth;
-  const scaleY = canvas.offsetHeight / state.lastResult.pageHeight;
+  const scaleX = canvas.offsetWidth  / res.pageWidth;
+  const scaleY = canvas.offsetHeight / res.pageHeight;
 
-  state.lastResult.items.forEach(it => {
+  res.items.forEach(it => {
     if (!it.trans) return;
 
     const x = it.x * scaleX;
     const y = it.y * scaleY;
     const w = Math.max((it.x1 - it.x) * scaleX, 10);
-    const h = Math.max((it.y1 - it.y) * scaleY, 8);
+    const hCore = Math.max((it.y1 - it.y) * scaleY, 8);
+    // Gleicher Puffer wie beim Text-Edit in clientengine.js (editBatchLocal:
+    // bottomPad = (y1-y) * 0.12) — deckt Unterlängen wie g/q/y/p sicher ab,
+    // die sonst unten aus der Overlay-Box rausschauen.
+    const bottomPad = hCore * 0.12;
+    const h = hCore + bottomPad;
 
     // === Hintergrundfarbe samplen (exakt wie Edit-Tool) ===
     let bgR = 255, bgG = 255, bgB = 255;
@@ -923,7 +943,7 @@ function renderOverlay() {
       color:${textColor};
       font-size:${Math.max(6, fs)}px;
       font-family:${it.font || 'Arial,sans-serif'};
-      line-height:${h}px;
+      line-height:${hCore}px;
     `;
     el.textContent = it.trans;
     overlay.appendChild(el);
@@ -948,12 +968,12 @@ function renderOverlay() {
     }
   }, true);
 
-  // when user changes page, drop overlay (it belongs to old page)
+  // Beim Seitenwechsel: Overlay der neuen Seite anzeigen, falls dafür bereits
+  // eine Übersetzung in resultsByPage vorliegt — sonst Overlay entfernen.
   const pageWatcher = setInterval(() => {
-    if (!state.lastResult) return;
-    if (state.lastResult.page !== (window.currentPageNum || 1)) {
-      removeOverlay();
-    } else if (state.overlayOn && !document.querySelector('.pft-overlay') && Date.now() > overlaySuppressUntil) {
+    const res = currentPageResult();
+    if (!res) { removeOverlay(); return; }
+    if (state.overlayOn && !document.querySelector('.pft-overlay') && Date.now() > overlaySuppressUntil) {
       renderOverlay();
     }
   }, 600);
@@ -973,9 +993,101 @@ function renderOverlay() {
     t.textContent = msg; t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 1800);
   }
+  // Baut für JEDE übersetzte Seite (state.resultsByPage) die fertigen Overlay-
+  // Daten (Position, Hintergrund-/Textfarbe, Schriftgröße) — unabhängig vom
+  // sichtbaren DOM/Canvas, damit der Download alle Seiten einbetten kann,
+  // nicht nur die gerade angezeigte. Nutzt dieselbe Farb-Sampling-Logik wie
+  // renderOverlay(), aber auf einer Offscreen-Canvas pro Seite (via
+  // _getOrRenderCanvas aus clientengine.js).
+  async function buildDownloadOverlayData() {
+    const pages = Object.keys(state.resultsByPage).map(Number).sort((a, b) => a - b);
+    const out = [];
+    for (const pageNum of pages) {
+      const res = state.resultsByPage[pageNum];
+      if (!res || !res.items || !res.items.length) continue;
+      if (typeof _getOrRenderCanvas !== 'function') continue; // clientengine.js nicht geladen
+
+      let canvas, ctx;
+      try {
+        const entry = await _getOrRenderCanvas(window.currentPdfDocLocal, pageNum - 1);
+        canvas = entry.canvas; ctx = entry.ctx;
+      } catch (_) { continue; }
+
+      const DPR = canvas.width / res.pageWidth; // Offscreen-Canvas-Skalierung ggü. Extraction-Viewport (i.d.R. 2)
+      let fullImageData = null;
+      try { fullImageData = ctx.getImageData(0, 0, canvas.width, canvas.height); } catch (_) {}
+      const fw = canvas.width, fh = canvas.height;
+      const getPixel = (px, py) => {
+        if (!fullImageData || px < 0 || py < 0 || px >= fw || py >= fh) return null;
+        const idx = (py * fw + px) * 4;
+        const d = fullImageData.data;
+        return [d[idx], d[idx + 1], d[idx + 2]];
+      };
+
+      const items = [];
+      res.items.forEach(it => {
+        if (!it.trans) return;
+        const x = it.x, y = it.y;
+        const w = Math.max(it.x1 - it.x, 6);
+        const hCore = Math.max(it.y1 - it.y, 5);
+        const bottomPad = hCore * 0.12; // gleicher Puffer wie renderOverlay()/editBatchLocal
+        const h = hCore + bottomPad;
+
+        let bgR = 255, bgG = 255, bgB = 255;
+        try {
+          const cx = Math.round(x * DPR), cy = Math.round(y * DPR);
+          const cw = Math.round(w * DPR), ch = Math.round(h * DPR);
+          const samples = [];
+          const pick = (px, py, weight) => {
+            const d = getPixel(px, py);
+            if (!d) return;
+            for (let i = 0; i < weight; i++) samples.push(d);
+          };
+          for (let i = 1; i <= 2; i++) {
+            pick(cx - i, cy - i, 2); pick(cx + cw + i, cy - i, 2);
+            pick(cx - i, cy + ch + i, 2); pick(cx + cw + i, cy + ch + i, 2);
+          }
+          for (let xi = 0; xi < cw; xi += Math.max(1, Math.floor(cw / 6))) {
+            pick(cx + xi, cy - 2, 1); pick(cx + xi, cy + ch + 2, 1);
+          }
+          if (samples.length) {
+            const buckets = {};
+            samples.forEach(s => {
+              const k = (s[0] >> 5) + ',' + (s[1] >> 5) + ',' + (s[2] >> 5);
+              if (!buckets[k]) buckets[k] = { n: 0, r: 0, g: 0, b: 0 };
+              buckets[k].n++; buckets[k].r += s[0]; buckets[k].g += s[1]; buckets[k].b += s[2];
+            });
+            let best = null;
+            for (const k in buckets) if (!best || buckets[k].n > best.n) best = buckets[k];
+            if (best) { bgR = Math.round(best.r / best.n); bgG = Math.round(best.g / best.n); bgB = Math.round(best.b / best.n); }
+          }
+        } catch (_) {}
+
+        const c = it.color | 0;
+        const pdfR = (c >> 16) & 255, pdfG = (c >> 8) & 255, pdfB = c & 255;
+        const luminance = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
+        const textColor = (pdfR === 0 && pdfG === 0 && pdfB === 0)
+          ? (luminance > 120 ? [15, 23, 42] : [240, 240, 240])
+          : [pdfR, pdfG, pdfB];
+
+        let fs = it.size * 0.95;
+        if (state.autoFit) {
+          const ratio = (it.text.length || 1) / Math.max(it.trans.length, 1);
+          if (ratio < 1) fs *= Math.max(0.65, ratio * 1.05);
+        }
+
+        items.push({ x, y, w, h, text: it.trans, bg: [bgR, bgG, bgB], color: textColor, fontSize: Math.max(6, fs) });
+      });
+
+      out.push({ page: pageNum, pageWidth: res.pageWidth, pageHeight: res.pageHeight, items });
+    }
+    return out;
+  }
+
   function copyTranslation() {
-    if (!state.lastResult) return;
-    const txt = state.lastResult.items.map(i => i.trans).join('\n');
+    const res = currentPageResult();
+    if (!res) return;
+    const txt = res.items.map(i => i.trans).join('\n');
     navigator.clipboard.writeText(txt).then(() => toast('Copied'));
   }
 
@@ -994,6 +1106,7 @@ function renderOverlay() {
       run: runTranslate,
       renderOverlay,
       removeOverlay,
+      buildDownloadOverlayData,
       state,
     };
   }
