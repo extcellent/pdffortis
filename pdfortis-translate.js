@@ -1322,21 +1322,18 @@ const pageWatcher = setInterval(() => {
           : [pdfR, pdfG, pdfB];
 
         const startFs = Math.max(6, b.size * 0.95);
-        let lines, fs;
-        if (state.autoFit) {
-          // Umbruch + Schriftgröße gemeinsam ermitteln, bis der Absatz in
-          // die Box passt (ersetzt die alte, ungenaue Zeichen-Ratio-Heuristik,
-          // die pro Einzelzeile skalierte statt den ganzen Absatz zu prüfen).
-          const fit = _fitBlockText(ctx, b.trans, b.font, startFs, w, h, 6);
-          lines = fit.lines;
-          fs = fit.size;
-        } else {
-          // autoFit aus: feste Originalgröße, Umbruch trotzdem nötig (sonst
-          // läuft eine lange Absatzübersetzung als eine Zeile weit über den
-          // Seitenrand hinaus). Kann vertikal über die Box hinausragen.
-          lines = _wrapTextToWidth(ctx, b.trans, b.font, startFs, w);
-          fs = startFs;
-        }
+        // WICHTIG: Shrink läuft für den Download IMMER, unabhängig vom
+        // autoFit-Toggle (der Toggle steuert nur noch die Live-Overlay-
+        // Anzeige im Editor via renderOverlay()). Grund: bei autoFit=off
+        // blieb hier vorher die Originalgröße stehen und der Absatz durfte
+        // "vertikal überlaufen" — index.html schneidet diesen Überlauf beim
+        // Zeichnen aber ab (sonst würde er die Box des nächsten Absatzes
+        // überschreiben), wodurch Sätze mitten drin abgeschnitten wurden.
+        // _fitBlockText() schrumpft nur, wenn der Text bei startFs tatsächlich
+        // nicht reinpasst — passt er schon, bleibt die Originalgröße erhalten.
+        const fit = _fitBlockText(ctx, b.trans, b.font, startFs, w, h, 6);
+        const lines = fit.lines;
+        const fs = fit.size;
 
         items.push({
           x, y, w, h,
