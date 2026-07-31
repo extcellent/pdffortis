@@ -2990,6 +2990,11 @@ async function closeInlineEditor(save=true){
   }
 
   // === Text wurde geändert ===
+  if (typeof window.pftNotifyPageEdited === 'function') {
+    window.pftNotifyPageEdited(pageNum);
+  }
+
+  // === Text wurde geändert ===
   const _prevMaskRect = span._maskRect;
 
   // 1) Maske dauerhaft in pageMasks übernehmen → bleibt nach Re-Render erhalten
