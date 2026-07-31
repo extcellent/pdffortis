@@ -564,29 +564,38 @@ const workerCode = `
         const pair = srcLang + '-' + tgt;
         const isOpus = !!OPUS_MODELS[pair];
 
+        // max_new_tokens an die tatsächliche Textlänge im Chunk anpassen.
+        // Vorher: fix 128 für JEDEN Text — bei kurzen, isolierten Fragmenten
+        // (Jahreszahlen, Firmennamen, einzelne Wörter, wie sie in Lebensläufen
+        // sehr häufig vorkommen) kann ein quantisiertes Modell gelegentlich
+        // nicht sauber stoppen und generiert bis zum Maximum durch. Das
+        // multipliziert sich bei vielen kurzen Fragmenten schnell zu Minuten.
+        const longestWords = Math.max(...chunk.map(t => (t || '').split(/\s+/).length));
+        const maxNewTokens = Math.min(128, Math.max(16, longestWords * 4 + 10));
+
         let results;
         if (isOpus) {
           // Opus-MT: kein src_lang/tgt_lang nötig
-          results = await Promise.all(
-            chunk.map(text => translator(text, {
-              max_new_tokens: 128,
-              num_beams: 1,
-              do_sample: false
-            }))
-          );
+          // Echter Batch-Call (EIN Modell-Aufruf für den ganzen Chunk) statt
+          // N einzelner sequenzieller Calls — spart Overhead pro Text erheblich.
+          const out = await translator(chunk, {
+            max_new_tokens: maxNewTokens,
+            num_beams: 1,
+            do_sample: false
+          });
+          results = Array.isArray(out) ? out.map(r => Array.isArray(r) ? r : [r]) : [[out]];
         } else {
           // NLLB: braucht Sprachcodes
           const safeSrc = NLLB_MAP[srcLang] || 'eng_Latn';
           const safeTgt = NLLB_MAP[tgt] || 'deu_Latn';
-          results = await Promise.all(
-            chunk.map(text => translator(text, {
-              src_lang: safeSrc,
-              tgt_lang: safeTgt,
-              max_new_tokens: 128,
-              num_beams: 1,
-              do_sample: false
-            }))
-          );
+          const out = await translator(chunk, {
+            src_lang: safeSrc,
+            tgt_lang: safeTgt,
+            max_new_tokens: maxNewTokens,
+            num_beams: 1,
+            do_sample: false
+          });
+          results = Array.isArray(out) ? out.map(r => Array.isArray(r) ? r : [r]) : [[out]];
         }
 
         self.postMessage({ type: 'translated', result: results.map(r => r[0]), chunkId });
@@ -728,7 +737,7 @@ async function translateLocal(texts, src, tgt) {
     return o0;
   }
 
-  const CHUNK = 4;
+  const CHUNK = 8; // hochgesetzt, da jetzt echtes Batching (ein Modell-Call/Chunk) — weniger Overhead pro Chunk
   const allChunks = [];
   for (let i = 0; i < todo.length; i += CHUNK) {
     allChunks.push(todo.slice(i, i + CHUNK));
