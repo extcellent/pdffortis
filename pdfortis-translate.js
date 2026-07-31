@@ -368,7 +368,6 @@
   const PARA_LINE_GAP_MAX = 1.65;      // gap <= size * dieser Faktor
   const PARA_REF_GAP_TOLERANCE = 1.3; // gap <= referenceGap * dieser Faktor
   const PARA_X_TOLERANCE_MIN = 4;     // pt, Mindest-Toleranz für X-Start
-  const DECORATIVE_RE = /^[\s.·•\-–—_]{2,}$/;
   const PARA_COLOR_TOLERANCE = 220;     // Manhattan-Distanz RGB; Überschrift-Akzentfarbe vs. Fließtext liegt i.d.R. weit drüber
 
   // Farbabstand mit Toleranz (statt exaktem Vergleich) — Farbsampling pro
@@ -430,7 +429,6 @@
     closeCurrent();
     return blocks;
   }
-
 
   // Verteilt den übersetzten Block-Text grob proportional (nach Zeichen-
   // anteil der Original-Zeile am Gesamtblock) auf die einzelnen Original-
@@ -511,7 +509,7 @@
         }
 
         const extracted = await extractPageLocal(window.currentPdfDocLocal, pageNum - 1);
-        const items = (extracted.items || []).filter(it => !DECORATIVE_RE.test(it.text));
+        const items = extracted.items || [];
         console.log('[pft] extracted', { page: pageNum, items: items.length, w: extracted.pageWidth, h: extracted.pageHeight });
 
         if (!items.length) {
@@ -519,7 +517,10 @@
           continue;
         }
 
-
+        // NEU: Zeilen zu Absätzen gruppieren, dann pro Absatz EIN
+        // zusammenhängender Text an die Übersetzung übergeben (Kontext
+        // bleibt erhalten statt einzelner, mitten im Satz abgeschnittener
+        // Zeilenfragmente).
         const blocks = groupItemsIntoParagraphs(items);
         const blockTexts = blocks.map(b => b.text);
         const { translated, provider } = await translatePageTexts(blockTexts, src, tgt, resultsBox);
