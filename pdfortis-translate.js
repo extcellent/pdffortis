@@ -763,10 +763,16 @@ const workerCode = `
           // Opus-MT: kein src_lang/tgt_lang nötig
           // Echter Batch-Call (EIN Modell-Aufruf für den ganzen Chunk) statt
           // N einzelner sequenzieller Calls — spart Overhead pro Text erheblich.
+          // repetition_penalty + no_repeat_ngram_size: verhindert die
+          // Wiederholungs-Endlosschleife (Modell findet kein EOS, wiederholt
+          // stattdessen denselben Satzzeichen-Token bis max_new_tokens erreicht
+          // ist — z.B. "tree.........................").
           const out = await translator(chunk, {
             max_new_tokens: maxNewTokens,
             num_beams: 1,
-            do_sample: false
+            do_sample: false,
+            repetition_penalty: 1.3,
+            no_repeat_ngram_size: 3
           });
           results = Array.isArray(out) ? out.map(r => Array.isArray(r) ? r : [r]) : [[out]];
         } else {
@@ -778,7 +784,9 @@ const workerCode = `
             tgt_lang: safeTgt,
             max_new_tokens: maxNewTokens,
             num_beams: 1,
-            do_sample: false
+            do_sample: false,
+            repetition_penalty: 1.3,
+            no_repeat_ngram_size: 3
           });
           results = Array.isArray(out) ? out.map(r => Array.isArray(r) ? r : [r]) : [[out]];
         }
@@ -876,6 +884,40 @@ async function ensureLocal() {
     state.localLoading = false;
     refreshBadge();
   }
+}
+
+// NEU — Opus-MT/NLLB sind auf vollständigen, satzzeichen-terminierten Sätzen
+// trainiert. Bei kurzen, unpunktierten Fragmenten (Überschriften, Stichpunkte,
+// einzelne Wörter wie "Berufserfahrung"), wie sie in Lebensläufen/PDFs sehr
+// häufig vorkommen, hängt das Modell gerne "von sich aus" einen Punkt (oder
+// ! ? …) ans Ende der Übersetzung an — das Original hatte diesen aber nie.
+// -> Wenn das Original KEINE Endzeichensetzung hat, die Übersetzung aber
+//    schon, entfernen wir das angehängte Zeichen wieder (halluziniert).
+// Hatte das Original selbst schon Satzzeichen am Ende, lassen wir alles
+// unverändert (dann ist der Punkt in der Übersetzung legitim).
+// NEU — Sicherheitsnetz gegen Wiederholungs-Endlosschleifen des Modells:
+// bei quantisierten Modellen + reinem Greedy-Decoding (num_beams:1,
+// do_sample:false) kann es passieren, dass kein EOS-Token erkannt wird und
+// stattdessen derselbe Satzzeichen-Token (fast immer ".") beliebig oft
+// wiederholt wird, bis max_new_tokens erreicht ist — unabhängig davon, ob
+// das Original selbst Satzzeichen hatte oder nicht (z.B. "tree.........").
+// repetition_penalty/no_repeat_ngram_size im Worker sollen das verhindern,
+// aber zur Sicherheit kollabieren wir hier trotzdem JEDE Folge von 2+
+// identischen Satzzeichen auf ein einzelnes Zeichen.
+function collapseRepeatedPunctuation(text) {
+  if (!text) return text;
+  return text.replace(/([.!?…,;:])\1{1,}/g, '$1');
+}
+
+const TRAILING_PUNCT_RE = /[.!?…]+\s*$/;
+function stripHallucinatedTrailingPunctuation(src, translated) {
+  const srcTrim = (src || '').trim();
+  const trTrim = (translated || '').trim();
+  if (!trTrim) return translated;
+  const srcHasEndPunct = TRAILING_PUNCT_RE.test(srcTrim);
+  if (srcHasEndPunct) return translated;               // Original hatte selbst Satzzeichen → unberührt
+  if (!TRAILING_PUNCT_RE.test(trTrim)) return translated; // Übersetzung hat gar keins angehängt
+  return trTrim.replace(TRAILING_PUNCT_RE, '');
 }
 
 async function translateLocal(texts, src, tgt) {
@@ -994,7 +1036,9 @@ async function translateLocal(texts, src, tgt) {
   results.forEach(({ chunk, result }) => {
     const arr = Array.isArray(result) ? result : [result];
     chunk.forEach((srcStr, j) => {
-      cache.set(srcStr, arr[j]?.translation_text || srcStr);
+      const raw = arr[j]?.translation_text || srcStr;
+      const collapsed = collapseRepeatedPunctuation(raw);
+      cache.set(srcStr, stripHallucinatedTrailingPunctuation(srcStr, collapsed));
     });
   });
 
