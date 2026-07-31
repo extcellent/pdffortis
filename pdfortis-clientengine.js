@@ -96,21 +96,27 @@ async function extractPageLocal(pdfDocLocal, pageIndex){
     }catch(e){ console.warn('extractPageLocal: item übersprungen', it.str, e); }
       }
     
-      // Wenn Edit-Text die Surgery nicht schafft (alter Text bleibt unsichtbar
-      // aber extrahierbar im Content-Stream, neuer Text wird nur obendrauf
-      // gezeichnet), liefert pdf.js zwei fast identische Items an derselben
-      // Position. Wir behalten nur das zuletzt gezeichnete (= das sichtbare,
-      // tatsächlich editierte) und verwerfen das ältere Duplikat.
       const deduped = [];
-      for (const it of items) {
-        const dupIdx = deduped.findIndex(o =>
-          Math.abs(o.x - it.x) < 2 && Math.abs(o.y - it.y) < 2 && Math.abs(o.x1 - it.x1) < 4
-        );
-        if (dupIdx > -1) deduped[dupIdx] = it; // später im Stream = später gezeichnet = gewinnt
-        else deduped.push(it);
-      }
-    
-      return { items: deduped, pageWidth: viewport.width, pageHeight: viewport.height };
+        for (const it of items) {
+          // Nur Startposition (x/y) vergleichen — NICHT x1 (rechte Kante). Editierter
+          // Text kann kürzer ODER länger sein als das Original, x1 unterscheidet sich
+          // dann stark, obwohl es dasselbe Feld ist.
+          const dupIdx = deduped.findIndex(o =>
+            Math.abs(o.x - it.x) < 2 && Math.abs(o.y - it.y) < 2
+          );
+          if (dupIdx > -1) {
+            // Später im Stream gezeichnet = der aktuell sichtbare (editierte) Text
+            // gewinnt inhaltlich — aber x1 muss die BREITERE der beiden Boxen sein,
+            // sonst deckt die Übersetzungs-Abdeckung nur die (oft kürzere) neue
+            // Textbreite ab und ein Rest des längeren alten Wortes schaut rechts raus.
+            const widerX1 = Math.max(deduped[dupIdx].x1, it.x1);
+            deduped[dupIdx] = { ...it, x1: widerX1 };
+          } else {
+            deduped.push(it);
+          }
+        }
+      
+        return { items: deduped, pageWidth: viewport.width, pageHeight: viewport.height };
     }
 
 // ═══════════════════════════════════════
