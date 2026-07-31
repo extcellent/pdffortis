@@ -365,7 +365,7 @@
   //      wenn die reine Größen-Schwelle sie noch durchlassen würde
   //   4. ähnliche linke X-Startposition (linksbündiger Fließtext)
   // ────────────────────────────────────────────────────────────────
-  const PARA_LINE_GAP_MAX = 1.65;      // gap <= size * dieser Faktor
+  const PARA_LINE_GAP_MAX = 1.55;      // gap <= size * dieser Faktor
   const PARA_REF_GAP_TOLERANCE = 1.3; // gap <= referenceGap * dieser Faktor
   const PARA_X_TOLERANCE_MIN = 4;     // pt, Mindest-Toleranz für X-Start
   const PARA_COLOR_TOLERANCE = 220;     // Manhattan-Distanz RGB; Überschrift-Akzentfarbe vs. Fließtext liegt i.d.R. weit drüber
