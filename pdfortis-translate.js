@@ -887,7 +887,8 @@ async function translateLocal(texts, src, tgt) {
       jobs.push({ index, key: cleaned });
       return;
     }
-    const key = cleaned.length > 220 ? cleaned.substring(0, 220) : cleaned;
+
+    const key = cleaned.length > 4000 ? cleaned.substring(0, 4000) : cleaned;
     if (!cache.has(key)) cache.set(key, null);
     jobs.push({ index, key });
   });
