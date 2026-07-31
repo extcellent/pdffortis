@@ -3081,11 +3081,17 @@ async function closeInlineEditor(save=true){
         const mi=arr.indexOf(_prevMaskRect);
         if(mi>-1) arr.splice(mi,1);
       }
-      if(prevEdit) pendingEdits[editIdx]=prevEdit;
-      else pendingEdits.splice(editIdx,1);
-      span.textContent=origText;
-      span.classList.remove('is-edited');
-      span.style.color='transparent';
+      if(prevEdit){
+        pendingEdits[editIdx]=prevEdit;
+        span.textContent=prevEdit.newText;
+        span.classList.add('is-edited');
+        span.style.color=span.dataset.cssColor||'black';
+      } else {
+        pendingEdits.splice(editIdx,1);
+        span.textContent=origText;
+        span.classList.remove('is-edited');
+        span.style.color='transparent';
+      }
       if(pageNum===currentPage) redrawPageCanvas(pageNum);
     },
     redo:()=>{
