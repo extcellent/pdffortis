@@ -763,16 +763,18 @@ const workerCode = `
           // Opus-MT: kein src_lang/tgt_lang nötig
           // Echter Batch-Call (EIN Modell-Aufruf für den ganzen Chunk) statt
           // N einzelner sequenzieller Calls — spart Overhead pro Text erheblich.
-          // repetition_penalty + no_repeat_ngram_size: verhindert die
-          // Wiederholungs-Endlosschleife (Modell findet kein EOS, wiederholt
-          // stattdessen denselben Satzzeichen-Token bis max_new_tokens erreicht
-          // ist — z.B. "tree.........................").
+          // repetition_penalty: verhindert die Wiederholungs-Endlosschleife
+          // (Modell findet kein EOS, wiederholt stattdessen Satzzeichen-
+          // Tokens bis max_new_tokens erreicht ist). no_repeat_ngram_size
+          // bewusst NICHT gesetzt — hat kurze, legitime Sätze abgeschnitten
+          // (blockierte nötige Wiederholungen und beendete die Generierung
+          // zu früh). Verbleibende Reste fängt fixTrailingPunctuationJunk()
+          // im Hauptthread ab.
           const out = await translator(chunk, {
             max_new_tokens: maxNewTokens,
             num_beams: 1,
             do_sample: false,
-            repetition_penalty: 1.3,
-            no_repeat_ngram_size: 3
+            repetition_penalty: 1.3
           });
           results = Array.isArray(out) ? out.map(r => Array.isArray(r) ? r : [r]) : [[out]];
         } else {
@@ -785,8 +787,7 @@ const workerCode = `
             max_new_tokens: maxNewTokens,
             num_beams: 1,
             do_sample: false,
-            repetition_penalty: 1.3,
-            no_repeat_ngram_size: 3
+            repetition_penalty: 1.3
           });
           results = Array.isArray(out) ? out.map(r => Array.isArray(r) ? r : [r]) : [[out]];
         }
@@ -895,29 +896,24 @@ async function ensureLocal() {
 //    schon, entfernen wir das angehängte Zeichen wieder (halluziniert).
 // Hatte das Original selbst schon Satzzeichen am Ende, lassen wir alles
 // unverändert (dann ist der Punkt in der Übersetzung legitim).
-// NEU — Sicherheitsnetz gegen Wiederholungs-Endlosschleifen des Modells:
-// bei quantisierten Modellen + reinem Greedy-Decoding (num_beams:1,
-// do_sample:false) kann es passieren, dass kein EOS-Token erkannt wird und
-// stattdessen derselbe Satzzeichen-Token (fast immer ".") beliebig oft
-// wiederholt wird, bis max_new_tokens erreicht ist — unabhängig davon, ob
-// das Original selbst Satzzeichen hatte oder nicht (z.B. "tree.........").
-// repetition_penalty/no_repeat_ngram_size im Worker sollen das verhindern,
-// aber zur Sicherheit kollabieren wir hier trotzdem JEDE Folge von 2+
-// identischen Satzzeichen auf ein einzelnes Zeichen.
-function collapseRepeatedPunctuation(text) {
-  if (!text) return text;
-  return text.replace(/([.!?…,;:])\1{1,}/g, '$1');
-}
-
-const TRAILING_PUNCT_RE = /[.!?…]+\s*$/;
-function stripHallucinatedTrailingPunctuation(src, translated) {
+// NEU (v2) — repetition_penalty verhindert nur das Wiederholen DESSELBEN
+// Tokens. Das Modell weicht bei der Wiederholungsschleife stattdessen auf
+// andere Satzzeichen-Tokens aus (springt zwischen . ? ! hin und her:
+// ".?.!." statt "......."). Ein reiner "identische Wiederholung"-Kollaps
+// greift hier nicht mehr. Diese Funktion erkennt JEDEN Müll-Schwanz aus
+// Satzzeichen (egal ob gleich oder gemischt) am Ende der Übersetzung und
+// ersetzt ihn durch GENAU das Satzzeichen, mit dem das Original endete
+// (oder nichts, falls das Original gar keins hatte).
+function fixTrailingPunctuationJunk(src, translated) {
   const srcTrim = (src || '').trim();
   const trTrim = (translated || '').trim();
   if (!trTrim) return translated;
-  const srcHasEndPunct = TRAILING_PUNCT_RE.test(srcTrim);
-  if (srcHasEndPunct) return translated;               // Original hatte selbst Satzzeichen → unberührt
-  if (!TRAILING_PUNCT_RE.test(trTrim)) return translated; // Übersetzung hat gar keins angehängt
-  return trTrim.replace(TRAILING_PUNCT_RE, '');
+  const TAIL_JUNK_RE = /[.!?…,;:]{2,}\s*$/; // 2+ Satzzeichen am Ende, gleich oder gemischt
+  const m = trTrim.match(TAIL_JUNK_RE);
+  if (!m) return translated; // kein Müll-Schwanz gefunden, unverändert lassen
+  const srcEndMatch = srcTrim.match(/[.!?…]\s*$/);
+  const properEnd = srcEndMatch ? srcEndMatch[0].trim() : '';
+  return trTrim.slice(0, m.index) + properEnd;
 }
 
 async function translateLocal(texts, src, tgt) {
@@ -1037,8 +1033,7 @@ async function translateLocal(texts, src, tgt) {
     const arr = Array.isArray(result) ? result : [result];
     chunk.forEach((srcStr, j) => {
       const raw = arr[j]?.translation_text || srcStr;
-      const collapsed = collapseRepeatedPunctuation(raw);
-      cache.set(srcStr, stripHallucinatedTrailingPunctuation(srcStr, collapsed));
+      cache.set(srcStr, fixTrailingPunctuationJunk(srcStr, raw));
     });
   });
 
