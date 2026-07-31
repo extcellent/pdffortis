@@ -164,12 +164,12 @@
             <button class="pft-go" id="pft-run" data-testid="translate-run-btn">Translate page</button>
           </div>
           <div class="pft-row" data-testid="translate-scope-row" style="gap:14px">
-            <label style="font-size:12px;color:#64748b;font-weight:600">Umfang</label>
+            <label style="font-size:12px;color:#64748b;font-weight:600">Scope</label>
             <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer">
-              <input type="radio" name="pft-scope" value="current" id="pft-scope-current" checked/> Nur diese Seite
+              <input type="radio" name="pft-scope" value="current" id="pft-scope-current" checked/> Current Page  
             </label>
             <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer">
-              <input type="radio" name="pft-scope" value="all" id="pft-scope-all"/> Alle Seiten
+              <input type="radio" name="pft-scope" value="all" id="pft-scope-all"/> All Pages
             </label>
           </div>
           <div class="pft-row" style="gap:18px">
