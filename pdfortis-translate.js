@@ -1016,12 +1016,7 @@ function renderOverlay() {
     }
   }, true);
 
-  // Beim Seitenwechsel: Overlay der neuen Seite anzeigen, falls dafür bereits
-  // eine Übersetzung in resultsByPage vorliegt — sonst Overlay entfernen.
-  // Solange der Edit-Text-Editor aktiv ist (window.activeInlineSpan gesetzt),
-  // NIE das Overlay zurückrendern — sonst deckt es den Editor bei längeren
-  // Edits wieder zu, sobald die feste 2s-Schonfrist abgelaufen ist.
-  const pageWatcher = setInterval(() => {
+const pageWatcher = setInterval(() => {
     const res = currentPageResult();
     if (!res) { removeOverlay(); return; }
     if (window.activeInlineSpan) { removeOverlay(); return; }
@@ -1029,6 +1024,19 @@ function renderOverlay() {
       renderOverlay();
     }
   }, 600);
+
+  // Wird von index.html aufgerufen, sobald ein Edit-Text auf einer bereits
+  // übersetzten Seite WIRKLICH gespeichert wurde (nicht bei Abbruch/unverändert).
+  // Übersetzung für diese Seite wird verworfen — Overlay bleibt seitdem weg,
+  // bis die Seite neu übersetzt wird (pageWatcher rendert dann nichts mehr,
+  // weil currentPageResult() für diese Seite null zurückgibt).
+  window.pftNotifyPageEdited = function (pageNum) {
+    if (state.resultsByPage[pageNum]) {
+      delete state.resultsByPage[pageNum];
+      if (pageNum === (window.currentPageNum || 1)) removeOverlay();
+      toast('Page changed — please translate again');
+    }
+  };
 
   // --------------------------------------------------------------
   // 9. UTILS
