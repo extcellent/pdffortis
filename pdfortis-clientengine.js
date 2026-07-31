@@ -94,9 +94,24 @@ async function extractPageLocal(pdfDocLocal, pageIndex){
         flags: _deriveFlags(styleInfo.fontFamily)
       });
     }catch(e){ console.warn('extractPageLocal: item übersprungen', it.str, e); }
-  }
-  return { items, pageWidth: viewport.width, pageHeight: viewport.height };
-}
+      }
+    
+      // Wenn Edit-Text die Surgery nicht schafft (alter Text bleibt unsichtbar
+      // aber extrahierbar im Content-Stream, neuer Text wird nur obendrauf
+      // gezeichnet), liefert pdf.js zwei fast identische Items an derselben
+      // Position. Wir behalten nur das zuletzt gezeichnete (= das sichtbare,
+      // tatsächlich editierte) und verwerfen das ältere Duplikat.
+      const deduped = [];
+      for (const it of items) {
+        const dupIdx = deduped.findIndex(o =>
+          Math.abs(o.x - it.x) < 2 && Math.abs(o.y - it.y) < 2 && Math.abs(o.x1 - it.x1) < 4
+        );
+        if (dupIdx > -1) deduped[dupIdx] = it; // später im Stream = später gezeichnet = gewinnt
+        else deduped.push(it);
+      }
+    
+      return { items: deduped, pageWidth: viewport.width, pageHeight: viewport.height };
+    }
 
 // ═══════════════════════════════════════
 // editBatchLocal-Helpers (unverändert)
