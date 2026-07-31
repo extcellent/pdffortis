@@ -2202,61 +2202,34 @@ async function performDownload(){
       workBytes = await doc.save();
     }
 
-   // ── Schritt 2b: Translation Overlays via pdf-lib einbetten ──
+    // ── Schritt 2b: Translation Overlays via pdf-lib einbetten (alle übersetzten Seiten) ──
     const pft = window.PFTranslate;
-    const overlayWasOff = !!pft && !pft.state.overlayOn && !!pft.state.lastResult
-      && pft.state.lastResult.page === (window.currentPageNum || 1);
-    // Overlay kurz erzwingen, falls der "Inline"-Toggle gerade aus ist —
-    // sonst gibt querySelectorAll unten 0 Treffer und die Übersetzung
-    // landet nie im Download, obwohl sie erfolgreich generiert wurde.
-    if (overlayWasOff) { pft.state.overlayOn = true; pft.renderOverlay(); }
-
-    const transOverlays = document.querySelectorAll('.pft-overlay-item');
-    if(transOverlays.length > 0){
+    const overlayPages = pft ? await pft.buildDownloadOverlayData() : [];
+    if (overlayPages.length){
       const doc2 = await PDFLib.PDFDocument.load(workBytes);
       const font2 = await doc2.embedFont(PDFLib.StandardFonts.Helvetica);
-      const canvas2 = document.getElementById('pdf-canvas');
-      const page2 = doc2.getPage((window.currentPageNum || 1) - 1);
-      const {width: pdfW2, height: pdfH2} = page2.getSize();
-      const scaleX2 = pdfW2 / canvas2.offsetWidth;
-      const scaleY2 = pdfH2 / canvas2.offsetHeight;
-
-      transOverlays.forEach(el => {
-        const text = el.textContent?.trim();
-        if(!text) return;
-        const x = parseFloat(el.style.left) || 0;
-        const y = parseFloat(el.style.top) || 0;
-        const w = parseFloat(el.style.width) || 100;
-        const h = parseFloat(el.style.height) || 12;
-        const fs = parseFloat(el.style.fontSize) || 10;
-        const colorRaw = el.style.color || 'rgb(0,0,0)';
-        const bgRaw = el.style.background || el.style.backgroundColor || 'rgb(255,255,255)';
-        const rgb2 = colorRaw.match(/\d+/g) || ['0','0','0'];
-        const bgRgb = bgRaw.match(/\d+/g) || ['255','255','255'];
-        const pdfX2 = x * scaleX2;
-        const pdfY2 = pdfH2 - ((y + h) * scaleY2);
-
-        // Hintergrund-Rechteck zum Abdecken des Originals
-        page2.drawRectangle({
-          x: pdfX2,
-          y: pdfY2,
-          width: w * scaleX2,
-          height: h * scaleY2,
-          color: PDFLib.rgb(parseInt(bgRgb[0])/255, parseInt(bgRgb[1])/255, parseInt(bgRgb[2])/255),
+      for (const pd of overlayPages){
+        const page2 = doc2.getPage(pd.page - 1);
+        const {width: pdfW2, height: pdfH2} = page2.getSize();
+        const scaleX2 = pdfW2 / pd.pageWidth;
+        const scaleY2 = pdfH2 / pd.pageHeight;
+        pd.items.forEach(it => {
+          const pdfX2 = it.x * scaleX2;
+          const pdfY2 = pdfH2 - ((it.y + it.h) * scaleY2);
+          page2.drawRectangle({
+            x: pdfX2, y: pdfY2, width: it.w * scaleX2, height: it.h * scaleY2,
+            color: PDFLib.rgb(it.bg[0]/255, it.bg[1]/255, it.bg[2]/255),
+          });
+          page2.drawText(it.text, {
+            x: pdfX2, y: pdfY2 + it.h * scaleY2 * 0.15,
+            size: Math.max(6, it.fontSize * scaleY2),
+            font: font2,
+            color: PDFLib.rgb(it.color[0]/255, it.color[1]/255, it.color[2]/255),
+          });
         });
-
-        page2.drawText(text, {
-          x: pdfX2,
-          y: pdfY2 + 1,
-          size: Math.max(6, fs * scaleX2),
-          font: font2,
-          color: PDFLib.rgb(parseInt(rgb2[0])/255, parseInt(rgb2[1])/255, parseInt(rgb2[2])/255),
-        });
-      });
+      }
       workBytes = await doc2.save();
-    } 
-    // Overlay-Zustand zurücksetzen, falls wir ihn nur für den Export erzwungen haben
-    if (overlayWasOff) { pft.state.overlayOn = false; pft.removeOverlay(); }
+    }
     
     // ── Schritt 3: Download ──
     const blob = new Blob([workBytes],{type:'application/pdf'});
