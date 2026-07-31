@@ -346,6 +346,106 @@
     return { translated, provider: 'local' };
   }
 
+  // ────────────────────────────────────────────────────────────────
+  // Absatz-Gruppierung (NEU)
+  // extractPageLocal() liefert Text zeilenweise (1 Item pro visueller
+  // Zeile aus dem pdf.js-Textlayer). Für Fließtext (Anschreiben etc.)
+  // übersetzt das MT-Modell isolierte, mitten im Satz abgeschnittene
+  // Zeilen mit teils halluzinierten Ergebnissen. Diese Funktion fasst
+  // zusammengehörige Zeilen zu Absatz-Blöcken zusammen, BEVOR übersetzt
+  // wird — die Original-Items werden dabei nicht verändert, nur über
+  // itemIndices referenziert (Edit Text / clientengine.js bleibt unberührt).
+  //
+  // Kriterium "gehört zur selben Gruppe wie die Vorzeile":
+  //   1. gleicher Font + gleiche Flags (Bold/Italic reißt Absatz ab)
+  //   2. ähnliche Schriftgröße (Toleranz statt exakt, Rundungsfehler)
+  //   3. vertikaler Sprung passt zu einem normalen Zeilenumbruch
+  //      (nicht zu groß) UND passt zum bisher in der Gruppe beobachteten
+  //      Zeilenabstand (referenceGap) — fängt Absatz-Leerzeilen ab, auch
+  //      wenn die reine Größen-Schwelle sie noch durchlassen würde
+  //   4. ähnliche linke X-Startposition (linksbündiger Fließtext)
+  // ────────────────────────────────────────────────────────────────
+  const PARA_LINE_GAP_MAX = 1.7;      // gap <= size * dieser Faktor
+  const PARA_REF_GAP_TOLERANCE = 1.3; // gap <= referenceGap * dieser Faktor
+  const PARA_X_TOLERANCE_MIN = 4;     // pt, Mindest-Toleranz für X-Start
+
+  function groupItemsIntoParagraphs(items) {
+    const blocks = [];
+    let currentIdxs = null;
+    let referenceGap = null;
+
+    const closeCurrent = () => {
+      if (!currentIdxs || !currentIdxs.length) return;
+      const first = items[currentIdxs[0]];
+      const last = items[currentIdxs[currentIdxs.length - 1]];
+      blocks.push({
+        itemIndices: currentIdxs.slice(),
+        text: currentIdxs.map(i => items[i].text).join(' '),
+        x: Math.min(...currentIdxs.map(i => items[i].x)),
+        y: first.y,
+        x1: Math.max(...currentIdxs.map(i => items[i].x1)),
+        y1: last.y1,
+        size: first.size,
+        font: first.font,
+        flags: first.flags,
+        color: first.color,
+      });
+    };
+
+    for (let i = 0; i < items.length; i++) {
+      if (!currentIdxs) { currentIdxs = [i]; continue; }
+
+      const prev = items[currentIdxs[currentIdxs.length - 1]];
+      const cur = items[i];
+
+      const fontMatch = prev.font === cur.font && prev.flags === cur.flags;
+      const sizeMatch = Math.abs(prev.size - cur.size) <= Math.max(0.4, prev.size * 0.08);
+      const gap = cur.y - prev.y;
+      const gapPlausible = gap > 0 && gap <= prev.size * PARA_LINE_GAP_MAX;
+      const gapConsistent = referenceGap === null || gap <= referenceGap * PARA_REF_GAP_TOLERANCE;
+      const xMatch = Math.abs(prev.x - cur.x) <= Math.max(PARA_X_TOLERANCE_MIN, prev.size * 0.35);
+
+      if (fontMatch && sizeMatch && gapPlausible && gapConsistent && xMatch) {
+        currentIdxs.push(i);
+        referenceGap = referenceGap === null ? gap : (referenceGap * 0.7 + gap * 0.3);
+      } else {
+        closeCurrent();
+        currentIdxs = [i];
+        referenceGap = null;
+      }
+    }
+    closeCurrent();
+    return blocks;
+  }
+
+  // Verteilt den übersetzten Block-Text grob proportional (nach Zeichen-
+  // anteil der Original-Zeile am Gesamtblock) auf die einzelnen Original-
+  // Zeilen zurück. Nur kosmetisch für die Zeilen-Ansicht (renderResults/
+  // copyTranslation) — für das Overlay/Download-Rendering zählt der volle
+  // Block-Text (siehe unten), nicht diese Verteilung.
+  function _distributeTranslationAcrossLines(lineTexts, translatedText) {
+    if (!lineTexts.length) return [];
+    if (lineTexts.length === 1) return [translatedText || ''];
+    const words = (translatedText || '').split(/\s+/).filter(Boolean);
+    if (!words.length) return lineTexts.map(() => '');
+
+    const totalLen = lineTexts.reduce((s, t) => s + t.length, 0) || 1;
+    const counts = lineTexts.map(t => Math.max(1, Math.round(words.length * (t.length / totalLen))));
+    const diff = words.length - counts.reduce((a, b) => a + b, 0);
+    counts[counts.length - 1] = Math.max(0, counts[counts.length - 1] + diff);
+
+    const out = [];
+    let idx = 0;
+    for (let c of counts) {
+      out.push(words.slice(idx, idx + c).join(' '));
+      idx += c;
+    }
+    if (idx < words.length) {
+      out[out.length - 1] = (out[out.length - 1] + ' ' + words.slice(idx).join(' ')).trim();
+    }
+    return out;
+  }
+
   async function runTranslate() {
     const gate = canTranslate();
     if (!gate.ok) {
@@ -401,18 +501,39 @@
         console.log('[pft] extracted', { page: pageNum, items: items.length, w: extracted.pageWidth, h: extracted.pageHeight });
 
         if (!items.length) {
-          state.resultsByPage[pageNum] = { page: pageNum, pageWidth: extracted.pageWidth, pageHeight: extracted.pageHeight, items: [], source: src, target: tgt, provider: 'empty' };
+          state.resultsByPage[pageNum] = { page: pageNum, pageWidth: extracted.pageWidth, pageHeight: extracted.pageHeight, items: [], blocks: [], source: src, target: tgt, provider: 'empty' };
           continue;
         }
 
-        const texts = items.map(i => i.text);
-        const { translated, provider } = await translatePageTexts(texts, src, tgt, resultsBox);
+        // NEU: Zeilen zu Absätzen gruppieren, dann pro Absatz EIN
+        // zusammenhängender Text an die Übersetzung übergeben (Kontext
+        // bleibt erhalten statt einzelner, mitten im Satz abgeschnittener
+        // Zeilenfragmente).
+        const blocks = groupItemsIntoParagraphs(items);
+        const blockTexts = blocks.map(b => b.text);
+        const { translated, provider } = await translatePageTexts(blockTexts, src, tgt, resultsBox);
+
+        // Rückmapping: jeder Block bekommt seine Übersetzung (maßgeblich
+        // für Overlay/Download). Zusätzlich wird die Block-Übersetzung
+        // grob auf die referenzierten Original-Zeilen zurückverteilt, damit
+        // renderResults()/copyTranslation() (die weiterhin pro Zeile
+        // arbeiten) sinnvolle Inhalte zeigen.
+        const newItems = items.map(it => ({ ...it }));
+        blocks.forEach((b, bi) => {
+          b.trans = translated[bi] || '';
+          const lineTexts = b.itemIndices.map(i => items[i].text);
+          const distributed = _distributeTranslationAcrossLines(lineTexts, b.trans);
+          b.itemIndices.forEach((itemIdx, li) => {
+            newItems[itemIdx].trans = distributed[li] || '';
+          });
+        });
 
         state.resultsByPage[pageNum] = {
           page: pageNum,
           pageWidth: extracted.pageWidth,
           pageHeight: extracted.pageHeight,
-          items: items.map((it, idx) => ({ ...it, trans: translated[idx] || '' })),
+          items: newItems,
+          blocks,           // NEU: Absatz-Blöcke, maßgeblich für Overlay/Download
           source: src, target: tgt, provider,
         };
         anyTranslated = true;
@@ -905,20 +1026,27 @@ function renderOverlay() {
   };
 
   const overlay = document.createElement('div');
-  overlay.className = 'pft-overlay' + (state.autoFit ? '' : ' wrap');
+  overlay.className = 'pft-overlay';
   overlay.setAttribute('data-testid', 'translate-inline-overlay');
   overlay.style.cssText = `position:absolute;pointer-events:none;z-index:5;left:${canvas.offsetLeft}px;top:${canvas.offsetTop}px;width:${canvas.offsetWidth}px;height:${canvas.offsetHeight}px;`;
 
   const scaleX = canvas.offsetWidth  / res.pageWidth;
   const scaleY = canvas.offsetHeight / res.pageHeight;
 
-  res.items.forEach(it => {
-    if (!it.trans) return;
+  // NEU: iteriert über Absatz-Blöcke (res.blocks) statt einzelner Zeilen
+  // (res.items). Ein Block deckt den kompletten Bereich von der ersten
+  // bis zur letzten Original-Zeile ab; der übersetzte Text bekommt einen
+  // eigenen, neu berechneten Zeilenumbruch (weiß-Raum:normal + feste
+  // Breite → der Browser bricht die Zeilen selbst um).
+  const blocksToRender = (res.blocks && res.blocks.length) ? res.blocks : [];
 
-    const x = it.x * scaleX;
-    const y = it.y * scaleY;
-    const w = Math.max((it.x1 - it.x) * scaleX, 10);
-    const hCore = Math.max((it.y1 - it.y) * scaleY, 8);
+  blocksToRender.forEach(b => {
+    if (!b.trans) return;
+
+    const x = b.x * scaleX;
+    const y = b.y * scaleY;
+    const w = Math.max((b.x1 - b.x) * scaleX, 10);
+    const hCore = Math.max((b.y1 - b.y) * scaleY, 8);
     // Gleicher Puffer wie beim Text-Edit in clientengine.js (editBatchLocal:
     // bottomPad = (y1-y) * 0.12) — deckt Unterlängen wie g/q/y/p sicher ab,
     // die sonst unten aus der Overlay-Box rausschauen.
@@ -970,31 +1098,49 @@ function renderOverlay() {
     } catch(_) {}
 
     // Textfarbe: Original-PDF-Farbe, Fallback: dunkel/hell je nach Hintergrund
-    const c = it.color | 0;
+    const c = b.color | 0;
     const pdfR = (c >> 16) & 255, pdfG = (c >> 8) & 255, pdfB = c & 255;
     const luminance = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
     const textColor = (pdfR === 0 && pdfG === 0 && pdfB === 0)
       ? (luminance > 120 ? 'rgb(15,23,42)' : 'rgb(240,240,240)')
       : `rgb(${pdfR},${pdfG},${pdfB})`;
 
-    let fs = it.size * scaleY * 0.95;
-    if (state.autoFit) {
-      const ratio = (it.text.length || 1) / Math.max(it.trans.length, 1);
-      if (ratio < 1) fs *= Math.max(0.65, ratio * 1.05);
-    }
+    const startFs = Math.max(6, b.size * scaleY * 0.95);
+    const lineHeightFactor = 1.18;
 
     const el = document.createElement('div');
-    el.className = 'pft-overlay-item';
+    el.className = 'pft-overlay-item pft-overlay-block';
     el.style.cssText = `
       left:${x}px;top:${y}px;width:${w}px;height:${h}px;
       background:rgb(${bgR},${bgG},${bgB});
       color:${textColor};
-      font-size:${Math.max(6, fs)}px;
-      font-family:${it.font || 'Arial,sans-serif'};
-      line-height:${hCore}px;
+      font-size:${startFs}px;
+      font-family:${b.font || 'Arial,sans-serif'};
+      line-height:${lineHeightFactor};
+      white-space:normal;
+      overflow:hidden;
     `;
-    el.textContent = it.trans;
+    el.textContent = b.trans;
     overlay.appendChild(el);
+
+    // Auto-Fit: Übersetzung braucht selten exakt so viele Zeilen wie das
+    // Original (Englisch meist kürzer/länger als Deutsch). Statt der alten
+    // Zeichen-Ratio-Heuristik jetzt echtes Messen im DOM: Schriftgröße
+    // schrittweise verkleinern, bis der (mehrzeilig umgebrochene) Text in
+    // die Absatzbox passt. Bei autoFit=off bleibt die Originalgröße stehen
+    // und der Text darf vertikal überlaufen (overflow:visible), analog zum
+    // bisherigen "wrap ohne shrink"-Verhalten.
+    if (state.autoFit) {
+      let size = startFs;
+      let guard = 0;
+      while (el.scrollHeight > h + 1 && size > 6 && guard < 30) {
+        size *= 0.94;
+        el.style.fontSize = size + 'px';
+        guard++;
+      }
+    } else {
+      el.style.overflow = 'visible';
+    }
   });
 
   wrap.appendChild(overlay);
@@ -1053,12 +1199,56 @@ const pageWatcher = setInterval(() => {
     t.textContent = msg; t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 1800);
   }
+  // Bricht `text` anhand von ctx.measureText() in Zeilen um, die innerhalb
+  // von maxWidth passen (2D-Canvas-Kontext der Offscreen-Seite, kein DOM
+  // nötig — funktioniert also auch außerhalb des sichtbaren Viewports).
+  function _wrapTextToWidth(ctx, text, fontFamily, fontSizePx, maxWidth) {
+    ctx.font = `${fontSizePx}px ${fontFamily || 'Arial'}`;
+    const words = (text || '').split(/\s+/).filter(Boolean);
+    const lines = [];
+    let line = '';
+    for (const w of words) {
+      const test = line ? line + ' ' + w : w;
+      if (line && ctx.measureText(test).width > maxWidth) {
+        lines.push(line);
+        line = w;
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  // Kombiniert Umbruch + Schriftgrößen-Shrink: verkleinert die Schrift
+  // iterativ, bis die umgebrochenen Zeilen (inkl. Zeilenabstand) in
+  // maxHeight passen. Analog zum Auto-Shrink in renderOverlay(), nur
+  // ohne echtes DOM-Messen (hier per ctx.measureText geschätzt).
+  function _fitBlockText(ctx, text, fontFamily, startSizePx, maxWidth, maxHeight, minSizePx = 6) {
+    let size = startSizePx;
+    let lines = _wrapTextToWidth(ctx, text, fontFamily, size, maxWidth);
+    let guard = 0;
+    while (lines.length * (size * 1.18) > maxHeight && size > minSizePx && guard < 30) {
+      size *= 0.94;
+      lines = _wrapTextToWidth(ctx, text, fontFamily, size, maxWidth);
+      guard++;
+    }
+    return { lines, size };
+  }
+
   // Baut für JEDE übersetzte Seite (state.resultsByPage) die fertigen Overlay-
   // Daten (Position, Hintergrund-/Textfarbe, Schriftgröße) — unabhängig vom
   // sichtbaren DOM/Canvas, damit der Download alle Seiten einbetten kann,
   // nicht nur die gerade angezeigte. Nutzt dieselbe Farb-Sampling-Logik wie
   // renderOverlay(), aber auf einer Offscreen-Canvas pro Seite (via
   // _getOrRenderCanvas aus clientengine.js).
+  //
+  // WICHTIG (Breaking Change ggü. vorher): Jedes Ergebnis-Item hat jetzt
+  // `lines` (Array von bereits umgebrochenen Zeilen-Strings) statt einem
+  // einzeiligen `text`. `text` bleibt als Fallback (lines.join('\n')) für
+  // Abwärtskompatibilität erhalten, ist aber für mehrzeiligen Absatz-Text
+  // nicht mehr ausreichend — der Draw-Code in index.html muss `it.lines`
+  // zeilenweise zeichnen (y-Offset pro Zeile um it.lineHeight erhöhen).
   async function buildDownloadOverlayData() {
     const pages = Object.keys(state.resultsByPage).map(Number).sort((a, b) => a - b);
     const out = [];
@@ -1085,11 +1275,12 @@ const pageWatcher = setInterval(() => {
       };
 
       const items = [];
-      res.items.forEach(it => {
-        if (!it.trans) return;
-        const x = it.x, y = it.y;
-        const w = Math.max(it.x1 - it.x, 6);
-        const hCore = Math.max(it.y1 - it.y, 5);
+      const blocksForPage = (res.blocks && res.blocks.length) ? res.blocks : [];
+      blocksForPage.forEach(b => {
+        if (!b.trans) return;
+        const x = b.x, y = b.y;
+        const w = Math.max(b.x1 - b.x, 6);
+        const hCore = Math.max(b.y1 - b.y, 5);
         const bottomPad = hCore * 0.12; // gleicher Puffer wie renderOverlay()/editBatchLocal
         const h = hCore + bottomPad;
 
@@ -1123,20 +1314,38 @@ const pageWatcher = setInterval(() => {
           }
         } catch (_) {}
 
-        const c = it.color | 0;
+        const c = b.color | 0;
         const pdfR = (c >> 16) & 255, pdfG = (c >> 8) & 255, pdfB = c & 255;
         const luminance = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
         const textColor = (pdfR === 0 && pdfG === 0 && pdfB === 0)
           ? (luminance > 120 ? [15, 23, 42] : [240, 240, 240])
           : [pdfR, pdfG, pdfB];
 
-        let fs = it.size * 0.95;
+        const startFs = Math.max(6, b.size * 0.95);
+        let lines, fs;
         if (state.autoFit) {
-          const ratio = (it.text.length || 1) / Math.max(it.trans.length, 1);
-          if (ratio < 1) fs *= Math.max(0.65, ratio * 1.05);
+          // Umbruch + Schriftgröße gemeinsam ermitteln, bis der Absatz in
+          // die Box passt (ersetzt die alte, ungenaue Zeichen-Ratio-Heuristik,
+          // die pro Einzelzeile skalierte statt den ganzen Absatz zu prüfen).
+          const fit = _fitBlockText(ctx, b.trans, b.font, startFs, w, h, 6);
+          lines = fit.lines;
+          fs = fit.size;
+        } else {
+          // autoFit aus: feste Originalgröße, Umbruch trotzdem nötig (sonst
+          // läuft eine lange Absatzübersetzung als eine Zeile weit über den
+          // Seitenrand hinaus). Kann vertikal über die Box hinausragen.
+          lines = _wrapTextToWidth(ctx, b.trans, b.font, startFs, w);
+          fs = startFs;
         }
 
-        items.push({ x, y, w, h, text: it.trans, bg: [bgR, bgG, bgB], color: textColor, fontSize: Math.max(6, fs) });
+        items.push({
+          x, y, w, h,
+          lines,                        // NEU: Array bereits umgebrochener Zeilen
+          text: lines.join('\n'),       // Fallback/Kompat für einzeiligen Alt-Draw-Code
+          bg: [bgR, bgG, bgB], color: textColor,
+          fontSize: fs,
+          lineHeight: fs * 1.18,
+        });
       });
 
       out.push({ page: pageNum, pageWidth: res.pageWidth, pageHeight: res.pageHeight, items });
