@@ -516,6 +516,8 @@
 
         const extracted = await extractPageLocal(window.currentPdfDocLocal, pageNum - 1);
   
+        const DOT_ITEM_RE = /^[.\u00B7•\-–—_]+$/;  // ganzes Item besteht NUR aus Punkt/Trennzeichen — auch wenn nur 1 Zeichen lang
+        
         function stripDotLeaders(text) {
           return text
             .replace(/[.\s]{3,}$/g, '')
@@ -524,6 +526,7 @@
         }
         
         const items = (extracted.items || [])
+          .filter(it => !DOT_ITEM_RE.test((it.text || '').trim()))   // NEU: einzelne Punkt-Items raus, VOR der Gruppierung
           .map(it => ({ ...it, text: stripDotLeaders(it.text) }))
           .filter(it => it.text.length > 0);
 
