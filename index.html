@@ -344,6 +344,13 @@ input,select,textarea{font-family:var(--font)}
 .pnav:hover{background:var(--gray-100)}
 #page-info-txt{font-size:11px;color:var(--gray-500);flex:1;text-align:center}
 
+.pf-switch-row{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--gray-700)}
+.pf-switch{position:relative;display:inline-block;width:34px;height:20px;flex-shrink:0}
+.pf-switch input{opacity:0;width:0;height:0}
+.pf-switch-slider{position:absolute;inset:0;background:var(--gray-200);border-radius:20px;cursor:pointer;transition:.15s}
+.pf-switch-slider::before{content:"";position:absolute;height:16px;width:16px;left:2px;top:2px;background:white;border-radius:50%;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.pf-switch input:checked + .pf-switch-slider{background:#6366f1}
+.pf-switch input:checked + .pf-switch-slider::before{transform:translateX(14px)}
 /* Overlay elements */
 .pdf-overlay{position:absolute;cursor:move;user-select:none}
   
@@ -939,6 +946,16 @@ input,select,textarea{font-family:var(--font)}
           <span data-i="history_toggle">History</span>
         </button>
       </div>
+      <div class="tools-section" id="history-section" style="display:none">
+        <div class="tools-section-title" data-i="history_section_title">Edit History</div>
+        <label class="pf-switch-row">
+          <span data-i="history_toggle">Show history</span>
+          <span class="pf-switch">
+            <input type="checkbox" id="history-toggle-btn" onchange="toggleHistoryOverlay()">
+            <span class="pf-switch-slider"></span>
+          </span>
+        </label>
+      </div>
     </div>
   </div>
 </div>
@@ -1455,17 +1472,16 @@ function renderHistoryOverlay(){
 // NEU — History-Toggle-Button-Logik, direkt dahinter:
 let historyOverlayOn = false;
 
-function toggleHistoryOverlay(){
-  historyOverlayOn = !historyOverlayOn;
-  document.getElementById('history-toggle-btn').classList.toggle('active', historyOverlayOn);
-  renderHistoryOverlay();
+function updateHistoryButtonVisibility(){
+  const section = document.getElementById('history-section');
+  if(!section || !pdfLibDoc) return;
+  const hasEntries = readAuditLog(pdfLibDoc).length > 0;
+  section.style.display = hasEntries ? 'block' : 'none';
 }
 
-function updateHistoryButtonVisibility(){
-  const btn = document.getElementById('history-toggle-btn');
-  if(!btn || !pdfLibDoc) return;
-  const hasEntries = readAuditLog(pdfLibDoc).length > 0;
-  btn.style.display = hasEntries ? 'flex' : 'none';
+function toggleHistoryOverlay(){
+  historyOverlayOn = document.getElementById('history-toggle-btn').checked;
+  renderHistoryOverlay();
 }
 
 async function loadSharedFromObj({ url, name }) {
