@@ -2730,7 +2730,9 @@ function restoreSessionFromStorage(){
     if(!raw) return;
     const s=JSON.parse(raw);
     if(!s?.user || (s.expires_at && s.expires_at < Date.now())){
-      localStorage.removeItem('pf_session'); return;
+      localStorage.removeItem('pf_session');
+      localStorage.removeItem(LS_TOKDAT);
+      return;
     }
     currentUser={
       id: s.user.id,
