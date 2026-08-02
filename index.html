@@ -980,7 +980,7 @@ input,select,textarea{font-family:var(--font)}
         <div class="form-field"><label data-i="pw_lbl">Password</label><input class="form-input" id="login-pw" type="password" placeholder="••••••••"/></div>
         <div class="form-error hidden" id="login-error"></div>
         <button class="form-submit" onclick="doLogin()" data-i="nav_login">Sign in</button>
-        <p class="form-note" data-i="no_account">No account? Create one free →</p>
+        <p class="form-note" data-i="no_account" onclick="switchAuthTab('signup')" style="cursor:pointer">No account? Create one free →</p>
       </div>
       <div id="auth-signup-form" class="hidden">
         <!-- Honeypot (Bots füllen das aus, User nie) -->
