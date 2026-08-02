@@ -944,12 +944,16 @@ input,select,textarea{font-family:var(--font)}
       </div>
       <div class="tools-section" id="history-section" style="display:none">
         <div class="tools-section-title" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0" data-i="history_section_title">
-          Show Edit History
-          <span class="pf-switch">
-            <input type="checkbox" id="history-toggle-btn" onchange="toggleHistoryOverlay()">
-            <span class="pf-switch-slider"></span>
-          </span>
+          Show Edit History  
+          <!-- Hier wieder das <label> drum herum machen! -->
+          <label class="pf-switch-row" style="margin:0;cursor:pointer">
+            <span class="pf-switch">
+              <input type="checkbox" id="history-toggle-btn" onchange="toggleHistoryOverlay()">
+              <span class="pf-switch-slider"></span>
+            </span>
+          </label>     
         </div>
+      </div>
       </div>
     </div>
   </div>
