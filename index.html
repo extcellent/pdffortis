@@ -1381,6 +1381,49 @@ function writeAuditLog(pdfLibDocInstance, newEntries){
     PDFLib.PDFString.of(JSON.stringify(merged))
   );
 }
+  
+function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function renderHistoryOverlay(){
+  const ol = document.getElementById('overlay-layer');
+  ol.querySelectorAll('.pf-history-item').forEach(e=>e.remove());
+  if(!historyOverlayOn || !pdfLibDoc) return;
+
+  const entries = readAuditLog(pdfLibDoc).filter(e => e.page === currentPage);
+  if(!entries.length) return;
+
+  const canvas = document.getElementById('pdf-canvas');
+  const page = pdfLibDoc.getPage(currentPage - 1);
+  const {width: pdfW, height: pdfH} = page.getSize();
+  const cssScale = parseFloat(canvas.style.width) / canvas.width;
+  const scaleX = (canvas.width / pdfW) * cssScale;
+  const scaleY = (canvas.height / pdfH) * cssScale;
+
+  const actionLabels = {signed:'Signed', add_text:'Add Text', add_image:'Add Image', add_date:'Add Date', add_initials:'Add Initials'};
+
+  entries.forEach(entry => {
+    const anchorX = entry.x * scaleX;
+    const anchorY = (canvas.height * cssScale) - (entry.y * scaleY);
+
+    const line = document.createElement('div');
+    line.className = 'pf-history-item';
+    line.style.cssText = `position:absolute;left:${anchorX}px;top:${anchorY}px;width:40px;height:1px;background:#9ca3af;z-index:40;pointer-events:none;`;
+    ol.appendChild(line);
+
+    const box = document.createElement('div');
+    box.className = 'pf-history-item';
+    box.style.cssText = `position:absolute;left:${anchorX+42}px;top:${anchorY-10}px;min-width:150px;background:rgba(255,255,255,.94);border:1px solid #d1d5db;border-radius:6px;padding:6px 8px;font-size:11px;color:#374151;box-shadow:0 2px 6px rgba(0,0,0,.1);z-index:41;pointer-events:none;`;
+    box.innerHTML = `
+      <div style="font-weight:600">${esc(entry.name)}</div>
+      ${entry.email ? `<div style="color:#6b7280">${esc(entry.email)}</div>` : ''}
+      <div>${new Date(entry.ts).toLocaleString(lang==='de'?'de-DE':'en-GB')}</div>
+      <div>Action: ${esc(actionLabels[entry.action] || entry.action)}</div>
+      ${entry.ip ? `<div style="color:#9ca3af">IP: ${esc(entry.ip)}</div>` : ''}
+      ${entry.vpn ? `<div style="color:#f59e0b">⚠ Used VPN</div>` : ''}
+    `;
+    ol.appendChild(box);
+  });
+}  
 // NEU — History-Toggle-Button-Logik, direkt dahinter:
 let historyOverlayOn = false;
 
@@ -1474,6 +1517,7 @@ async function renderPage(n){
 
   document.getElementById('page-info-txt').textContent=`${n} / ${totalPages}`;
   document.querySelectorAll('.thumb-item').forEach((t,i)=>t.classList.toggle('active',i===n-1));
+  renderHistoryOverlay(); 
 }
    
 async function loadTextItems(pageNum, imgWidth, canvasWidth){
