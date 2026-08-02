@@ -322,6 +322,7 @@ input,select,textarea{font-family:var(--font)}
 /* Main canvas */
 .canvas-area{flex:1;overflow:auto;background:#e8e8e8;display:flex;align-items:flex-start;justify-content:center;padding:24px;position:relative}
 .canvas-wrap{position:relative;box-shadow:0 4px 32px rgba(0,0,0,.18);border-radius:1px;background:white;display:inline-block}
+.canvas-wrap.pf-history-on{margin-right:190px}
 #pdf-canvas{display:block}
 #overlay-layer{position:absolute;inset:0;pointer-events:none}
 #overlay-layer.can-edit{pointer-events:all}
@@ -1441,6 +1442,7 @@ let historyOverlayOn = false;
 function toggleHistoryOverlay(){
   historyOverlayOn = !historyOverlayOn;
   document.getElementById('history-toggle-btn').classList.toggle('active', historyOverlayOn);
+  document.getElementById('canvas-wrap').classList.toggle('pf-history-on', historyOverlayOn); // NEU
   renderHistoryOverlay();
 }
 
