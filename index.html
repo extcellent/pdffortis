@@ -1346,6 +1346,36 @@ window.addEventListener('load', async () => {
     }
   }
 });
+// ═══════════════════════════════════════
+// AUDIT LOG — direkt im PDF eingebettet, kein Server-Storage nötig
+// ═══════════════════════════════════════
+const PF_AUDIT_KEY = 'PDFortisAudit';
+
+async function getClientIp(){
+  try{
+    const r = await fetch('/api/ip');
+    if(!r.ok) return null;
+    const d = await r.json();
+    return d.ip || null;
+  }catch(e){ return null; }
+}
+
+function readAuditLog(pdfLibDocInstance){
+  try{
+    const raw = pdfLibDocInstance.catalog.get(PDFLib.PDFName.of(PF_AUDIT_KEY));
+    if(!raw) return [];
+    return JSON.parse(raw.decodeText());
+  }catch(e){ return []; }
+}
+
+function writeAuditLog(pdfLibDocInstance, newEntries){
+  const existing = readAuditLog(pdfLibDocInstance);
+  const merged = existing.concat(newEntries);
+  pdfLibDocInstance.catalog.set(
+    PDFLib.PDFName.of(PF_AUDIT_KEY),
+    PDFLib.PDFString.of(JSON.stringify(merged))
+  );
+}
 
 async function loadSharedFromObj({ url, name }) {
   showPdfLoader('Geteiltes Dokument wird geladen...');
@@ -1612,6 +1642,7 @@ function addTextBox(x,y){
 
   const wrap=document.createElement('div');
   wrap.className='pf-tbox-wrap selected';
+  wrap.dataset.pfAction='add_text';
   wrap.dataset.pfPage=currentPage;
   wrap.dataset.pfCanvasW=canvas.width;
   wrap.dataset.pfCanvasH=canvas.height;
@@ -1793,6 +1824,7 @@ function addImageOverlay(){
     rd.onload=ev=>{
       const wrap=document.createElement('div');
       wrap.className='pdf-overlay';
+      wrap.dataset.pfAction='add_image';
       wrap.style.cssText='position:absolute;left:80px;top:80px;z-index:10;display:inline-block;';
 
       const del=document.createElement('button');
@@ -1943,6 +1975,7 @@ function placeSig(src){
   const ol=document.getElementById('overlay-layer');
   const wrap=document.createElement('div');
   wrap.className='pdf-overlay';
+  wrap.dataset.pfAction='signed';
   wrap.style.cssText='position:absolute;left:80px;top:100px;width:180px;display:inline-block;';
   const img=document.createElement('img');
   img.src=src;img.className='pdf-img-overlay';
@@ -2135,7 +2168,9 @@ async function performDownload(){
         for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
         return bytes;
       };
-
+     
+      const auditEntries = [];
+      
       for(const wrap of overlays){
         const boxPage = parseInt(wrap.dataset.pfPage, 10) || currentPage;
         const page = doc.getPage(boxPage - 1);
@@ -2164,6 +2199,13 @@ async function performDownload(){
             const pdfY = pdfH - (wrapTop * scaleY) - pdfImgH;
 
             page.drawImage(embedded, {x: pdfX, y: pdfY, width: pdfImgW, height: pdfImgH});
+            auditEntries.push({
+              name: currentUser?.name || 'Anonymous',
+              email: currentUser?.email || null,
+              ts: new Date().toISOString(),
+              action: wrap.dataset.pfAction || 'add_image',
+              page: boxPage, x: pdfX, y: pdfY
+            });            
           }catch(e){ console.warn('Image overlay embed failed', e); }
           continue;
         }
@@ -2197,8 +2239,19 @@ async function performDownload(){
             color
           });
         });
+        auditEntries.push({
+          name: currentUser?.name || 'Anonymous',
+          email: currentUser?.email || null,
+          ts: new Date().toISOString(),
+          action: wrap.dataset.pfAction || 'add_text',
+          page: boxPage, x: pdfX, y: pdfY
+        });        
       }
-
+      if(auditEntries.length){
+        const ip = await getClientIp();
+        auditEntries.forEach(e => e.ip = ip);
+        writeAuditLog(doc, auditEntries);
+      }
       workBytes = await doc.save();
     }
 
