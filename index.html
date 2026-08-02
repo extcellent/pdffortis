@@ -1306,6 +1306,7 @@ async function loadPDF(file){
   document.getElementById('file-size-txt').textContent=kb>1024?`${(kb/1024).toFixed(1)} MB`:`${kb} KB`;
   await buildThumbs();
   await renderPage(currentPage);
+  updateHistoryButtonVisibility(); 
   logRecent(fileName);
   goTo('editor');
 }
