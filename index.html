@@ -1391,8 +1391,8 @@ function toggleHistoryOverlay(){
 
 function updateHistoryButtonVisibility(){
   const btn = document.getElementById('history-toggle-btn');
-  if(!btn) return;
-  const hasEntries = currentUser && pdfLibDoc && readAuditLog(pdfLibDoc).length > 0;
+  if(!btn || !pdfLibDoc) return;
+  const hasEntries = readAuditLog(pdfLibDoc).length > 0;
   btn.style.display = hasEntries ? 'flex' : 'none';
 }
 
