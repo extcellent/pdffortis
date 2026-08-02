@@ -1411,11 +1411,11 @@ function renderHistoryOverlay(){
     const anchorX = entry.x * scaleX;
     const anchorY = canvasCssH - (entry.y * scaleY);
 
-    // Näher zum linken oder rechten Rand? → dorthin ausrichten
+// Immer am festen Canvas-Rand, egal wie weit die Änderung von dort weg ist
     const side = anchorX < canvasCssW / 2 ? 'right' : 'left';
-    let boxLeft = side === 'right'
-      ? Math.min(anchorX + lineLen, canvasCssW - boxWidth - 6)
-      : Math.max(anchorX - lineLen - boxWidth, 6);
+    const boxLeft = side === 'right'
+      ? canvasCssW - boxWidth - 8
+      : 8;
 
     // Vertikale Kollision mit bereits platzierten Boxen derselben Seite vermeiden
     let boxTop = anchorY - 10;
