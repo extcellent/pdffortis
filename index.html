@@ -1400,19 +1400,28 @@ function renderHistoryOverlay(){
   const scaleY = (canvas.height / pdfH) * cssScale;
 
   const actionLabels = {signed:'Signed', add_text:'Add Text', add_image:'Add Image', add_date:'Add Date', add_initials:'Add Initials'};
+  const marginX = canvas.width * cssScale + 16; // rechter Rand, neben der Seite
+  const boxWidth = 160;
+  let stackY = 20; // nächste freie vertikale Position im Rand
 
   entries.forEach(entry => {
     const anchorX = entry.x * scaleX;
     const anchorY = (canvas.height * cssScale) - (entry.y * scaleY);
+    const boxY = stackY;
 
+    // Verbindungslinie: diagonal von der Änderung zum Rand
+    const dx = marginX - anchorX, dy = boxY - anchorY;
+    const len = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx) * 180/Math.PI;
     const line = document.createElement('div');
     line.className = 'pf-history-item';
-    line.style.cssText = `position:absolute;left:${anchorX}px;top:${anchorY}px;width:40px;height:1px;background:#9ca3af;z-index:40;pointer-events:none;`;
+    line.style.cssText = `position:absolute;left:${anchorX}px;top:${anchorY}px;width:${len}px;height:1px;background:rgba(156,163,175,.7);transform:rotate(${angle}deg);transform-origin:0 0;z-index:40;pointer-events:none;`;
     ol.appendChild(line);
 
+    // Kommentar-Box im Rand
     const box = document.createElement('div');
     box.className = 'pf-history-item';
-    box.style.cssText = `position:absolute;left:${anchorX+42}px;top:${anchorY-10}px;min-width:150px;background:rgba(255,255,255,.94);border:1px solid #d1d5db;border-radius:6px;padding:6px 8px;font-size:11px;color:#374151;box-shadow:0 2px 6px rgba(0,0,0,.1);z-index:41;pointer-events:none;`;
+    box.style.cssText = `position:absolute;left:${marginX}px;top:${boxY}px;width:${boxWidth}px;background:rgba(243,244,246,.9);backdrop-filter:blur(2px);border:1px solid rgba(209,213,219,.7);border-radius:6px;padding:6px 8px;font-size:11px;color:#374151;z-index:41;pointer-events:none;`;
     box.innerHTML = `
       <div style="font-weight:600">${esc(entry.name)}</div>
       ${entry.email ? `<div style="color:#6b7280">${esc(entry.email)}</div>` : ''}
@@ -1422,8 +1431,10 @@ function renderHistoryOverlay(){
       ${entry.vpn ? `<div style="color:#f59e0b">⚠ Used VPN</div>` : ''}
     `;
     ol.appendChild(box);
+
+    stackY += box.offsetHeight + 10; // nächste Box weiter unten, keine Überlappung
   });
-}  
+}
 // NEU — History-Toggle-Button-Logik, direkt dahinter:
 let historyOverlayOn = false;
 
