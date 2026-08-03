@@ -130,8 +130,8 @@ async function sbHeartbeat(userId, accessToken) {
 async function sbValidateToken(token) {
   if (!token) return null;
   const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/company_tokens?token=eq.${encodeURIComponent(token)}&select=*`,
-    { headers: SB_HEADERS }
+    `${SUPABASE_URL}/rest/v1/rpc/check_company_token`,
+    { method: 'POST', headers: SB_HEADERS, body: JSON.stringify({ p_token: token }) }
   );
   const d = await r.json();
   return d?.[0] || null;
