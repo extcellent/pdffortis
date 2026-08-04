@@ -239,6 +239,23 @@ input,select,textarea{font-family:var(--font)}
   right:0;
   height:16px;
 }
+.form-legal-note {
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--gray-500);
+  text-align: center;
+  line-height: 1.4;
+}
+
+.form-legal-note a {
+  color: var(--gray-700);
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.form-legal-note a:hover {
+  color: var(--gray-900);
+}
 /* ═══════════════════════════════════════
    PAGE 1 — LANDING
 ═══════════════════════════════════════ */
@@ -1058,12 +1075,7 @@ input,select,textarea{font-family:var(--font)}
         <div class="form-error hidden" id="login-error"></div>
         <button class="form-submit" onclick="doLogin()" data-i="nav_login">Sign in</button>
         <p class="form-note" data-i="no_account" onclick="switchAuthTab('signup')" style="cursor:pointer">No account? Create one free →</p>
-      </div>
-        <p class="form-note">
-          By creating an account, you agree to our 
-          <a href="/agb.html" target="_blank">Terms of Service (AGB)</a> and 
-          <a href="/privacy.html" target="_blank">Privacy Policy</a>.
-        </p>      
+      </div>     
       <div id="auth-signup-form" class="hidden">
         <!-- Honeypot (Bots füllen das aus, User nie) -->
         <input class="pf-hp" id="hp-field" type="text" tabindex="-1" autocomplete="off"/>
@@ -1083,6 +1095,12 @@ input,select,textarea{font-family:var(--font)}
         </div>
         <div class="form-error hidden" id="signup-error"></div>
         <button class="form-submit" onclick="doSignup()" data-i="nav_signup">Create free account</button>
+      <!-- LEGAL TERMS NOTICE -->
+        <p class="form-note form-legal-note">
+          By signing up, you agree to our 
+          <a href="/agb.html" target="_blank">Terms (AGB)</a> & 
+          <a href="/privacy.html" target="_blank">Privacy Policy</a>.
+        </p>   
       </div>
     </div>
   </div>
