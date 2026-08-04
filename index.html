@@ -1059,6 +1059,11 @@ input,select,textarea{font-family:var(--font)}
         <button class="form-submit" onclick="doLogin()" data-i="nav_login">Sign in</button>
         <p class="form-note" data-i="no_account" onclick="switchAuthTab('signup')" style="cursor:pointer">No account? Create one free →</p>
       </div>
+        <p class="form-note">
+          By creating an account, you agree to our 
+          <a href="/agb.html" target="_blank">Terms of Service (AGB)</a> and 
+          <a href="/privacy.html" target="_blank">Privacy Policy</a>.
+        </p>      
       <div id="auth-signup-form" class="hidden">
         <!-- Honeypot (Bots füllen das aus, User nie) -->
         <input class="pf-hp" id="hp-field" type="text" tabindex="-1" autocomplete="off"/>
