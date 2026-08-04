@@ -56,27 +56,28 @@ a{color:inherit}
 .value-card h3{font-size:14px;margin:0 0 6px}
 .value-card p{font-size:12px;color:var(--gray-500);line-height:1.5;margin:0}
 
-/* Dashboard mockup — real component classes from dashboard.html, fake demo data */
---amber:#d97706;--amber-l:#fffbeb;
-.mockup{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:16px;padding:18px;display:flex;gap:14px;box-shadow:var(--shadow-md);font-family:var(--font)}
-.mockup-sidebar{width:140px;background:white;border-radius:10px;padding:14px 10px;flex-shrink:0}
-.mockup-logo-mini{font-size:11px;font-weight:800;margin-bottom:14px;padding:0 4px}
-.mockup-nav-item{font-size:11px;color:var(--gray-500);padding:7px 8px;border-radius:6px;margin-bottom:2px;display:flex;align-items:center;gap:6px}
-.mockup-nav-item.active{background:var(--gray-100);color:var(--gray-900);font-weight:600}
-.mockup-main{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0}
-.mockup-row{display:flex;gap:10px}
-.mockup-card{background:white;border-radius:10px;padding:12px;flex:1;border:1px solid var(--gray-200);min-width:0}
-.mockup-card .label{font-size:9px;color:var(--gray-400);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
-/* Team members — real .member-card structure, shrunk */
-.mm-card{display:flex;align-items:center;gap:8px;padding:6px 0}
-.mm-avatar{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;flex-shrink:0}
-.mm-info{min-width:0}
-.mm-name{font-size:11px;font-weight:700;color:var(--gray-900);white-space:nowrap}
-.mm-status{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--gray-500)}
-.mm-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.mm-dot.online{background:#22c55e}
-.mm-dot.away{background:var(--amber)}
-/* Activity feed — real .activity-item structure, shrunk */
+/* Dashboard mockup — carousel replica of real Overview/Team/Documents/Chat tabs */
+.mockup{position:relative;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:16px;padding:20px 52px;box-shadow:var(--shadow-md);font-family:var(--font);min-height:280px}
+.mockup-arrow{position:absolute;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;background:white;border:1px solid var(--gray-200);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--gray-500);transition:all .15s}
+.mockup-arrow:hover{color:var(--gray-900);border-color:var(--gray-300)}
+.mockup-arrow.left{left:10px}
+.mockup-arrow.right{right:10px}
+.mockup-tabs{display:flex;justify-content:center;gap:6px;margin-bottom:16px}
+.mockup-tab-dot{font-size:10px;font-weight:600;color:var(--gray-400);padding:4px 10px;border-radius:99px;cursor:pointer}
+.mockup-tab-dot.active{background:var(--gray-900);color:white}
+.mockup-slide{display:none}
+.mockup-slide.active{display:block}
+
+/* Stat cards */
+.mf-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.mf-stat{background:white;border:1px solid var(--gray-200);border-radius:10px;padding:10px}
+.mf-stat-val{font-size:18px;font-weight:800}
+.mf-stat-label{font-size:9px;color:var(--gray-500);margin-top:2px}
+.mf-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mf-card{background:white;border:1px solid var(--gray-200);border-radius:10px;padding:12px}
+.mf-card-title{font-size:11px;font-weight:700;margin-bottom:10px}
+
+/* Activity / online rows */
 .ma-item{display:flex;align-items:center;gap:8px;padding:5px 0}
 .ma-avatar{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:white;flex-shrink:0}
 .ma-info{flex:1;min-width:0}
@@ -85,12 +86,36 @@ a{color:inherit}
 .ma-badge{padding:2px 6px;border-radius:99px;font-size:8px;font-weight:700;flex-shrink:0}
 .badge-edit{background:#eff6ff;color:var(--blue)}
 .badge-sign{background:#f0fdf4;color:#16a34a}
-/* Chat — real .chat-msg structure, shrunk */
+.mf-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0}
+
+/* Team grid */
+.mf-team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.mf-member{background:white;border:1px solid var(--gray-200);border-radius:10px;padding:12px}
+.mf-member-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;margin-bottom:8px}
+.mf-member-name{font-size:11px;font-weight:700}
+.mf-member-email{font-size:9px;color:var(--gray-400);margin-bottom:6px}
+.mf-member-status{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--gray-500)}
+
+/* Documents table */
+.mf-filters{display:flex;gap:6px;margin-bottom:10px}
+.mf-filter{padding:3px 10px;font-size:9px;font-weight:600;border-radius:99px;border:1px solid var(--gray-200);background:white;color:var(--gray-500)}
+.mf-filter.active{background:var(--gray-900);color:white;border-color:var(--gray-900)}
+.mf-table{width:100%;border-collapse:collapse;background:white;border:1px solid var(--gray-200);border-radius:10px;overflow:hidden}
+.mf-table th{font-size:8px;font-weight:700;color:var(--gray-400);text-transform:uppercase;padding:6px 10px;text-align:left;border-bottom:1px solid var(--gray-200)}
+.mf-table td{padding:8px 10px;font-size:10px;color:var(--gray-700);border-bottom:1px solid var(--gray-100)}
+.mf-table tr:last-child td{border-bottom:none}
+
+/* Chat */
+.mf-chat{display:flex;gap:10px}
+.mf-chat-main{flex:1;background:white;border:1px solid var(--gray-200);border-radius:10px;padding:12px}
+.mf-chat-online{width:100px;background:white;border:1px solid var(--gray-200);border-radius:10px;padding:10px;flex-shrink:0}
+.mf-chat-online .lbl{font-size:9px;font-weight:700;color:var(--gray-400);margin-bottom:8px}
 .mc-msg{display:flex;gap:6px;margin-bottom:8px;max-width:90%}
 .mc-msg.own{margin-left:auto;flex-direction:row-reverse}
 .mc-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:white;flex-shrink:0}
 .mc-bubble{padding:6px 9px;border-radius:9px 9px 9px 2px;font-size:10px;background:var(--gray-100);color:var(--gray-900)}
 .mc-msg.own .mc-bubble{background:var(--gray-900);color:white;border-radius:9px 9px 2px 9px}
+.mf-online-row{display:flex;align-items:center;gap:6px;font-size:9px;color:var(--gray-700);margin-bottom:8px}
 
 .pricing-card{max-width:380px;margin:0 auto;background:white;border:2px solid var(--gray-900);border-radius:16px;padding:32px;text-align:center;box-shadow:var(--shadow-lg)}
 .pricing-card .trial-tag{display:inline-block;background:var(--green-l);color:var(--green);font-size:11px;font-weight:700;padding:5px 12px;border-radius:99px;margin-bottom:16px}
@@ -160,59 +185,109 @@ a{color:inherit}
 <div class="section">
   <div class="section-label">What your dashboard looks like</div>
   <div class="mockup">
-    <div class="mockup-sidebar">
-      <div class="mockup-logo-mini">📄 Musterfirma GmbH</div>
-      <div class="mockup-nav-item active">📊 Overview</div>
-      <div class="mockup-nav-item">📁 Documents</div>
-      <div class="mockup-nav-item">👥 Team</div>
-      <div class="mockup-nav-item">💬 Chat</div>
-      <div class="mockup-nav-item">⚙️ Settings</div>
+    <div class="mockup-arrow left" onclick="mfPrev()">‹</div>
+    <div class="mockup-arrow right" onclick="mfNext()">›</div>
+    <div class="mockup-tabs">
+      <span class="mockup-tab-dot active" data-i="0" onclick="mfGoTo(0)">Overview</span>
+      <span class="mockup-tab-dot" data-i="1" onclick="mfGoTo(1)">Team</span>
+      <span class="mockup-tab-dot" data-i="2" onclick="mfGoTo(2)">Documents</span>
+      <span class="mockup-tab-dot" data-i="3" onclick="mfGoTo(3)">Chat</span>
     </div>
-    <div class="mockup-main">
-      <div class="mockup-row">
-        <div class="mockup-card">
-          <div class="label">Team</div>
-          <div class="mm-card">
-            <div class="mm-avatar" style="background:linear-gradient(135deg,var(--rb1),var(--rb2))">AK</div>
-            <div class="mm-info"><div class="mm-name">Anna Keller</div><div class="mm-status"><span class="mm-dot online"></span>Online</div></div>
-          </div>
-          <div class="mm-card">
-            <div class="mm-avatar" style="background:linear-gradient(135deg,var(--rb3),var(--rb4))">MB</div>
-            <div class="mm-info"><div class="mm-name">Max Brandt</div><div class="mm-status"><span class="mm-dot online"></span>Online</div></div>
-          </div>
-          <div class="mm-card">
-            <div class="mm-avatar" style="background:linear-gradient(135deg,var(--rb5),var(--rb6))">SW</div>
-            <div class="mm-info"><div class="mm-name">Sophie Wagner</div><div class="mm-status"><span class="mm-dot away"></span>Away</div></div>
-          </div>
-        </div>
-        <div class="mockup-card">
-          <div class="label">Recent activity</div>
+
+    <!-- SLIDE 1: OVERVIEW -->
+    <div class="mockup-slide active" data-slide="0">
+      <div class="mf-stats">
+        <div class="mf-stat"><div class="mf-stat-val">12</div><div class="mf-stat-label">Documents today</div></div>
+        <div class="mf-stat"><div class="mf-stat-val">54</div><div class="mf-stat-label">This week</div></div>
+        <div class="mf-stat"><div class="mf-stat-val">8</div><div class="mf-stat-label">Team members</div></div>
+        <div class="mf-stat"><div class="mf-stat-val" style="color:var(--green)">€192</div><div class="mf-stat-label">Saved vs Adobe</div></div>
+      </div>
+      <div class="mf-grid2">
+        <div class="mf-card">
+          <div class="mf-card-title">Recent Activity</div>
           <div class="ma-item">
-            <div class="ma-avatar" style="background:linear-gradient(135deg,var(--rb1),var(--rb2))">AK</div>
-            <div class="ma-info"><div class="ma-name">Vertrag_Mueller.pdf</div><div class="ma-meta">Anna · 2m ago</div></div>
+            <div class="ma-avatar" style="background:linear-gradient(135deg,var(--rb1),var(--rb2))">SC</div>
+            <div class="ma-info"><div class="ma-name">Contract_Smith.pdf</div><div class="ma-meta">Sarah · 2m ago</div></div>
             <span class="ma-badge badge-edit">Edited</span>
           </div>
           <div class="ma-item">
-            <div class="ma-avatar" style="background:linear-gradient(135deg,var(--rb3),var(--rb4))">MB</div>
-            <div class="ma-info"><div class="ma-name">Rechnung_2026_08.pdf</div><div class="ma-meta">Max · 14m ago</div></div>
+            <div class="ma-avatar" style="background:linear-gradient(135deg,var(--rb3),var(--rb4))">JM</div>
+            <div class="ma-info"><div class="ma-name">Invoice_08_2026.pdf</div><div class="ma-meta">James · 14m ago</div></div>
             <span class="ma-badge badge-sign">Signed</span>
           </div>
-          <div class="ma-item">
-            <div class="ma-avatar" style="background:linear-gradient(135deg,var(--rb5),var(--rb6))">SW</div>
-            <div class="ma-info"><div class="ma-name">Angebot_Klein_GmbH.pdf</div><div class="ma-meta">Sophie · 1h ago</div></div>
-            <span class="ma-badge badge-edit">Edited</span>
-          </div>
+        </div>
+        <div class="mf-card">
+          <div class="mf-card-title">Online Now</div>
+          <div class="mf-online-row"><span class="mf-dot"></span>Sarah Chen</div>
+          <div class="mf-online-row"><span class="mf-dot"></span>James Miller</div>
+          <div class="mf-online-row"><span class="mf-dot"></span>Emma Davis</div>
         </div>
       </div>
-      <div class="mockup-card">
-        <div class="label">Team chat</div>
-        <div class="mc-msg">
-          <div class="mc-avatar" style="background:linear-gradient(135deg,var(--rb1),var(--rb2))">AK</div>
-          <div class="mc-bubble">Can someone check the Müller contract before 5pm?</div>
+    </div>
+
+    <!-- SLIDE 2: TEAM -->
+    <div class="mockup-slide" data-slide="1">
+      <div class="mf-team-grid">
+        <div class="mf-member">
+          <div class="mf-member-avatar" style="background:linear-gradient(135deg,var(--rb1),var(--rb2))">SC</div>
+          <div class="mf-member-name">Sarah Chen</div>
+          <div class="mf-member-email">sarah@company.com</div>
+          <div class="mf-member-status"><span class="mf-dot"></span>Online</div>
         </div>
-        <div class="mc-msg own">
-          <div class="mc-avatar" style="background:linear-gradient(135deg,var(--rb3),var(--rb4))">MB</div>
-          <div class="mc-bubble">On it, reviewing now 👍</div>
+        <div class="mf-member">
+          <div class="mf-member-avatar" style="background:linear-gradient(135deg,var(--rb3),var(--rb4))">JM</div>
+          <div class="mf-member-name">James Miller</div>
+          <div class="mf-member-email">james@company.com</div>
+          <div class="mf-member-status"><span class="mf-dot"></span>Online</div>
+        </div>
+        <div class="mf-member">
+          <div class="mf-member-avatar" style="background:linear-gradient(135deg,var(--rb5),var(--rb6))">ED</div>
+          <div class="mf-member-name">Emma Davis</div>
+          <div class="mf-member-email">emma@company.com</div>
+          <div class="mf-member-status"><span class="mf-dot" style="background:var(--amber)"></span>Away</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: DOCUMENTS -->
+    <div class="mockup-slide" data-slide="2">
+      <div class="mf-filters">
+        <div class="mf-filter active">All</div>
+        <div class="mf-filter">Edited</div>
+        <div class="mf-filter">Signed</div>
+      </div>
+      <table class="mf-table">
+        <thead><tr><th>Document</th><th>By</th><th>Action</th><th>Expires</th></tr></thead>
+        <tbody>
+          <tr><td>Contract_Smith.pdf</td><td>Sarah Chen</td><td>Edited</td><td>46h</td></tr>
+          <tr><td>Invoice_08_2026.pdf</td><td>James Miller</td><td>Signed</td><td>40h</td></tr>
+          <tr><td>Proposal_Wilson.pdf</td><td>Emma Davis</td><td>Compressed</td><td>12h</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- SLIDE 4: CHAT -->
+    <div class="mockup-slide" data-slide="3">
+      <div class="mf-chat">
+        <div class="mf-chat-main">
+          <div class="mc-msg">
+            <div class="mc-avatar" style="background:linear-gradient(135deg,var(--rb1),var(--rb2))">SC</div>
+            <div class="mc-bubble">Can someone check the Smith contract before 5pm?</div>
+          </div>
+          <div class="mc-msg own">
+            <div class="mc-avatar" style="background:linear-gradient(135deg,var(--rb3),var(--rb4))">JM</div>
+            <div class="mc-bubble">On it, reviewing now 👍</div>
+          </div>
+          <div class="mc-msg">
+            <div class="mc-avatar" style="background:linear-gradient(135deg,var(--rb5),var(--rb6))">ED</div>
+            <div class="mc-bubble">Great, thanks both!</div>
+          </div>
+        </div>
+        <div class="mf-chat-online">
+          <div class="lbl">ONLINE</div>
+          <div class="mf-online-row"><span class="mf-dot"></span>Sarah</div>
+          <div class="mf-online-row"><span class="mf-dot"></span>James</div>
+          <div class="mf-online-row"><span class="mf-dot"></span>Emma</div>
         </div>
       </div>
     </div>
@@ -244,5 +319,16 @@ a{color:inherit}
   </div>
 </footer>
 
+<script>
+let mfIndex = 0;
+const mfTotal = 4;
+function mfRender(){
+  document.querySelectorAll('.mockup-slide').forEach(s => s.classList.toggle('active', +s.dataset.slide === mfIndex));
+  document.querySelectorAll('.mockup-tab-dot').forEach(d => d.classList.toggle('active', +d.dataset.i === mfIndex));
+}
+function mfNext(){ mfIndex = (mfIndex + 1) % mfTotal; mfRender(); }
+function mfPrev(){ mfIndex = (mfIndex - 1 + mfTotal) % mfTotal; mfRender(); }
+function mfGoTo(i){ mfIndex = i; mfRender(); }
+</script>
 </body>
 </html>
