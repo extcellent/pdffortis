@@ -209,6 +209,9 @@ async function saveProfile(){
   const updated = await sbUpsertProfile(session.user.id, { display_name: name }, session.user.access_token);
   if(updated){
     profile = updated;
+    // Keep the cached session in sync so the nav avatar/name updates immediately
+    session.user.user_metadata = { ...(session.user.user_metadata||{}), name: name };
+    localStorage.setItem('pf_session', JSON.stringify(session));
     toast('Profile updated');
   } else {
     toast('Something went wrong — try again');
