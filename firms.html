@@ -56,20 +56,41 @@ a{color:inherit}
 .value-card h3{font-size:14px;margin:0 0 6px}
 .value-card p{font-size:12px;color:var(--gray-500);line-height:1.5;margin:0}
 
-/* Stylized dashboard mockup — illustrative only, no real data */
-.mockup{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:16px;padding:20px;display:flex;gap:16px;box-shadow:var(--shadow-md)}
-.mockup-sidebar{width:150px;background:white;border-radius:10px;padding:14px 10px;flex-shrink:0}
-.mockup-sidebar .dot{width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--rb1),var(--rb3));display:inline-block;margin-right:8px}
-.mockup-nav-item{font-size:11px;color:var(--gray-500);padding:7px 8px;border-radius:6px;margin-bottom:4px}
+/* Dashboard mockup — real component classes from dashboard.html, fake demo data */
+--amber:#d97706;--amber-l:#fffbeb;
+.mockup{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:16px;padding:18px;display:flex;gap:14px;box-shadow:var(--shadow-md);font-family:var(--font)}
+.mockup-sidebar{width:140px;background:white;border-radius:10px;padding:14px 10px;flex-shrink:0}
+.mockup-logo-mini{font-size:11px;font-weight:800;margin-bottom:14px;padding:0 4px}
+.mockup-nav-item{font-size:11px;color:var(--gray-500);padding:7px 8px;border-radius:6px;margin-bottom:2px;display:flex;align-items:center;gap:6px}
 .mockup-nav-item.active{background:var(--gray-100);color:var(--gray-900);font-weight:600}
-.mockup-main{flex:1;display:flex;flex-direction:column;gap:10px}
+.mockup-main{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0}
 .mockup-row{display:flex;gap:10px}
-.mockup-card{background:white;border-radius:10px;padding:14px;flex:1}
-.mockup-card .label{font-size:10px;color:var(--gray-400);margin-bottom:8px;font-weight:600}
-.mockup-member{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px}
-.mockup-avatar{width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--rb1),var(--rb2),var(--rb3));flex-shrink:0}
-.mockup-bar{height:6px;border-radius:3px;background:var(--gray-100);margin-bottom:8px}
-.mockup-bar.short{width:60%}
+.mockup-card{background:white;border-radius:10px;padding:12px;flex:1;border:1px solid var(--gray-200);min-width:0}
+.mockup-card .label{font-size:9px;color:var(--gray-400);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+/* Team members — real .member-card structure, shrunk */
+.mm-card{display:flex;align-items:center;gap:8px;padding:6px 0}
+.mm-avatar{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;flex-shrink:0}
+.mm-info{min-width:0}
+.mm-name{font-size:11px;font-weight:700;color:var(--gray-900);white-space:nowrap}
+.mm-status{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--gray-500)}
+.mm-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.mm-dot.online{background:#22c55e}
+.mm-dot.away{background:var(--amber)}
+/* Activity feed — real .activity-item structure, shrunk */
+.ma-item{display:flex;align-items:center;gap:8px;padding:5px 0}
+.ma-avatar{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:white;flex-shrink:0}
+.ma-info{flex:1;min-width:0}
+.ma-name{font-size:10px;font-weight:600;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ma-meta{font-size:9px;color:var(--gray-400)}
+.ma-badge{padding:2px 6px;border-radius:99px;font-size:8px;font-weight:700;flex-shrink:0}
+.badge-edit{background:#eff6ff;color:var(--blue)}
+.badge-sign{background:#f0fdf4;color:#16a34a}
+/* Chat — real .chat-msg structure, shrunk */
+.mc-msg{display:flex;gap:6px;margin-bottom:8px;max-width:90%}
+.mc-msg.own{margin-left:auto;flex-direction:row-reverse}
+.mc-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:white;flex-shrink:0}
+.mc-bubble{padding:6px 9px;border-radius:9px 9px 9px 2px;font-size:10px;background:var(--gray-100);color:var(--gray-900)}
+.mc-msg.own .mc-bubble{background:var(--gray-900);color:white;border-radius:9px 9px 2px 9px}
 
 .pricing-card{max-width:380px;margin:0 auto;background:white;border:2px solid var(--gray-900);border-radius:16px;padding:32px;text-align:center;box-shadow:var(--shadow-lg)}
 .pricing-card .trial-tag{display:inline-block;background:var(--green-l);color:var(--green);font-size:11px;font-weight:700;padding:5px 12px;border-radius:99px;margin-bottom:16px}
@@ -140,31 +161,59 @@ a{color:inherit}
   <div class="section-label">What your dashboard looks like</div>
   <div class="mockup">
     <div class="mockup-sidebar">
-      <div class="mockup-nav-item active"><span class="dot"></span>Overview</div>
-      <div class="mockup-nav-item">Documents</div>
-      <div class="mockup-nav-item">Team</div>
-      <div class="mockup-nav-item">Chat</div>
-      <div class="mockup-nav-item">Settings</div>
+      <div class="mockup-logo-mini">📄 Musterfirma GmbH</div>
+      <div class="mockup-nav-item active">📊 Overview</div>
+      <div class="mockup-nav-item">📁 Documents</div>
+      <div class="mockup-nav-item">👥 Team</div>
+      <div class="mockup-nav-item">💬 Chat</div>
+      <div class="mockup-nav-item">⚙️ Settings</div>
     </div>
     <div class="mockup-main">
       <div class="mockup-row">
         <div class="mockup-card">
-          <div class="label">TEAM</div>
-          <div class="mockup-member"><div class="mockup-avatar"></div>Team member</div>
-          <div class="mockup-member"><div class="mockup-avatar"></div>Team member</div>
-          <div class="mockup-member"><div class="mockup-avatar"></div>Team member</div>
+          <div class="label">Team</div>
+          <div class="mm-card">
+            <div class="mm-avatar" style="background:linear-gradient(135deg,var(--rb1),var(--rb2))">AK</div>
+            <div class="mm-info"><div class="mm-name">Anna Keller</div><div class="mm-status"><span class="mm-dot online"></span>Online</div></div>
+          </div>
+          <div class="mm-card">
+            <div class="mm-avatar" style="background:linear-gradient(135deg,var(--rb3),var(--rb4))">MB</div>
+            <div class="mm-info"><div class="mm-name">Max Brandt</div><div class="mm-status"><span class="mm-dot online"></span>Online</div></div>
+          </div>
+          <div class="mm-card">
+            <div class="mm-avatar" style="background:linear-gradient(135deg,var(--rb5),var(--rb6))">SW</div>
+            <div class="mm-info"><div class="mm-name">Sophie Wagner</div><div class="mm-status"><span class="mm-dot away"></span>Away</div></div>
+          </div>
         </div>
         <div class="mockup-card">
-          <div class="label">RECENT ACTIVITY</div>
-          <div class="mockup-bar"></div>
-          <div class="mockup-bar"></div>
-          <div class="mockup-bar short"></div>
+          <div class="label">Recent activity</div>
+          <div class="ma-item">
+            <div class="ma-avatar" style="background:linear-gradient(135deg,var(--rb1),var(--rb2))">AK</div>
+            <div class="ma-info"><div class="ma-name">Vertrag_Mueller.pdf</div><div class="ma-meta">Anna · 2m ago</div></div>
+            <span class="ma-badge badge-edit">Edited</span>
+          </div>
+          <div class="ma-item">
+            <div class="ma-avatar" style="background:linear-gradient(135deg,var(--rb3),var(--rb4))">MB</div>
+            <div class="ma-info"><div class="ma-name">Rechnung_2026_08.pdf</div><div class="ma-meta">Max · 14m ago</div></div>
+            <span class="ma-badge badge-sign">Signed</span>
+          </div>
+          <div class="ma-item">
+            <div class="ma-avatar" style="background:linear-gradient(135deg,var(--rb5),var(--rb6))">SW</div>
+            <div class="ma-info"><div class="ma-name">Angebot_Klein_GmbH.pdf</div><div class="ma-meta">Sophie · 1h ago</div></div>
+            <span class="ma-badge badge-edit">Edited</span>
+          </div>
         </div>
       </div>
       <div class="mockup-card">
-        <div class="label">SHARED DOCUMENTS</div>
-        <div class="mockup-bar"></div>
-        <div class="mockup-bar short"></div>
+        <div class="label">Team chat</div>
+        <div class="mc-msg">
+          <div class="mc-avatar" style="background:linear-gradient(135deg,var(--rb1),var(--rb2))">AK</div>
+          <div class="mc-bubble">Can someone check the Müller contract before 5pm?</div>
+        </div>
+        <div class="mc-msg own">
+          <div class="mc-avatar" style="background:linear-gradient(135deg,var(--rb3),var(--rb4))">MB</div>
+          <div class="mc-bubble">On it, reviewing now 👍</div>
+        </div>
       </div>
     </div>
   </div>
