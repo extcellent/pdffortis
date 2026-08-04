@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account Settings — PDFortis</title>
+<script>
+  // Anti-flicker: bounce to home immediately if not logged in
+  (function(){
+    try{
+      var raw = localStorage.getItem('pf_session');
+      if(!raw){ window.location.href = '/index.html'; return; }
+      var s = JSON.parse(raw);
+      if(!s || !s.user || (s.expires_at && s.expires_at < Date.now())){
+        window.location.href = '/index.html'; return;
+      }
+    }catch(e){ window.location.href = '/index.html'; }
+  })();
+</script>
+<style>
+:root{
+  --white:#ffffff;
+  --off:#f8f8f8;
+  --gray-50:#f9fafb;
+  --gray-100:#f3f4f6;
+  --gray-200:#e5e7eb;
+  --gray-300:#d1d5db;
+  --gray-400:#9ca3af;
+  --gray-500:#6b7280;
+  --gray-600:#4b5563;
+  --gray-700:#374151;
+  --gray-900:#111827;
+  --blue:#2563eb;
+  --blue-l:#eff6ff;
+  --radius:8px;
+  --shadow:0 1px 4px rgba(0,0,0,.08);
+  --shadow-md:0 4px 16px rgba(0,0,0,.10);
+  --shadow-lg:0 20px 60px rgba(0,0,0,.13);
+  --font:'Inter',system-ui,sans-serif;
+  --red:#dc2626;--red-l:#fef2f2;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:var(--font);background:var(--off);color:var(--gray-900)}
+a{color:inherit}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;background:var(--white);border-bottom:1px solid var(--gray-200)}
+.nav-logo{font-weight:800;font-size:16px;text-decoration:none;display:flex;align-items:center;gap:8px}
+.back-link{font-size:13px;color:var(--gray-500);text-decoration:none;font-weight:500}
+.back-link:hover{color:var(--gray-900)}
+.wrap{max-width:640px;margin:0 auto;padding:40px 24px 80px}
+h1{font-size:22px;margin:0 0 6px}
+.sub{color:var(--gray-500);font-size:13px;margin:0 0 28px}
+.card{background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:22px;box-shadow:var(--shadow);margin-bottom:18px}
+.card h2{font-size:14px;margin:0 0 16px;display:flex;align-items:center;gap:8px}
+label{display:block;font-size:12px;font-weight:600;color:var(--gray-600);margin-bottom:6px}
+input{width:100%;padding:10px 12px;border:1px solid var(--gray-300);border-radius:8px;font-size:13px;font-family:var(--font);margin-bottom:14px}
+input:disabled{background:var(--gray-50);color:var(--gray-500)}
+input:focus{outline:none;border-color:var(--blue)}
+.row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray-100);font-size:13px}
+.row:last-child{border-bottom:none}
+.row .lbl{color:var(--gray-500);font-size:12px}
+.row .val{font-weight:600;font-size:12px}
+.btn{padding:10px 16px;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)}
+.btn-primary{background:var(--gray-900);color:white}
+.btn-primary:hover{background:#000}
+.btn-ghost{background:var(--gray-100);color:var(--gray-700)}
+.btn-ghost:hover{background:var(--gray-200)}
+.btn-danger{background:var(--red);color:white}
+.btn-danger:hover{background:#b91c1c}
+.btn-full{width:100%}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--gray-900);color:white;padding:11px 20px;border-radius:8px;font-size:13px;box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+.danger-card{border-color:#fecaca}
+.danger-card h2{color:var(--red)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:100}
+.modal-overlay.open{display:flex}
+.modal{background:white;border-radius:14px;padding:26px;max-width:380px;width:90%;box-shadow:var(--shadow-lg)}
+.modal h3{margin:0 0 10px;font-size:16px;color:var(--red)}
+.modal p{font-size:13px;color:var(--gray-600);margin:0 0 16px;line-height:1.5}
+.modal input{margin-bottom:16px}
+.modal-actions{display:flex;gap:10px}
+.modal-actions .btn{flex:1}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-logo" href="/index.html">📄 PDFortis</a>
+  <a class="back-link" href="/index.html">← Back to tools</a>
+</nav>
+
+<div class="wrap">
+  <h1>Account Settings</h1>
+  <p class="sub">Manage your profile, company, and account.</p>
+
+  <div class="card">
+    <h2>👤 Profile</h2>
+    <label>Name</label>
+    <input type="text" id="in-name" placeholder="Your name">
+    <label>Email</label>
+    <input type="text" id="in-email" disabled>
+    <button class="btn btn-primary btn-full" onclick="saveProfile()">Save changes</button>
+  </div>
+
+  <div class="card" id="company-card">
+    <!-- filled in by JS: either "your company" info or "add a token" form -->
+  </div>
+
+  <div class="card danger-card">
+    <h2>⚠️ Danger zone</h2>
+    <div class="row"><span class="lbl">Delete your account and all associated data</span></div>
+    <button class="btn btn-danger btn-full" style="margin-top:10px" onclick="openDeleteModal()">Delete account</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal">
+    <h3>Delete your account?</h3>
+    <p>This permanently deletes your profile, messages, and activity. This cannot be undone. Type <strong>DELETE</strong> below to confirm.</p>
+    <input type="text" id="delete-confirm-input" placeholder="Type DELETE">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">Delete forever</button>
+    </div>
+  </div>
+</div>
+
+<script src="/supabase.js"></script>
+<script>
+let session = pfGetSession();
+let profile = null;
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2500);
+}
+
+async function init(){
+  if(!session){ window.location.href = '/index.html'; return; }
+  profile = await sbGetProfile(session.user.id, session.user.access_token);
+
+  document.getElementById('in-name').value = profile?.display_name || '';
+  document.getElementById('in-email').value = session.user.email || '';
+
+  renderCompanyCard();
+}
+
+function renderCompanyCard(){
+  const card = document.getElementById('company-card');
+  if(profile?.company_token){
+    card.innerHTML = `
+      <h2>🏢 Company</h2>
+      <div class="row"><span class="lbl">Company</span><span class="val" id="co-name">—</span></div>
+      <div class="row"><span class="lbl">Address</span><span class="val" id="co-addr">—</span></div>
+      <button class="btn btn-ghost btn-full" style="margin-top:14px" onclick="leaveCompany()">Leave this company</button>
+    `;
+    sbValidateToken(profile.company_token).then(tk=>{
+      if(tk){
+        document.getElementById('co-name').textContent = tk.company_name || '—';
+        document.getElementById('co-addr').textContent = tk.company_address || '—';
+      }
+    });
+  } else {
+    card.innerHTML = `
+      <h2>🏢 Company</h2>
+      <label>Have a company token?</label>
+      <input type="text" id="in-token" placeholder="Enter your company token">
+      <button class="btn btn-primary btn-full" onclick="addToken()">Link company token</button>
+    `;
+  }
+}
+
+async function saveProfile(){
+  const name = document.getElementById('in-name').value.trim();
+  if(!name){ toast('Name cannot be empty'); return; }
+  const updated = await sbUpsertProfile(session.user.id, { display_name: name }, session.user.access_token);
+  if(updated){
+    profile = updated;
+    toast('Profile updated');
+  } else {
+    toast('Something went wrong — try again');
+  }
+}
+
+async function addToken(){
+  const val = document.getElementById('in-token').value.trim();
+  if(!val){ toast('Enter a token first'); return; }
+  const tk = await sbValidateToken(val);
+  if(!tk){ toast('Invalid token'); return; }
+  const updated = await sbUpsertProfile(session.user.id, { company_token: tk.token }, session.user.access_token);
+  profile = updated || { ...profile, company_token: tk.token };
+  toast('Company linked');
+  renderCompanyCard();
+}
+
+async function leaveCompany(){
+  const updated = await sbUpsertProfile(session.user.id, { company_token: null }, session.user.access_token);
+  profile = updated || { ...profile, company_token: null };
+  toast('You left the company');
+  renderCompanyCard();
+}
+
+function openDeleteModal(){
+  document.getElementById('delete-modal').classList.add('open');
+  document.getElementById('delete-confirm-input').value = '';
+}
+function closeDeleteModal(){
+  document.getElementById('delete-modal').classList.remove('open');
+}
+async function confirmDelete(){
+  const val = document.getElementById('delete-confirm-input').value.trim();
+  if(val !== 'DELETE'){ toast('Type DELETE exactly to confirm'); return; }
+  const ok = await sbDeleteAccount(session.user.access_token);
+  if(ok){
+    pfClearSession();
+    window.location.href = '/index.html';
+  } else {
+    toast('Something went wrong — try again');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
