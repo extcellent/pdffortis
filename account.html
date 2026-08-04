@@ -79,14 +79,18 @@ input:focus{outline:none;border-color:var(--blue)}
 .modal input{margin-bottom:16px}
 .modal-actions{display:flex;gap:10px}
 .modal-actions .btn{flex:1}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo-icon{width:28px;height:28px}
+.nav-logo-text{font-size:15px;font-weight:700;color:var(--gray-900);letter-spacing:-.3px}
+.nav-logo-text span{background:linear-gradient(135deg,var(--rb1),var(--rb3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 </style>
 </head>
 <body>
 
-<nav class="nav">
-  <a class="nav-logo" href="/index.html">📄 PDFortis</a>
-  <a class="back-link" href="/index.html">← Back to tools</a>
-</nav>
+<a class="nav-logo" href="/index.html">
+  <svg class="nav-logo-icon" viewBox="0 0 28 28" fill="none"><rect x="3" y="2" width="16" height="21" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="16" height="21" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="16" height="21" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+  <span class="nav-logo-text">PDF<span>ortis</span></span>
+</a>
 
 <div class="wrap">
   <h1>Account Settings</h1>
