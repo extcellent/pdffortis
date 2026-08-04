@@ -1,27 +1,3 @@
-PDFortis processes all document edits, conversions, and metadata locally inside the user's browser, while team sharing relies on temporary, auto-expiring Supabase storage.
-
-### How Privacy & Data Flow Work in PDFortis
-
-* **Local-First Architecture**: Standard PDF operations (editing, compression, translation, and invisible metadata/history embedded into the PDF file) execute 100% in the browser client. Files never touch a server unless explicitly shared.
-
-
-* **Team Dashboard & Shared Links**: When a user chooses to share a document with their team, the PDF is temporarily stored in Supabase Storage (`shared-pdfs/`). Links use signed URLs expiring in 48 hours, after which the files and associated activity logs are purged via automated cleanup functions.
-
-
-* **Anonymous Download Tracking**: Unauthenticated tool usage generates a non-reversible SHA-256 hash of browser attributes (screen resolution, timezone, user agent) to prevent abuse. These hashes expire automatically after 8 hours.
-
-
-* **Sign-In Legal Acceptance**: Standard practice requires users to acknowledge the **Privacy Policy** and accept the **Terms of Service** upon account creation. A notice beneath sign-up forms ("By signing up, you agree to our Privacy Policy") typically satisfies legal requirements under GDPR/DSGVO.
-
----
-
-### Privacy Page Structure & `privacy.html`
-
-Standard privacy policies for web tools break down into six core sections: Controller Information, Local Processing Guarantee, Cloud Storage & Retention, Anonymous Analytics, Infrastructure Vendors, and User Data Rights.
-
-Here is the complete `privacy.html` file designed to match your existing styling and codebase:
-
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
