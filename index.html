@@ -201,6 +201,33 @@ input,select,textarea{font-family:var(--font)}
 .nav-user{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--gray-700)}
 .nav-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--rb1),var(--rb3));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white}
 
+.nav-user-wrap{position:relative}
+.nav-dropdown{
+  position:absolute;
+  top:calc(100% + 8px);
+  right:0;
+  background:white;
+  border:1px solid var(--gray-200);
+  border-radius:10px;
+  box-shadow:var(--shadow-md);
+  min-width:180px;
+  padding:6px;
+  display:none;
+  z-index:50;
+}
+.nav-dropdown.open{display:block}
+.nav-dropdown a{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:9px 10px;
+  border-radius:7px;
+  font-size:13px;
+  font-weight:500;
+  color:var(--gray-700);
+  text-decoration:none;
+}
+.nav-dropdown a:hover{background:var(--gray-50)}
 /* ═══════════════════════════════════════
    PAGE 1 — LANDING
 ═══════════════════════════════════════ */
@@ -614,10 +641,15 @@ input,select,textarea{font-family:var(--font)}
         <button class="nav-auth-btn nav-login" onclick="openAuth('login')" data-i="nav_login">Sign in</button>
         <button class="nav-auth-btn nav-signup" onclick="openAuth('signup')" data-i="nav_signup">Get started</button>
       </div>
-      <a id="landing-user-area" class="nav-user hidden" href="/dashboard.html" style="text-decoration:none;color:inherit;cursor:pointer" title="Open Dashboard">
-        <div class="nav-avatar" id="landing-avatar">?</div>
-        <span id="landing-username"></span>
-      </a>
+      <div id="landing-user-area" class="nav-user nav-user-wrap hidden">
+        <div class="nav-avatar" id="landing-avatar" onclick="toggleNavDropdown('landing')" style="cursor:pointer"></div>
+        <span id="landing-username" onclick="toggleNavDropdown('landing')" style="cursor:pointer"></span>
+        <div class="nav-dropdown" id="landing-nav-dropdown">
+          <a href="/dashboard.html">🏢 Dashboard</a>
+          <a href="/account.html">⚙️ Account Settings</a>
+          <a href="#" onclick="logout();return false">Logout</a>
+        </div>
+      </div>
       <button id="landing-logout-btn" class="nav-auth-btn nav-login hidden" onclick="logout()" style="font-size:11px" data-i="logout">Logout</button>
     </div>
   </nav>  
@@ -697,10 +729,14 @@ input,select,textarea{font-family:var(--font)}
         <button class="nav-auth-btn nav-login" onclick="openAuth('login')" data-i="nav_login">Sign in</button>
         <button class="nav-auth-btn nav-signup" onclick="openAuth('signup')" data-i="nav_signup">Get started</button>
       </div>
-      <div id="upload-user-area" class="nav-user hidden">
-        <div class="nav-avatar" id="upload-avatar">?</div>
-        <span id="upload-username"></span>
-        <button class="nav-auth-btn nav-login" onclick="logout()" style="font-size:11px" data-i="logout">Logout</button>
+      <div id="upload-user-area" class="nav-user nav-user-wrap hidden">
+        <div class="nav-avatar" id="upload-avatar" onclick="toggleNavDropdown('upload')" style="cursor:pointer"></div>
+        <span id="upload-username" onclick="toggleNavDropdown('upload')" style="cursor:pointer"></span>
+        <div class="nav-dropdown" id="upload-nav-dropdown">
+          <a href="/dashboard.html">🏢 Dashboard</a>
+          <a href="/account.html">⚙️ Account Settings</a>
+          <a href="#" onclick="logout();return false">Logout</a>
+        </div>
       </div>
     </div>
   <script>
