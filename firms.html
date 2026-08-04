@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDFortis for Teams — Shared PDF workspace for businesses</title>
+<link rel="icon" href="/pdfortis_big.png" type="image/png">
+<style>
+:root{
+  --white:#ffffff;
+  --off:#f8f8f8;
+  --gray-50:#f9fafb;
+  --gray-100:#f3f4f6;
+  --gray-200:#e5e7eb;
+  --gray-300:#d1d5db;
+  --gray-400:#9ca3af;
+  --gray-500:#6b7280;
+  --gray-600:#4b5563;
+  --gray-700:#374151;
+  --gray-900:#111827;
+  --blue:#2563eb;
+  --blue-l:#eff6ff;
+  --green:#10b981;--green-l:#ecfdf5;
+  --radius:8px;
+  --shadow:0 1px 4px rgba(0,0,0,.08);
+  --shadow-md:0 4px 16px rgba(0,0,0,.10);
+  --shadow-lg:0 20px 60px rgba(0,0,0,.13);
+  --font:'Inter',system-ui,sans-serif;
+  --rb1:#6366f1;--rb2:#8b5cf6;--rb3:#ec4899;--rb4:#f59e0b;--rb5:#10b981;--rb6:#3b82f6;
+}
+*{box-sizing:border-box}
+html,body{margin:0;font-family:var(--font);background:var(--white);color:var(--gray-900)}
+a{color:inherit}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--gray-200)}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo-icon{width:28px;height:28px}
+.nav-logo-text{font-size:15px;font-weight:700;color:var(--gray-900);letter-spacing:-.3px}
+.nav-logo-text span{background:linear-gradient(135deg,var(--rb1),var(--rb3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.nav-right a{font-size:13px;color:var(--gray-600);text-decoration:none;font-weight:500;margin-left:20px}
+.nav-right a:hover{color:var(--gray-900)}
+
+.hero{max-width:720px;margin:0 auto;padding:80px 24px 50px;text-align:center}
+.hero h1{font-size:38px;font-weight:800;line-height:1.15;margin:0 0 16px}
+.hero p{font-size:16px;color:var(--gray-500);line-height:1.6;margin:0 0 32px}
+.btn{padding:13px 26px;border-radius:99px;border:none;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}
+.btn-primary{background:var(--gray-900);color:white}
+.btn-primary:hover{background:#000}
+.hero-note{font-size:12px;color:var(--gray-400);margin-top:14px}
+
+.section{max-width:1000px;margin:0 auto;padding:50px 24px}
+.section-label{text-align:center;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--gray-400);margin-bottom:36px}
+
+.value-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.value-card{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:12px;padding:20px}
+.value-card .icon{font-size:22px;margin-bottom:10px}
+.value-card h3{font-size:14px;margin:0 0 6px}
+.value-card p{font-size:12px;color:var(--gray-500);line-height:1.5;margin:0}
+
+/* Stylized dashboard mockup — illustrative only, no real data */
+.mockup{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:16px;padding:20px;display:flex;gap:16px;box-shadow:var(--shadow-md)}
+.mockup-sidebar{width:150px;background:white;border-radius:10px;padding:14px 10px;flex-shrink:0}
+.mockup-sidebar .dot{width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--rb1),var(--rb3));display:inline-block;margin-right:8px}
+.mockup-nav-item{font-size:11px;color:var(--gray-500);padding:7px 8px;border-radius:6px;margin-bottom:4px}
+.mockup-nav-item.active{background:var(--gray-100);color:var(--gray-900);font-weight:600}
+.mockup-main{flex:1;display:flex;flex-direction:column;gap:10px}
+.mockup-row{display:flex;gap:10px}
+.mockup-card{background:white;border-radius:10px;padding:14px;flex:1}
+.mockup-card .label{font-size:10px;color:var(--gray-400);margin-bottom:8px;font-weight:600}
+.mockup-member{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px}
+.mockup-avatar{width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--rb1),var(--rb2),var(--rb3));flex-shrink:0}
+.mockup-bar{height:6px;border-radius:3px;background:var(--gray-100);margin-bottom:8px}
+.mockup-bar.short{width:60%}
+
+.pricing-card{max-width:380px;margin:0 auto;background:white;border:2px solid var(--gray-900);border-radius:16px;padding:32px;text-align:center;box-shadow:var(--shadow-lg)}
+.pricing-card .trial-tag{display:inline-block;background:var(--green-l);color:var(--green);font-size:11px;font-weight:700;padding:5px 12px;border-radius:99px;margin-bottom:16px}
+.pricing-card .price{font-size:40px;font-weight:800;margin:0}
+.pricing-card .price span{font-size:14px;font-weight:500;color:var(--gray-400)}
+.pricing-card ul{list-style:none;padding:0;margin:20px 0;text-align:left;font-size:13px;color:var(--gray-600)}
+.pricing-card li{padding:6px 0;display:flex;gap:8px}
+.pricing-note{font-size:11px;color:var(--gray-400);margin-top:14px}
+
+.footer{border-top:1px solid var(--gray-200);padding:20px 28px;display:flex;justify-content:space-between;font-size:12px;color:var(--gray-400)}
+.footer a{color:var(--gray-400);text-decoration:none}
+.footer a:hover{color:var(--gray-700)}
+.footer-links{display:flex;gap:18px}
+
+@media(max-width:700px){
+  .value-grid{grid-template-columns:1fr 1fr}
+  .mockup{flex-direction:column}
+  .mockup-sidebar{width:100%}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-logo" href="/index.html">
+    <svg class="nav-logo-icon" viewBox="0 0 28 28" fill="none"><rect x="3" y="2" width="16" height="21" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="16" height="21" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="16" height="21" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <span class="nav-logo-text">PDF<span>ortis</span></span>
+  </a>
+  <div class="nav-right">
+    <a href="/index.html">← Back to tools</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <h1>One shared workspace for every PDF your team touches</h1>
+  <p>Stop emailing documents back and forth. See who's working on what, chat with your team, and keep a full activity log — built for law firms, tax offices, and busy small teams.</p>
+  <a class="btn btn-primary" href="mailto:pdfortis@proton.me?subject=Firmenanfrage%20%E2%80%93%20PDFortis%20Team%20Dashboard&body=Firma%3A%20%5BFirma%20GmbH%5D%0D%0A%0D%0AAdresse%3A%20%5BHauptsitz%5D%0D%0A%0D%0AMitarbeiterzahl%3A%20%5BAnzahl%5D%0D%0A%0D%0AKontakt-E-Mail%3A%20%5Bemail%40firma.de%5D%0D%0A%0D%0AWebsite%3A%20%5Bhttps%3A%2F%2Ffirma.de%5D%0D%0A%0D%0AWof%C3%BCr%20soll%20PDFortis%20genutzt%20werden%3F%3A%20%5B...%5D">Request access for your team →</a>
+  <div class="hero-note">No setup fees. Free trial, no credit card required.</div>
+</div>
+
+<div class="section">
+  <div class="section-label">Built for teams</div>
+  <div class="value-grid">
+    <div class="value-card">
+      <div class="icon">📁</div>
+      <h3>Shared documents</h3>
+      <p>Every file your team edits or shares lives in one place — no more "which version is the latest" over email.</p>
+    </div>
+    <div class="value-card">
+      <div class="icon">💬</div>
+      <h3>Team chat</h3>
+      <p>A quick channel for your team to talk about a document without switching to another app.</p>
+    </div>
+    <div class="value-card">
+      <div class="icon">📊</div>
+      <h3>Activity log</h3>
+      <p>See who opened, edited, or downloaded a document, and when — useful for regulated work.</p>
+    </div>
+    <div class="value-card">
+      <div class="icon">💶</div>
+      <h3>No per-seat fees</h3>
+      <p>One company token for your whole team — not per-user pricing like Adobe Acrobat Pro.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-label">What your dashboard looks like</div>
+  <div class="mockup">
+    <div class="mockup-sidebar">
+      <div class="mockup-nav-item active"><span class="dot"></span>Overview</div>
+      <div class="mockup-nav-item">Documents</div>
+      <div class="mockup-nav-item">Team</div>
+      <div class="mockup-nav-item">Chat</div>
+      <div class="mockup-nav-item">Settings</div>
+    </div>
+    <div class="mockup-main">
+      <div class="mockup-row">
+        <div class="mockup-card">
+          <div class="label">TEAM</div>
+          <div class="mockup-member"><div class="mockup-avatar"></div>Team member</div>
+          <div class="mockup-member"><div class="mockup-avatar"></div>Team member</div>
+          <div class="mockup-member"><div class="mockup-avatar"></div>Team member</div>
+        </div>
+        <div class="mockup-card">
+          <div class="label">RECENT ACTIVITY</div>
+          <div class="mockup-bar"></div>
+          <div class="mockup-bar"></div>
+          <div class="mockup-bar short"></div>
+        </div>
+      </div>
+      <div class="mockup-card">
+        <div class="label">SHARED DOCUMENTS</div>
+        <div class="mockup-bar"></div>
+        <div class="mockup-bar short"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-label">Pricing</div>
+  <div class="pricing-card">
+    <div class="trial-tag">[X]-day free trial</div>
+    <p class="price">€[XX]<span>/month</span></p>
+    <ul>
+      <li>✓ Unlimited team members</li>
+      <li>✓ Shared document workspace</li>
+      <li>✓ Team chat & activity log</li>
+      <li>✓ Company-branded signatures</li>
+    </ul>
+    <a class="btn btn-primary" style="width:100%" href="mailto:pdfortis@proton.me?subject=Firmenanfrage%20%E2%80%93%20PDFortis%20Team%20Dashboard&body=Firma%3A%20%5BFirma%20GmbH%5D%0D%0A%0D%0AAdresse%3A%20%5BHauptsitz%5D%0D%0A%0D%0AMitarbeiterzahl%3A%20%5BAnzahl%5D%0D%0A%0D%0AKontakt-E-Mail%3A%20%5Bemail%40firma.de%5D%0D%0A%0D%0AWebsite%3A%20%5Bhttps%3A%2F%2Ffirma.de%5D%0D%0A%0D%0AWof%C3%BCr%20soll%20PDFortis%20genutzt%20werden%3F%3A%20%5B...%5D">Start free trial →</a>
+    <div class="pricing-note">Pricing shown is a placeholder — replace with your actual trial length and price.</div>
+  </div>
+</div>
+
+<footer class="footer">
+  <span>© PDFortis</span>
+  <div class="footer-links">
+    <a href="/legal.html">Legal Notice</a>
+    <a href="/privacy.html">Privacy</a>
+    <a href="/contact.html">Contact</a>
+  </div>
+</footer>
+
+</body>
+</html>
