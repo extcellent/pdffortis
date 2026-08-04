@@ -1,0 +1,141 @@
+PDFortis processes all document edits, conversions, and metadata locally inside the user's browser, while team sharing relies on temporary, auto-expiring Supabase storage.
+
+### How Privacy & Data Flow Work in PDFortis
+
+* **Local-First Architecture**: Standard PDF operations (editing, compression, translation, and invisible metadata/history embedded into the PDF file) execute 100% in the browser client. Files never touch a server unless explicitly shared.
+
+
+* **Team Dashboard & Shared Links**: When a user chooses to share a document with their team, the PDF is temporarily stored in Supabase Storage (`shared-pdfs/`). Links use signed URLs expiring in 48 hours, after which the files and associated activity logs are purged via automated cleanup functions.
+
+
+* **Anonymous Download Tracking**: Unauthenticated tool usage generates a non-reversible SHA-256 hash of browser attributes (screen resolution, timezone, user agent) to prevent abuse. These hashes expire automatically after 8 hours.
+
+
+* **Sign-In Legal Acceptance**: Standard practice requires users to acknowledge the **Privacy Policy** and accept the **Terms of Service** upon account creation. A notice beneath sign-up forms ("By signing up, you agree to our Privacy Policy") typically satisfies legal requirements under GDPR/DSGVO.
+
+---
+
+### Privacy Page Structure & `privacy.html`
+
+Standard privacy policies for web tools break down into six core sections: Controller Information, Local Processing Guarantee, Cloud Storage & Retention, Anonymous Analytics, Infrastructure Vendors, and User Data Rights.
+
+Here is the complete `privacy.html` file designed to match your existing styling and codebase:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — PDFortis</title>
+<link rel="icon" href="/pdfortis_big.png" type="image/png">
+<style>
+:root{
+  --white:#ffffff;--off:#f8f8f8;--gray-50:#f9fafb;--gray-100:#f3f4f6;--gray-200:#e5e7eb;
+  --gray-300:#d1d5db;--gray-400:#9ca3af;--gray-500:#6b7280;--gray-600:#4b5563;--gray-700:#374151;--gray-900:#111827;
+  --radius:8px;--shadow:0 1px 4px rgba(0,0,0,.08);--font:'Inter',system-ui,sans-serif;
+  --rb1:#6366f1;--rb3:#ec4899;--amber:#d97706;--amber-l:#fffbeb;--green:#10b981;--green-l:#ecfdf5;
+}
+*{box-sizing:border-box}
+html,body{margin:0;font-family:var(--font);background:var(--white);color:var(--gray-900)}
+a{color:inherit}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--gray-200)}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo-icon{width:28px;height:28px}
+.nav-logo-text{font-size:15px;font-weight:700;letter-spacing:-.3px}
+.nav-logo-text span{background:linear-gradient(135deg,var(--rb1),var(--rb3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.back-link{font-size:13px;color:var(--gray-500);text-decoration:none;font-weight:500}
+.back-link:hover{color:var(--gray-900)}
+.wrap{max-width:640px;margin:0 auto;padding:48px 24px 80px}
+h1{font-size:24px;margin:0 0 6px}
+.updated{font-size:12px;color:var(--gray-400);margin-bottom:28px}
+h2{font-size:16px;margin:32px 0 10px}
+p,li{font-size:14px;line-height:1.65;color:var(--gray-700)}
+ul{padding-left:20px;margin:10px 0}
+li{margin-bottom:6px}
+.notice{background:var(--green-l);border:1px solid #a7f3d0;border-radius:10px;padding:14px 16px;font-size:13px;color:#065f46;margin-bottom:28px;line-height:1.6}
+.field{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px 14px;margin:10px 0;font-size:13px}
+.field .k{font-size:11px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;font-weight:600}
+footer{border-top:1px solid var(--gray-200);padding:20px 28px;display:flex;justify-content:space-between;font-size:12px;color:var(--gray-400)}
+footer a{color:var(--gray-400);text-decoration:none}
+footer a:hover{color:var(--gray-700)}
+.footer-links{display:flex;gap:18px}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-logo" href="/index.html">
+    <svg class="nav-logo-icon" viewBox="0 0 28 28" fill="none"><rect x="3" y="2" width="16" height="21" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="16" height="21" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="16" height="21" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <span class="nav-logo-text">PDF<span>ortis</span></span>
+  </a>
+  <a class="back-link" href="/index.html">← Back to tools</a>
+</nav>
+
+<div class="wrap">
+  <h1>Privacy Policy</h1>
+  <div class="updated">Last updated: August 2026</div>
+
+  <div class="notice">
+    <strong>Privacy-First Guarantee:</strong> Your documents are processed locally on your device. We do not upload, read, or store your private PDF files during standard single-user operations.
+  </div>
+
+  <h2>1. Overview & Data Controller</h2>
+  <p>PDFortis is designed around a client-side architecture to protect your documents. For any privacy inquiries or account management, contact us at:</p>
+  <div class="field">
+    <div class="k">Data Controller Contact</div>
+    pdfortis@proton.me
+  </div>
+
+  <h2>2. Local Browser Processing</h2>
+  <p>When using our online PDF tools (merging, editing, compressing, translating, or signing), processing takes place entirely within your browser environment:</p>
+  <ul>
+    <li><strong>Zero Server Uploads:</strong> Files remain in local RAM and are not transferred to backend servers.</li>
+    <li><strong>Embedded Metadata & History:</strong> Document revision history and signature states are embedded directly into the generated PDF binary or local storage on your device.</li>
+    <li><strong>Browser Translations:</strong> Document translation tasks execute locally via client-side scripts.</li>
+  </ul>
+
+  <h2>3. Team Workspace & Temporary Storage</h2>
+  <p>If you create an account and use team collaboration features, limited cloud processing applies strictly to shared assets:</p>
+  <ul>
+    <li><strong>Explicit PDF Sharing:</strong> Documents are uploaded to Supabase Storage only when you explicitly select "Share with Team." Shared link access defaults to a strict <strong>48-hour expiration window</strong>.</li>
+    <li><strong>Automatic File Purging:</strong> Shared files and associated activity entries are automatically purged from servers upon expiration.</li>
+    <li><strong>Team Messaging:</strong> Team chat messages are stored in Supabase and automatically removed after 7 days.</li>
+  </ul>
+
+  <h2>4. Usage Tracking & Abuse Prevention</h2>
+  <p>To enforce free usage quotas without requiring cookies or user registration, we use anonymized technical identifiers:</p>
+  <div class="field">
+    <div class="k">Anonymous Fingerprinting</div>
+    We generate a one-way SHA-256 hash derived from your browser headers (screen resolution, language, user-agent, timezone). This hash cannot be reversed into personally identifiable information and is automatically deleted from download logs after 8 hours.
+  </div>
+
+  <h2>5. Infrastructure & Subprocessors</h2>
+  <p>We rely on trusted third-party cloud infrastructure to serve web assets and handle optional team workspace databases:</p>
+  <ul>
+    <li><strong>Vercel Inc.:</strong> Hosting platform for static application assets.</li>
+    <li><strong>Supabase Inc.:</strong> Cloud database and storage provider for team authentication, active subscriptions, and temporary shared links.</li>
+  </ul>
+
+  <h2>6. Your Rights under GDPR / DSGVO</h2>
+  <p>You have full ownership of your data. Registered workspace users retain the right to:</p>
+  <ul>
+    <li>Request access to stored profile information.</li>
+    <li>Update or correct account details via the Dashboard.</li>
+    <li>Delete your account and all linked workspace profiles instantly using the account deletion workflow.</li>
+  </ul>
+</div>
+
+<footer>
+  <span>© PDFortis</span>
+  <div class="footer-links">
+    <a href="/legal.html">Legal Notice</a>
+    <a href="/privacy.html">Privacy</a>
+    <a href="/contact.html">Contact</a>
+  </div>
+</footer>
+
+</body>
+</html>
+
+```
