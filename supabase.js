@@ -124,6 +124,14 @@ async function sbHeartbeat(userId, accessToken) {
   });
 }
 
+async function sbDeleteAccount(accessToken) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/delete_my_account`, {
+    method: 'POST',
+    headers: authHeaders(accessToken)
+  });
+  return r.ok;
+}
+
 // ============================================
 // COMPANY TOKEN
 // ============================================
