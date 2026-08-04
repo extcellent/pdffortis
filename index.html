@@ -205,7 +205,7 @@ input,select,textarea{font-family:var(--font)}
 .nav-dropdown{
   position:absolute;
   top:calc(100% + 8px);
-  right:0;
+  right:-100px;
   background:white;
   border:1px solid var(--gray-200);
   border-radius:10px;
@@ -647,7 +647,6 @@ input,select,textarea{font-family:var(--font)}
         <div class="nav-dropdown" id="landing-nav-dropdown">
           <a href="/dashboard.html">🏢 Dashboard</a>
           <a href="/account.html">⚙️ Account Settings</a>
-          <a href="#" onclick="logout();return false">Logout</a>
         </div>
       </div>
       <button id="landing-logout-btn" class="nav-auth-btn nav-login hidden" onclick="logout()" style="font-size:11px" data-i="logout">Logout</button>
@@ -734,8 +733,7 @@ input,select,textarea{font-family:var(--font)}
         <span id="upload-username" onclick="toggleNavDropdown('upload')" style="cursor:pointer"></span>
         <div class="nav-dropdown" id="upload-nav-dropdown">
           <a href="/dashboard.html">🏢 Dashboard</a>
-          <a href="/account.html">⚙️ Account Settings</a>
-          <a href="#" onclick="logout();return false">Logout</a>
+          <a href="/account.html">⚙️ Settings</a>
         </div>
       </div>
     </div>
