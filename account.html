@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Account Settings — PDFortis</title>
+<link rel="icon" href="/pdfortis_big.png" type="image/png">
 <script>
   // Anti-flicker: bounce to home immediately if not logged in
   (function(){
@@ -38,12 +39,16 @@
   --shadow-lg:0 20px 60px rgba(0,0,0,.13);
   --font:'Inter',system-ui,sans-serif;
   --red:#dc2626;--red-l:#fef2f2;
+  --rb1:#6366f1;--rb2:#8b5cf6;--rb3:#ec4899;--rb4:#f59e0b;--rb5:#10b981;--rb6:#3b82f6;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;font-family:var(--font);background:var(--off);color:var(--gray-900)}
 a{color:inherit}
 .nav{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;background:var(--white);border-bottom:1px solid var(--gray-200)}
-.nav-logo{font-weight:800;font-size:16px;text-decoration:none;display:flex;align-items:center;gap:8px}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo-icon{width:28px;height:28px}
+.nav-logo-text{font-size:15px;font-weight:700;color:var(--gray-900);letter-spacing:-.3px}
+.nav-logo-text span{background:linear-gradient(135deg,var(--rb1),var(--rb3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .back-link{font-size:13px;color:var(--gray-500);text-decoration:none;font-weight:500}
 .back-link:hover{color:var(--gray-900)}
 .wrap{max-width:640px;margin:0 auto;padding:40px 24px 80px}
@@ -79,18 +84,17 @@ input:focus{outline:none;border-color:var(--blue)}
 .modal input{margin-bottom:16px}
 .modal-actions{display:flex;gap:10px}
 .modal-actions .btn{flex:1}
-.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
-.nav-logo-icon{width:28px;height:28px}
-.nav-logo-text{font-size:15px;font-weight:700;color:var(--gray-900);letter-spacing:-.3px}
-.nav-logo-text span{background:linear-gradient(135deg,var(--rb1),var(--rb3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 </style>
 </head>
 <body>
 
-<a class="nav-logo" href="/index.html">
-  <svg class="nav-logo-icon" viewBox="0 0 28 28" fill="none"><rect x="3" y="2" width="16" height="21" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="16" height="21" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="16" height="21" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
-  <span class="nav-logo-text">PDF<span>ortis</span></span>
-</a>
+<nav class="nav">
+  <a class="nav-logo" href="/index.html">
+    <svg class="nav-logo-icon" viewBox="0 0 28 28" fill="none"><rect x="3" y="2" width="16" height="21" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="16" height="21" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="16" height="21" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <span class="nav-logo-text">PDF<span>ortis</span></span>
+  </a>
+  <a class="back-link" href="/index.html">← Back to tools</a>
+</nav>
 
 <div class="wrap">
   <h1>Account Settings</h1>
