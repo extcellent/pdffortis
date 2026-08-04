@@ -31,8 +31,18 @@ p,li{font-size:14px;line-height:1.65;color:var(--gray-700)}
 .field{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px;margin:6px 0;font-size:14px}
 .field .k{font-size:11px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px}
 .field .missing{color:var(--gray-400);font-style:italic}
-footer{border-top:1px solid var(--gray-200);padding:20px 28px;display:flex;justify-content:space-between;font-size:12px;color:var(--gray-400)}
-footer a{color:var(--gray-400);text-decoration:none}
+footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 10px 28px;
+    margin-top: 25%;
+    font-size: 11px;
+    color: var(--gray-400);
+    border-top: 1px solid var(--gray-200);
+}footer a{color:var(--gray-400);text-decoration:none}
 footer a:hover{color:var(--gray-700)}
 .footer-links{display:flex;gap:18px}
 </style>
@@ -66,7 +76,8 @@ footer a:hover{color:var(--gray-700)}
   <span>© PDFortis</span>
   <div class="footer-links">
     <a href="/legal.html">Legal Notice</a>
-    <a href="/privacy.html">Privacy</a>
+    <a href="/privacy.html">Privacy</a
+    <a href="/tos.html">ToS</a>
     <a href="/contact.html">Contact</a>
   </div>
 </footer>
