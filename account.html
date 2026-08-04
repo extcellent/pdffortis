@@ -14,7 +14,17 @@
       var s = JSON.parse(raw);
       if(!s || !s.user || (s.expires_at && s.expires_at < Date.now())){
         window.location.href = '/index.html'; return;
-      }
+      }    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--gray-100);
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, .92);
+    backdrop-filter: blur(8px);
+    position: relative;
+    z-index: 100;
     }catch(e){ window.location.href = '/index.html'; }
   })();
 </script>
@@ -44,7 +54,19 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;font-family:var(--font);background:var(--off);color:var(--gray-900)}
 a{color:inherit}
-.nav{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;background:var(--white);border-bottom:1px solid var(--gray-200)}
+.nav{
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--gray-100);
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, .92);
+    backdrop-filter: blur(8px);
+    position: relative;
+    z-index: 100;
+}
 .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
 .nav-logo-icon{width:28px;height:28px}
 .nav-logo-text{font-size:15px;font-weight:700;color:var(--gray-900);letter-spacing:-.3px}
