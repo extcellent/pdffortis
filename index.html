@@ -204,7 +204,9 @@ input,select,textarea{font-family:var(--font)}
 .nav-user-wrap{position:relative}
 .nav-dropdown{
   position:absolute;
-  top:calc(100% + 8px);
+  top:100%;
+  margin-top:8px;
+  padding-top:8px;
   right:-100px;
   background:white;
   border:1px solid var(--gray-200);
@@ -229,6 +231,14 @@ input,select,textarea{font-family:var(--font)}
 }
 .nav-dropdown a:hover{background:var(--gray-50)}
 .nav-user-wrap:hover .nav-dropdown{display:block}
+.nav-user-wrap::after{
+  content:'';
+  position:absolute;
+  top:100%;
+  left:0;
+  right:0;
+  height:16px;
+}
 /* ═══════════════════════════════════════
    PAGE 1 — LANDING
 ═══════════════════════════════════════ */
