@@ -1336,8 +1336,16 @@ let sigDrawing=false, sigLX=0, sigLY=0;
 let currentUser=null, currentToken=null;
 let clientFP=null;
 let thumbCanvases=[];
-const MAX_DL=5, LIMIT_MS=8*60*60*1000;
-const LS_DL='pf_dl', LS_TOKEN='pf_tok', LS_TOKDAT='pf_tokdat', LS_USER='pf_user';
+  
+const CONFIG = {
+  ENABLE_PAYWALL: false,
+  ENABLE_ADS: false,
+  DAILY_FREE_LOGGED_IN_LIMIT: 3,
+  GUEST_DL_LIMIT: 1
+};
+const MAX_DL=CONFIG.DAILY_FREE_LOGGED_IN_LIMIT, LIMIT_MS=8*60*60*1000;
+const LS_DL='pf_dl', LS_GUEST_DL='pdfortis_guest_downloads_used', LS_TOKEN='pf_tok', LS_TOKDAT='pf_tokdat', LS_USER='pf_user';
+  
 let lang='en';
 // ── CAPTCHA ──
 let pfCaptchaVerified = false;
@@ -2345,12 +2353,25 @@ async function compressAndSave(){
 async function triggerDownload(){
   if(!pdfLibDoc){toast('No document loaded','err');return}
   if(currentToken){await logTokenUsage('download');await performDownload();return}
+
+  if(!isLoggedIn()){
+    // Guest path — mirrors translate: 1 free, then sign-up wall
+    if(guestDLUsed() >= CONFIG.GUEST_DL_LIMIT){
+      document.getElementById('auth-modal')?.classList.remove('hidden');
+      return;
+    }
+    incGuestDLUsed();
+    updateDLDisplay();
+    await performDownload();
+    return;
+  }
+
+  // Logged-in path — daily cap
   const lsCount=getLSDLCount();
   let sbCount=0;
   try{sbCount=await sbGetDLCount(await getFingerprint())}catch(e){}
   const used=Math.max(lsCount,sbCount);
   if(used>=MAX_DL){showLimitModal();return}
-  if(used===2&&!currentUser){showNudge()}
   logLSDL();
   try{await sbLogDL(await getFingerprint())}catch(e){}
   updateDLDisplay();
@@ -2546,6 +2567,10 @@ function _doDownload(bytes){
   URL.revokeObjectURL(url);
   toast(lang==='de'?'PDF gespeichert!':'PDF saved!','ok');
 }
+  
+function isLoggedIn(){ return !!currentUser; }
+function guestDLUsed(){ return parseInt(localStorage.getItem(LS_GUEST_DL) || '0', 10); }
+function incGuestDLUsed(){ localStorage.setItem(LS_GUEST_DL, String(guestDLUsed() + 1)); }  
 
 function getLSDLCount(){
   const raw=localStorage.getItem(LS_DL);if(!raw)return 0;
