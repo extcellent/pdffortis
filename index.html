@@ -1070,7 +1070,7 @@ input,select,textarea{font-family:var(--font)}
         <button class="auth-tab active" id="auth-tab-login" onclick="switchAuthTab('login')" data-i="nav_login">Sign in</button>
         <button class="auth-tab" id="auth-tab-signup" onclick="switchAuthTab('signup')" data-i="nav_signup">Create account</button>
       </div>
-        <button class="form-submit" style="background:#fff;color:#1f1f1f;border:1px solid var(--gray-200);margin-bottom:10px" onclick="signInWithGoogle()">
+        <button class="form-submit" id="google-signin-btn" style="background:#fff;color:#1f1f1f;border:1px solid var(--gray-200);margin-bottom:10px" onclick="signInWithGoogle()">
           <span>Continue with Google</span>
         </button>
       <div id="auth-login-form">
@@ -2678,12 +2678,70 @@ function removeToken(){
 // ═══════════════════════════════════════
 // AUTH (Supabase Auth)
 // ═══════════════════════════════════════
-function signInWithGoogle(){
-  const redirectTo = window.location.origin + window.location.pathname;
-  window.location.href = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
+const GOOGLE_CLIENT_ID = '762322811608-apb6sln1ek7jhdupa2h98f5ho5e97d57.apps.googleusercontent.com';
+let _googleNonce = null;
+
+async function initGoogleSignIn(){
+  const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+  const encoded = new TextEncoder().encode(nonce);
+  const hashBuf = await crypto.subtle.digest('SHA-256', encoded);
+  const hashedNonce = Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  _googleNonce = nonce;
+
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleGoogleCredential,
+    nonce: hashedNonce,
+    use_fedcm_for_prompt: true
+  });
 }
+
+function signInWithGoogle(){
+  google.accounts.id.prompt();
+}
+
+async function handleGoogleCredential(response){
+  try{
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=id_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+      body: JSON.stringify({ provider: 'google', id_token: response.credential, nonce: _googleNonce })
+    });
+    const d = await r.json();
+    if(d.error || !d.access_token){ toast('Google sign-in failed','err'); return; }
+
+    pfSaveSession(d);
+
+    let profile = await sbGetProfile(d.user.id, d.access_token);
+    if(!profile){
+      profile = await sbUpsertProfile(d.user.id, {
+        email: d.user.email,
+        display_name: d.user.user_metadata?.name || d.user.email?.split('@')[0]
+      }, d.access_token);
+    }
+
+    currentUser = {
+      id: d.user.id,
+      email: d.user.email,
+      name: profile?.display_name || d.user.user_metadata?.name || d.user.email?.split('@')[0] || 'User',
+      token: d.access_token,
+      company_token: profile?.company_token || null
+    };
+
+    if(currentUser.company_token){
+      const tok = await sbValidateToken(currentUser.company_token);
+      if(tok){ currentToken = tok; localStorage.setItem(LS_TOKDAT, JSON.stringify(tok)); applyTokenUI(tok); }
+    }
+
+    applyUserUI();
+    closeModal('auth-modal');
+    toast(lang==='de'?'Willkommen!':'Welcome!','ok');
+  }catch(e){ console.warn('Google sign-in error', e); toast('Connection error','err'); }
+}
+
+window.addEventListener('load', initGoogleSignIn);
   
-function openAuth(tab){
+  function openAuth(tab){
   document.getElementById('auth-modal').classList.remove('hidden');
   switchAuthTab(tab);
 }
@@ -2899,57 +2957,9 @@ function restoreSessionFromStorage(){
       token: s.user.access_token
     };
     applyUserUI();
-}catch(e){ console.warn('session restore failed', e); }
+  }catch(e){ console.warn('session restore failed', e); }
 }
-
-async function handleOAuthCallback(){
-  const hash = window.location.hash;
-  if(!hash.includes('access_token')) return;
-  const params = new URLSearchParams(hash.slice(1));
-  const access_token = params.get('access_token');
-  const expires_in = params.get('expires_in');
-  if(!access_token) return;
-
-  try{
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { 'Authorization': `Bearer ${access_token}`, 'apikey': SUPABASE_ANON_KEY }
-    });
-    const user = await r.json();
-    if(!user?.id) return;
-
-    pfSaveSession({ user, access_token, expires_in: parseInt(expires_in || '3600', 10) });
-
-    let profile = await sbGetProfile(user.id, access_token);
-    if(!profile){
-      profile = await sbUpsertProfile(user.id, {
-        email: user.email,
-        display_name: user.user_metadata?.name || user.email?.split('@')[0]
-      }, access_token);
-    }
-
-    currentUser = {
-      id: user.id,
-      email: user.email,
-      name: profile?.display_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
-      token: access_token,
-      company_token: profile?.company_token || null
-    };
-
-    if(currentUser.company_token){
-      const tok = await sbValidateToken(currentUser.company_token);
-      if(tok){ currentToken = tok; localStorage.setItem(LS_TOKDAT, JSON.stringify(tok)); applyTokenUI(tok); }
-    }
-
-    applyUserUI();
-    history.replaceState(null, '', window.location.pathname); // strip #access_token from URL
-    toast(lang==='de'?'Willkommen!':'Welcome!','ok');
-  }catch(e){ console.warn('OAuth callback failed', e); }
-}
-
-window.addEventListener('load', () => {
-  handleOAuthCallback();
-  restoreSessionFromStorage();
-});
+window.addEventListener('load', restoreSessionFromStorage);
   
 function pfVerifyCaptcha(){
   const el = document.getElementById('pf-captcha');
@@ -3504,5 +3514,6 @@ window.openAuthModal = () => document.getElementById('auth-modal')?.classList.re
 <script src="/auth-badge.js"></script>
 <script src="/pdfortis-clientengine.js"></script>
 <script src="/pdfortis-translate.js" defer></script>
+<script src="https://accounts.google.com/gsi/client" async></script>
 </body>
 </html>
