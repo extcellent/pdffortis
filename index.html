@@ -3,9 +3,7 @@
 <head>
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/coi-serviceworker.js').then(reg => {
-      if (!crossOriginIsolated) location.reload();
-    });
+    navigator.serviceWorker.register('/coi-serviceworker.js');
   }
 </script>
 <script>
