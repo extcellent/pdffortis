@@ -1070,9 +1070,7 @@ input,select,textarea{font-family:var(--font)}
         <button class="auth-tab active" id="auth-tab-login" onclick="switchAuthTab('login')" data-i="nav_login">Sign in</button>
         <button class="auth-tab" id="auth-tab-signup" onclick="switchAuthTab('signup')" data-i="nav_signup">Create account</button>
       </div>
-        <button class="form-submit" id="google-signin-btn" style="background:#fff;color:#1f1f1f;border:1px solid var(--gray-200);margin-bottom:10px" onclick="signInWithGoogle()">
-          <span>Continue with Google</span>
-        </button>
+        <div id="google-btn-container" style="display:flex;justify-content:center;margin-bottom:10px"></div>
       <div id="auth-login-form">
         <div class="form-field"><label data-i="email_lbl">Email</label><input class="form-input" id="login-email" type="email" placeholder="you@example.com"/></div>
         <div class="form-field"><label data-i="pw_lbl">Password</label><input class="form-input" id="login-pw" type="password" placeholder="••••••••"/></div>
@@ -2694,16 +2692,14 @@ async function initGoogleSignIn(){
     nonce: hashedNonce,
     use_fedcm_for_prompt: true
   });
+
+  google.accounts.id.renderButton(
+    document.getElementById('google-btn-container'),
+    { theme: 'outline', size: 'large', width: 300, text: 'continue_with' }
+  );
 }
 
-function signInWithGoogle(){
-  google.accounts.id.prompt((notification) => {
-    console.log('isNotDisplayed:', notification.isNotDisplayed());
-    console.log('notDisplayedReason:', notification.getNotDisplayedReason());
-    console.log('isSkippedMoment:', notification.isSkippedMoment());
-    console.log('skippedReason:', notification.getSkippedReason());
-  });
-}
+
 
 async function handleGoogleCredential(response){
   try{
