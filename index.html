@@ -2697,7 +2697,12 @@ async function initGoogleSignIn(){
 }
 
 function signInWithGoogle(){
-  google.accounts.id.prompt();
+  google.accounts.id.prompt((notification) => {
+    console.log('isNotDisplayed:', notification.isNotDisplayed());
+    console.log('notDisplayedReason:', notification.getNotDisplayedReason());
+    console.log('isSkippedMoment:', notification.isSkippedMoment());
+    console.log('skippedReason:', notification.getSkippedReason());
+  });
 }
 
 async function handleGoogleCredential(response){
