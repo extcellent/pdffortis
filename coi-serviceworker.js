@@ -19,7 +19,7 @@ self.addEventListener("fetch", function(event) {
     fetch(event.request.clone()).then(function(response) {
       if (!response || response.status === 0 || !response.body) return response;
       const newHeaders = new Headers(response.headers);
-      newHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
+      newHeaders.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
       newHeaders.set("Cross-Origin-Embedder-Policy", "credentialless");
       return new Response(response.body, {
         status: response.status,
