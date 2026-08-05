@@ -3,8 +3,15 @@ self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
 self.addEventListener("fetch", function(event) {
   const url = event.request.url;
   
-  // Supabase und andere Auth-Requests direkt durchlassen
-  if (url.includes('supabase.co') || url.includes('googleapis.com/identitytoolkit')) {
+// Supabase und andere Auth-Requests direkt durchlassen
+  if (
+    url.includes('supabase.co') ||
+    url.includes('googleapis.com/identitytoolkit') ||
+    url.includes('accounts.google.com') ||
+    url.includes('googleusercontent.com') ||
+    url.includes('gstatic.com') ||
+    url.includes('csp.withgoogle.com')
+  ) {
     return; // Kein respondWith → Browser handled es nativ
   }
 
