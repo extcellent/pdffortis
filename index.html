@@ -2587,6 +2587,11 @@ function logLSDL(){
 }
 function updateDLDisplay(){
   if(currentToken){document.getElementById('dl-count-display').textContent='∞';return}
+  if(!isLoggedIn()){
+    const left=Math.max(0,CONFIG.GUEST_DL_LIMIT-guestDLUsed());
+    document.getElementById('dl-count-display').textContent=`${left} left`;
+    return;
+  }
   const left=Math.max(0,MAX_DL-getLSDLCount());
   document.getElementById('dl-count-display').textContent=`${left} left`;
 }
