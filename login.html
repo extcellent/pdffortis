@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anmelden – PDFortis</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#171a21; --border:#2a2e38;
+    --text:#e8eaed; --muted:#9aa0ac; --accent:#4f7cff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  }
+  .card{
+    width:100%; max-width:380px; background:var(--card); border:1px solid var(--border);
+    border-radius:16px; padding:36px 32px; text-align:center;
+  }
+  .logo{font-size:20px; font-weight:700; margin-bottom:4px;}
+  .sub{color:var(--muted); font-size:14px; margin-bottom:28px;}
+  #google-btn-container{display:flex; justify-content:center; min-height:44px;}
+  .status{margin-top:18px; font-size:13px; color:var(--muted); min-height:18px;}
+  .status.err{color:#f27272;}
+  .back{
+    display:inline-block; margin-top:22px; color:var(--muted); font-size:13px;
+    text-decoration:none; border-top:1px solid var(--border); padding-top:16px; width:100%;
+  }
+  .back:hover{color:var(--text);}
+  .spinner{
+    display:inline-block; width:16px; height:16px; border:2px solid var(--border);
+    border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite;
+    vertical-align:middle; margin-right:8px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+  <div class="card">
+    <div class="logo">PDFortis</div>
+    <div class="sub">Mit Google anmelden</div>
+
+    <div id="google-btn-container"></div>
+
+    <div class="status" id="status"></div>
+
+    <a class="back" href="/index.html">← Zurück zur normalen Anmeldung</a>
+  </div>
+
+  <!-- Session-Helfer, SUPABASE_URL/ANON_KEY, pfSaveSession, sbGetProfile, sbUpsertProfile, sbValidateToken -->
+  <script src="/supabase.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <script>
+    const GOOGLE_CLIENT_ID = '762322811608-apb6sln1ek7jhdupa2h98f5ho5e97d57.apps.googleusercontent.com';
+    const LS_TOKDAT = 'pf_tokdat';
+    let _googleNonce = null;
+
+    // Wohin nach erfolgreichem Login? Default: index.html
+    // Aufruf z.B. /login.html?redirect=/dashboard.html möglich
+    function getRedirectTarget(){
+      const p = new URLSearchParams(location.search).get('redirect');
+      return p && p.startsWith('/') ? p : '/index.html';
+    }
+
+    function setStatus(msg, isErr){
+      const el = document.getElementById('status');
+      el.innerHTML = msg;
+      el.classList.toggle('err', !!isErr);
+    }
+
+    async function initGoogleSignIn(){
+      if (typeof google === 'undefined' || !google.accounts) {
+        // Google-Skript noch nicht geladen -> kurz warten und retry
+        setTimeout(initGoogleSignIn, 150);
+        return;
+      }
+      const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+      const encoded = new TextEncoder().encode(nonce);
+      const hashBuf = await crypto.subtle.digest('SHA-256', encoded);
+      const hashedNonce = Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+      _googleNonce = nonce;
+
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogleCredential,
+        nonce: hashedNonce,
+        use_fedcm_for_prompt: true,
+        use_fedcm_for_button: true
+      });
+
+      google.accounts.id.renderButton(
+        document.getElementById('google-btn-container'),
+        { theme: 'outline', size: 'large', width: 300, text: 'continue_with' }
+      );
+    }
+
+    async function handleGoogleCredential(response){
+      setStatus('<span class="spinner"></span>Anmeldung läuft…');
+      try{
+        const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=id_token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+          body: JSON.stringify({ provider: 'google', id_token: response.credential, nonce: _googleNonce })
+        });
+        const d = await r.json();
+        if(d.error || !d.access_token){
+          setStatus('Google-Anmeldung fehlgeschlagen. Bitte erneut versuchen.', true);
+          return;
+        }
+
+        // Exakt gleiche Session wie normale Anmeldung -> index.html/dashboard.html
+        // erkennen den Nutzer danach automatisch als eingeloggt (localStorage).
+        pfSaveSession(d);
+
+        let profile = await sbGetProfile(d.user.id, d.access_token);
+        if(!profile){
+          profile = await sbUpsertProfile(d.user.id, {
+            email: d.user.email,
+            display_name: d.user.user_metadata?.name || d.user.email?.split('@')[0]
+          }, d.access_token);
+        }
+
+        // Session-Mirror wie im normalen Login (Anti-Flicker beim Reload kennt den Namen)
+        try{
+          const userObj = {...d.user, access_token: d.access_token};
+          userObj.user_metadata = {...(d.user.user_metadata||{}), name: profile?.display_name || d.user.user_metadata?.name};
+          localStorage.setItem('pf_session', JSON.stringify({
+            user: userObj,
+            expires_at: Date.now()+(d.expires_in||3600)*1000
+          }));
+        }catch(e){}
+
+        if(profile?.company_token){
+          const tok = await sbValidateToken(profile.company_token);
+          if(tok){ localStorage.setItem(LS_TOKDAT, JSON.stringify(tok)); }
+        }
+
+        setStatus('Angemeldet — weiterleiten…');
+        window.location.href = getRedirectTarget();
+
+      }catch(e){
+        console.warn('Google sign-in error', e);
+        setStatus('Verbindungsfehler. Bitte erneut versuchen.', true);
+      }
+    }
+
+    window.addEventListener('load', initGoogleSignIn);
+  </script>
+
+</body>
+</html>
