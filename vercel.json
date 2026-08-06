@@ -2,9 +2,17 @@
   "version": 2,
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/login.html",
       "headers": {
         "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+        "Cross-Origin-Embedder-Policy": "credentialless"
+      },
+      "dest": "/login.html"
+    },
+    {
+      "src": "/(.*)",
+      "headers": {
+        "Cross-Origin-Opener-Policy": "same-origin",
         "Cross-Origin-Embedder-Policy": "credentialless"
       },
       "dest": "/$1"
