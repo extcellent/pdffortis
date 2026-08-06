@@ -820,7 +820,7 @@ function resetWorkerPool() {
 }
 
 function getWorkerPool() {
-  const count = 1; // NUR 1 Worker — WASM-Speicher wächst nur, schrumpft nie;
+  const count = 2; // NUR 1 Worker — WASM-Speicher wächst nur, schrumpft nie;
                     // mehrere Worker mit je eigenem Modell (~100-600MB) summieren
                     // sich sonst auf und lassen den Tab nach ein paar Übersetzungen einfrieren.
   if (workerPool.length === count) return workerPool;
