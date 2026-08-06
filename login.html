@@ -4,50 +4,73 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Anmelden – PDFortis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0f1115; --card:#171a21; --border:#2a2e38;
-    --text:#e8eaed; --muted:#9aa0ac; --accent:#4f7cff;
+    --white:#ffffff;
+    --gray-50:#f9fafb;
+    --gray-100:#f3f4f6;
+    --gray-200:#e5e7eb;
+    --gray-300:#d1d5db;
+    --gray-400:#9ca3af;
+    --gray-500:#6b7280;
+    --gray-600:#4b5563;
+    --gray-700:#374151;
+    --gray-900:#111827;
+    --blue:#2563eb;
+    --blue-l:#eff6ff;
+    --shadow-lg:0 20px 60px rgba(0,0,0,.13);
+    --font:'Inter',system-ui,sans-serif;
   }
   *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;font-family:var(--font);color:var(--gray-900);}
   body{
-    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
-    background:var(--bg); color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.4); backdrop-filter:blur(3px);
+    min-height:100vh;
   }
-  .card{
-    width:100%; max-width:380px; background:var(--card); border:1px solid var(--border);
-    border-radius:16px; padding:36px 32px; text-align:center;
+  .modal{
+    background:var(--white); border-radius:14px; box-shadow:var(--shadow-lg);
+    width:420px; max-width:94vw; overflow:hidden; animation:modalIn .2s ease;
   }
-  .logo{font-size:20px; font-weight:700; margin-bottom:4px;}
-  .sub{color:var(--muted); font-size:14px; margin-bottom:28px;}
+  @keyframes modalIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+  .modal-hd{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 20px 14px; border-bottom:1px solid var(--gray-100);
+  }
+  .modal-hd h3{font-size:15px; font-weight:700; margin:0;}
+  .modal-x{
+    background:none; border:none; font-size:18px; color:var(--gray-400);
+    cursor:pointer; line-height:1; padding:2px 5px; border-radius:4px; transition:all .12s;
+    text-decoration:none;
+  }
+  .modal-x:hover{background:var(--gray-100); color:var(--gray-700);}
+  .modal-body{padding:28px 24px 32px; text-align:center;}
+  .sub{color:var(--gray-500); font-size:13px; margin:0 0 24px;}
   #google-btn-container{display:flex; justify-content:center; min-height:44px;}
-  .status{margin-top:18px; font-size:13px; color:var(--muted); min-height:18px;}
-  .status.err{color:#f27272;}
-  .back{
-    display:inline-block; margin-top:22px; color:var(--muted); font-size:13px;
-    text-decoration:none; border-top:1px solid var(--border); padding-top:16px; width:100%;
-  }
-  .back:hover{color:var(--text);}
+  .status{margin-top:16px; font-size:13px; color:var(--gray-500); min-height:18px;}
+  .status.err{color:#dc2626;}
   .spinner{
-    display:inline-block; width:16px; height:16px; border:2px solid var(--border);
-    border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite;
-    vertical-align:middle; margin-right:8px;
+    display:inline-block; width:14px; height:14px; border:2px solid var(--gray-200);
+    border-top-color:var(--blue); border-radius:50%; animation:spin .7s linear infinite;
+    vertical-align:middle; margin-right:7px;
   }
   @keyframes spin{to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
 
-  <div class="card">
-    <div class="logo">PDFortis</div>
-    <div class="sub">Mit Google anmelden</div>
-
-    <div id="google-btn-container"></div>
-
-    <div class="status" id="status"></div>
-
-    <a class="back" href="/index.html">← Zurück zur normalen Anmeldung</a>
+  <div class="modal">
+    <div class="modal-hd">
+      <h3>Sign in</h3>
+      <a class="modal-x" href="/index.html">✕</a>
+    </div>
+    <div class="modal-body">
+      <p class="sub">Mit Google fortfahren</p>
+      <div id="google-btn-container"></div>
+      <div class="status" id="status"></div>
+    </div>
   </div>
 
   <!-- Session-Helfer, SUPABASE_URL/ANON_KEY, pfSaveSession, sbGetProfile, sbUpsertProfile, sbValidateToken -->
@@ -59,8 +82,6 @@
     const LS_TOKDAT = 'pf_tokdat';
     let _googleNonce = null;
 
-    // Wohin nach erfolgreichem Login? Default: index.html
-    // Aufruf z.B. /login.html?redirect=/dashboard.html möglich
     function getRedirectTarget(){
       const p = new URLSearchParams(location.search).get('redirect');
       return p && p.startsWith('/') ? p : '/index.html';
@@ -74,7 +95,6 @@
 
     async function initGoogleSignIn(){
       if (typeof google === 'undefined' || !google.accounts) {
-        // Google-Skript noch nicht geladen -> kurz warten und retry
         setTimeout(initGoogleSignIn, 150);
         return;
       }
@@ -112,8 +132,6 @@
           return;
         }
 
-        // Exakt gleiche Session wie normale Anmeldung -> index.html/dashboard.html
-        // erkennen den Nutzer danach automatisch als eingeloggt (localStorage).
         pfSaveSession(d);
 
         let profile = await sbGetProfile(d.user.id, d.access_token);
@@ -124,7 +142,6 @@
           }, d.access_token);
         }
 
-        // Session-Mirror wie im normalen Login (Anti-Flicker beim Reload kennt den Namen)
         try{
           const userObj = {...d.user, access_token: d.access_token};
           userObj.user_metadata = {...(d.user.user_metadata||{}), name: profile?.display_name || d.user.user_metadata?.name};
