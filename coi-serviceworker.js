@@ -15,11 +15,16 @@ self.addEventListener("fetch", function(event) {
     return; // Kein respondWith → Browser handled es nativ
   }
 
+  
+  // login.html braucht lockerere Policy fürs Google-Popup
+  const isLoginPage = url.includes('/login.html');
+  const coop = isLoginPage ? "same-origin-allow-popups" : "same-origin";
+
   event.respondWith(
     fetch(event.request.clone()).then(function(response) {
       if (!response || response.status === 0 || !response.body) return response;
       const newHeaders = new Headers(response.headers);
-      newHeaders.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+      newHeaders.set("Cross-Origin-Opener-Policy", coop);
       newHeaders.set("Cross-Origin-Embedder-Policy", "credentialless");
       return new Response(response.body, {
         status: response.status,
