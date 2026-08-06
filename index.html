@@ -1068,7 +1068,10 @@ input,select,textarea{font-family:var(--font)}
         <button class="auth-tab active" id="auth-tab-login" onclick="switchAuthTab('login')" data-i="nav_login">Sign in</button>
         <button class="auth-tab" id="auth-tab-signup" onclick="switchAuthTab('signup')" data-i="nav_signup">Create account</button>
       </div>
-        <div id="google-btn-container" style="display:flex;justify-content:center;margin-bottom:10px"></div>
+        <a href="/login.html" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;padding:10px 16px;border:1px solid #dadce0;border-radius:8px;background:#fff;color:#3c4043;font-family:inherit;font-size:14px;font-weight:500;text-decoration:none;">
+          <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.12-.84 2.07-1.8 2.71v2.26h2.92c1.7-1.57 2.68-3.87 2.68-6.61z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33C2.44 15.98 5.48 18 9 18z"/><path fill="#FBBC05" d="M3.97 10.71c-.18-.54-.28-1.11-.28-1.71s.1-1.17.28-1.71V4.96H.96C.35 6.17 0 7.55 0 9s.35 2.83.96 4.04l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.59-2.59C13.46.89 11.43 0 9 0 5.48 0 2.44 2.02.96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+          Mit Google anmelden
+        </a>
       <div id="auth-login-form">
         <div class="form-field"><label data-i="email_lbl">Email</label><input class="form-input" id="login-email" type="email" placeholder="you@example.com"/></div>
         <div class="form-field"><label data-i="pw_lbl">Password</label><input class="form-input" id="login-pw" type="password" placeholder="••••••••"/></div>
@@ -2674,74 +2677,7 @@ function removeToken(){
 // ═══════════════════════════════════════
 // AUTH (Supabase Auth)
 // ═══════════════════════════════════════
-const GOOGLE_CLIENT_ID = '762322811608-apb6sln1ek7jhdupa2h98f5ho5e97d57.apps.googleusercontent.com';
-let _googleNonce = null;
-
-async function initGoogleSignIn(){
-  const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
-  const encoded = new TextEncoder().encode(nonce);
-  const hashBuf = await crypto.subtle.digest('SHA-256', encoded);
-  const hashedNonce = Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-  _googleNonce = nonce;
-
-  google.accounts.id.initialize({
-    client_id: GOOGLE_CLIENT_ID,
-    callback: handleGoogleCredential,
-    nonce: hashedNonce,
-    use_fedcm_for_prompt: true,
-    use_fedcm_for_button: true   // ← neu
-  });
-
-  google.accounts.id.renderButton(
-    document.getElementById('google-btn-container'),
-    { theme: 'outline', size: 'large', width: 300, text: 'continue_with' }
-  );
-}
-
-
-
-async function handleGoogleCredential(response){
-  try{
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=id_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
-      body: JSON.stringify({ provider: 'google', id_token: response.credential, nonce: _googleNonce })
-    });
-    const d = await r.json();
-    if(d.error || !d.access_token){ toast('Google sign-in failed','err'); return; }
-
-    pfSaveSession(d);
-
-    let profile = await sbGetProfile(d.user.id, d.access_token);
-    if(!profile){
-      profile = await sbUpsertProfile(d.user.id, {
-        email: d.user.email,
-        display_name: d.user.user_metadata?.name || d.user.email?.split('@')[0]
-      }, d.access_token);
-    }
-
-    currentUser = {
-      id: d.user.id,
-      email: d.user.email,
-      name: profile?.display_name || d.user.user_metadata?.name || d.user.email?.split('@')[0] || 'User',
-      token: d.access_token,
-      company_token: profile?.company_token || null
-    };
-
-    if(currentUser.company_token){
-      const tok = await sbValidateToken(currentUser.company_token);
-      if(tok){ currentToken = tok; localStorage.setItem(LS_TOKDAT, JSON.stringify(tok)); applyTokenUI(tok); }
-    }
-
-    applyUserUI();
-    closeModal('auth-modal');
-    toast(lang==='de'?'Willkommen!':'Welcome!','ok');
-  }catch(e){ console.warn('Google sign-in error', e); toast('Connection error','err'); }
-}
-
-window.addEventListener('load', initGoogleSignIn);
-  
-  function openAuth(tab){
+function openAuth(tab){
   document.getElementById('auth-modal').classList.remove('hidden');
   switchAuthTab(tab);
 }
@@ -3514,6 +3450,5 @@ window.openAuthModal = () => document.getElementById('auth-modal')?.classList.re
 <script src="/auth-badge.js"></script>
 <script src="/pdfortis-clientengine.js"></script>
 <script src="/pdfortis-translate.js" defer></script>
-<script src="https://accounts.google.com/gsi/client" async></script>
 </body>
 </html>
