@@ -6,25 +6,61 @@
   <title>Pricing — PDFortis</title>
   <link rel="icon" href="/pdfortis_big.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <style>  
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --ink:#0f1320;
+      --ink-soft:#4b5563;
+      --gray-500:#6b7280;
+      --gray-400:#9ca3af;
+      --gray-200:#e5e7eb;
+      --gray-100:#f3f4f6;
+      --gray-50:#f9fafb;
+      --indigo:#6366f1;
+      --indigo-deep:#4f46e5;
+      --pink:#ec4899;
+      --blue:#2563eb;
+      --blue-l:#eff6ff;
+      --green:#10b981;
+      --green-l:#ecfdf5;
+      --amber:#f59e0b;
+      --radius:12px;
+      --radius-lg:16px;
+      --shadow-sm:0 1px 2px rgba(15,19,32,0.06);
+      --shadow-md:0 8px 24px rgba(15,19,32,0.08);
+      --shadow-lg:0 24px 64px rgba(15,19,32,0.14);
+      --ease:cubic-bezier(0.16,1,0.3,1);
+    }
     * { box-sizing: border-box; margin: 0; }
+    html { scroll-behavior: smooth; }
     body {
       font-family: 'Inter', system-ui, sans-serif;
       background: #ffffff;
-      color: #111827;
+      color: var(--ink);
       -webkit-font-smoothing: antialiased;
       line-height: 1.5;
     }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    ::selection { background: #e0e7ff; color: var(--indigo-deep); }
+    a { color: inherit; }
+    button { font-family: inherit; cursor: pointer; }
+
     /* ----- nav ----- */
     .nav {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 16px 24px;
-      border-bottom: 1px solid #e5e7eb;
+      border-bottom: 1px solid var(--gray-200);
       flex-wrap: wrap;
       gap: 12px;
+      position: sticky;
+      top: 0;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 50;
     }
     .nav-logo {
       display: flex;
@@ -44,19 +80,50 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
+    .nav-right { display: flex; align-items: center; gap: 18px; }
     .back-link {
       font-size: 13px;
-      color: #6b7280;
+      color: var(--gray-500);
       text-decoration: none;
       font-weight: 500;
+      transition: color 0.15s var(--ease);
     }
-    .back-link:hover { color: #111827; }
+    .back-link:hover { color: var(--ink); }
+    .nav-cta {
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 100px;
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+    }
+    .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(15,19,32,0.22); }
 
     /* ----- hero ----- */
+    .hero-wrap {
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-glow {
+      position: absolute;
+      top: -220px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 900px;
+      height: 480px;
+      background: radial-gradient(closest-side, rgba(99,102,241,0.14), rgba(236,72,153,0.08) 55%, transparent 75%);
+      filter: blur(10px);
+      pointer-events: none;
+      z-index: 0;
+    }
     .hero {
+      position: relative;
+      z-index: 1;
       max-width: 720px;
       margin: 0 auto;
-      padding: 56px 20px 8px;
+      padding: 64px 20px 8px;
       text-align: center;
     }
     .eyebrow {
@@ -65,65 +132,96 @@
       gap: 6px;
       font-size: 12px;
       font-weight: 600;
-      color: #2563eb;
-      background: #eff6ff;
+      color: var(--blue);
+      background: var(--blue-l);
       padding: 5px 14px;
       border-radius: 100px;
       margin-bottom: 18px;
     }
     .eyebrow svg { width: 14px; height: 14px; }
     h1 {
-      font-size: clamp(28px, 5vw, 38px);
-      line-height: 1.15;
-      letter-spacing: -0.02em;
+      font-size: clamp(30px, 5vw, 42px);
+      line-height: 1.12;
+      letter-spacing: -0.025em;
       margin: 0 0 14px;
       font-weight: 800;
     }
     .hero p {
-      font-size: 15.5px;
-      color: #6b7280;
+      font-size: 16px;
+      color: var(--gray-500);
       line-height: 1.6;
       max-width: 520px;
       margin: 0 auto;
     }
 
+    /* trust bar */
+    .trust-bar {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px 28px;
+      margin: 26px auto 0;
+      padding: 0 20px;
+      max-width: 640px;
+    }
+    .trust-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--ink-soft);
+    }
+    .trust-item svg { width: 15px; height: 15px; color: var(--green); flex-shrink: 0; }
+
     /* ----- toggle ----- */
     .toggle-wrap {
       display: flex;
       justify-content: center;
-      margin: 32px 0 8px;
+      margin: 36px 0 8px;
       padding: 0 20px;
     }
     .toggle {
       display: inline-flex;
       align-items: center;
-      background: #f3f4f6;
+      background: var(--gray-100);
       border-radius: 100px;
       padding: 4px;
       gap: 2px;
+      position: relative;
     }
     .toggle button {
       border: none;
       background: none;
-      padding: 8px 18px;
+      padding: 9px 18px;
       border-radius: 100px;
       font-size: 13px;
       font-weight: 600;
-      color: #6b7280;
-      transition: 0.15s;
+      color: var(--gray-500);
+      transition: color 0.2s var(--ease);
       white-space: nowrap;
-      cursor: pointer;
+      position: relative;
+      z-index: 1;
     }
-    .toggle button.active {
+    .toggle button.active { color: var(--ink); }
+    .toggle-pill {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      left: 4px;
+      width: calc(50% - 4px);
       background: #ffffff;
-      color: #111827;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      border-radius: 100px;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.32s var(--ease);
     }
+    .toggle button[data-mode="yearly"].active ~ .toggle-pill,
+    .toggle-pill.shift { transform: translateX(100%); }
     .save-badge {
       font-size: 11px;
       font-weight: 700;
-      color: #10b981;
-      background: #ecfdf5;
+      color: var(--green);
+      background: var(--green-l);
       padding: 2px 8px;
       border-radius: 100px;
       margin-left: 6px;
@@ -132,47 +230,78 @@
     /* ----- plan grid ----- */
     .plans {
       max-width: 1100px;
-      margin: 40px auto 0;
+      margin: 44px auto 0;
       padding: 0 20px;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 22px;
     }
     .plan {
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      padding: 26px 24px;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      padding: 28px 26px;
       display: flex;
       flex-direction: column;
       background: #ffffff;
       position: relative;
+      transition: transform 0.28s var(--ease), box-shadow 0.28s var(--ease), border-color 0.28s var(--ease);
     }
+    .plan:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: #d8dbe3; }
+
     .plan.featured {
-      border: 2px solid #111827;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.10);
+      background: #0f1320;
+      color: #fff;
+      border: 1px solid transparent;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
     }
+    .plan.featured::before {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      z-index: -2;
+      border-radius: inherit;
+      background: conic-gradient(from var(--angle,0deg), #6366f1, #ec4899, #f59e0b, #6366f1);
+      animation: spin 7s linear infinite;
+    }
+    .plan.featured::after {
+      content: "";
+      position: absolute;
+      inset: 1.5px;
+      z-index: -1;
+      border-radius: calc(var(--radius-lg) - 1px);
+      background: #0f1320;
+    }
+    @keyframes spin { to { --angle: 360deg; } }
+    @property --angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+    .plan.featured:hover { transform: translateY(-6px) scale(1.015); }
+
     .plan-badge {
       position: absolute;
-      top: -12px;
+      top: -13px;
       left: 50%;
       transform: translateX(-50%);
-      background: #111827;
+      background: linear-gradient(135deg, #6366f1, #ec4899);
       color: #fff;
       font-size: 11px;
       font-weight: 700;
-      padding: 4px 14px;
+      padding: 5px 16px;
       border-radius: 100px;
       letter-spacing: 0.02em;
       white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(99,102,241,0.4);
     }
     .plan-name {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
-      color: #6b7280;
+      color: var(--gray-500);
       text-transform: uppercase;
-      letter-spacing: 0.04em;
-      margin-bottom: 10px;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
     }
+    .plan.featured .plan-name { color: rgba(255,255,255,0.55); }
     .plan-price {
       display: flex;
       align-items: baseline;
@@ -181,50 +310,73 @@
       flex-wrap: wrap;
     }
     .plan-price .amt {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
       font-size: 38px;
-      font-weight: 800;
+      font-weight: 700;
       letter-spacing: -0.02em;
+      display: inline-block;
+      transition: opacity 0.18s var(--ease), transform 0.18s var(--ease);
     }
+    .plan-price .amt.swapping { opacity: 0; transform: translateY(4px); }
     .plan-price .per {
       font-size: 14px;
-      color: #9ca3af;
+      color: var(--gray-400);
       font-weight: 500;
     }
+    .plan.featured .plan-price .per { color: rgba(255,255,255,0.45); }
     .plan-sub {
       font-size: 13px;
-      color: #9ca3af;
-      margin-bottom: 22px;
+      color: var(--gray-400);
+      margin-bottom: 8px;
       min-height: 18px;
+      transition: opacity 0.18s var(--ease);
     }
+    .plan.featured .plan-sub { color: rgba(255,255,255,0.55); }
+    .plan-save {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--green);
+      margin-bottom: 18px;
+      min-height: 16px;
+      opacity: 0;
+      transition: opacity 0.2s var(--ease);
+    }
+    .plan-save.show { opacity: 1; }
+    .plan.featured .plan-save { color: #6ee7b7; }
     .plan-cta {
       width: 100%;
-      padding: 11px;
-      border-radius: 8px;
+      padding: 12px;
+      border-radius: 9px;
       font-size: 14px;
       font-weight: 600;
-      border: 1px solid #d1d5db;
+      border: 1px solid var(--gray-200);
       background: #ffffff;
-      color: #111827;
+      color: var(--ink);
       margin-bottom: 26px;
-      transition: 0.15s;
+      transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), border-color 0.18s var(--ease), background 0.18s var(--ease);
       text-align: center;
       text-decoration: none;
       display: block;
     }
-    .plan-cta:hover { border-color: #111827; }
+    .plan-cta:hover { border-color: var(--ink); transform: translateY(-1px); }
+    .plan-cta:active { transform: translateY(0); }
     .plan-cta.primary {
-      background: #111827;
+      background: linear-gradient(135deg, #6366f1, #ec4899);
       color: #fff;
-      border-color: #111827;
+      border-color: transparent;
+      box-shadow: 0 8px 22px rgba(99,102,241,0.35);
     }
-    .plan-cta.primary:hover { background: #000; }
+    .plan-cta.primary:hover { box-shadow: 0 10px 28px rgba(99,102,241,0.5); transform: translateY(-2px); }
+    .plan.featured .plan-cta:not(.primary) { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.16); }
+    .plan.featured .plan-cta:not(.primary):hover { border-color: rgba(255,255,255,0.34); }
+
     .feat-list {
       list-style: none;
       margin: 0;
       padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 13px;
     }
     .feat-list li {
       display: flex;
@@ -234,15 +386,19 @@
       color: #374151;
       line-height: 1.5;
     }
+    .plan.featured .feat-list li { color: rgba(255,255,255,0.82); }
     .feat-list svg {
       flex-shrink: 0;
       margin-top: 2px;
       width: 15px;
       height: 15px;
-      color: #10b981;
+      color: var(--green);
     }
-    .feat-list li.dim { color: #9ca3af; }
-    .feat-list li.dim svg { color: #d1d5db; }
+    .plan.featured .feat-list svg { color: #6ee7b7; }
+    .feat-list li.dim { color: var(--gray-400); }
+    .feat-list li.dim svg { color: var(--gray-200); }
+    .plan.featured .feat-list li.dim { color: rgba(255,255,255,0.32); }
+    .plan.featured .feat-list li.dim svg { color: rgba(255,255,255,0.2); }
 
     /* privacy strip */
     .privacy-strip{max-width:1100px;margin:44px auto 0;padding:0 20px}
@@ -250,15 +406,8 @@
     .privacy-strip svg{flex-shrink:0;width:20px;height:20px;color:var(--blue)}
 
     /* ----- cmp blocks ----- */
-    .cmp-block {
-      padding: 88px 0;
-    }
-    /* 2d3d5f background with white text, font same as "this is us" (Inter) */
-    .cmp-block.is-alt {
-      background: #2d3d5f;        /* requested background */
-      color: #ffffff;            /* white text for readability */
-    }
-    /* keep text light but readable */
+    .cmp-block { padding: 88px 0; }
+    .cmp-block.is-alt { background: #2d3d5f; color: #ffffff; }
     .cmp-block.is-alt .cmp-eyebrow { color: rgba(255,255,255,0.5); }
     .cmp-block.is-alt .cmp-price .unit { color: rgba(255,255,255,0.5); }
     .cmp-block.is-alt .cmp-price-team { color: rgba(255,255,255,0.6); }
@@ -268,11 +417,7 @@
     .cmp-block.is-alt .cmp-list li.bad svg { color: #fbbf24; }
     .cmp-block.is-alt .cmp-list li.good svg { color: #6ee7b7; }
 
-    /* dark block (this is us) stays as is */
-    .cmp-block.is-dark {
-      background: #111827;
-      color: #ffffff;
-    }
+    .cmp-block.is-dark { background: #111827; color: #ffffff; }
     .cmp-block.is-dark .cmp-eyebrow { color: rgba(255,255,255,0.4); }
     .cmp-block.is-dark .cmp-price .unit { color: rgba(255,255,255,0.4); }
     .cmp-block.is-dark .cmp-price-team { color: rgba(255,255,255,0.6); }
@@ -290,94 +435,23 @@
       gap: 56px;
       align-items: center;
     }
-    .cmp-eyebrow {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #9ca3af;
-      margin-bottom: 14px;
-    }
-    .cmp-name {
-      font-size: clamp(24px, 3.2vw, 32px);
-      font-weight: 800;
-      letter-spacing: -0.01em;
-      margin: 0 0 18px;
-    }
-    .cmp-price-row {
-      display: flex;
-      align-items: baseline;
-      gap: 18px;
-      flex-wrap: wrap;
-      margin-bottom: 20px;
-    }
-    .cmp-price {
-      font-size: clamp(44px, 6vw, 64px);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1;
-    }
-    .cmp-price .unit {
-      font-size: 15px;
-      font-weight: 500;
-      color: #9ca3af;
-      margin-left: 4px;
-    }
-    .cmp-price-team {
-      font-size: 15px;
-      color: #6b7280;
-      font-weight: 600;
-    }
-    .cmp-desc {
-      font-size: 14.5px;
-      line-height: 1.65;
-      color: #4b5563;
-      max-width: 440px;
-    }
-    .cmp-desc strong { color: #111827; font-weight: 700; }
-    .cmp-list {
-      list-style: none;
-      margin: 20px 0 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .cmp-list li {
-      display: flex;
-      align-items: flex-start;
-      gap: 11px;
-      font-size: 14px;
-      line-height: 1.5;
-      color: #374151;
-    }
-    .cmp-list svg {
-      flex-shrink: 0;
-      margin-top: 2px;
-      width: 17px;
-      height: 17px;
-    }
-    .cmp-list li.good svg { color: #10b981; }
-    .cmp-list li.bad svg { color: #f59e0b; }
+    .cmp-eyebrow { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gray-400); margin-bottom: 14px; }
+    .cmp-name { font-size: clamp(24px, 3.2vw, 32px); font-weight: 800; letter-spacing: -0.01em; margin: 0 0 18px; }
+    .cmp-price-row { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; margin-bottom: 20px; }
+    .cmp-price { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: clamp(40px, 5.6vw, 58px); font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+    .cmp-price .unit { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 500; color: var(--gray-400); margin-left: 4px; }
+    .cmp-price-team { font-size: 15px; color: var(--gray-500); font-weight: 600; }
+    .cmp-desc { font-size: 14.5px; line-height: 1.65; color: #4b5563; max-width: 440px; }
+    .cmp-desc strong { color: var(--ink); font-weight: 700; }
+    .cmp-list { list-style: none; margin: 20px 0 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+    .cmp-list li { display: flex; align-items: flex-start; gap: 11px; font-size: 14px; line-height: 1.5; color: #374151; }
+    .cmp-list svg { flex-shrink: 0; margin-top: 2px; width: 17px; height: 17px; }
+    .cmp-list li.good svg { color: var(--green); }
+    .cmp-list li.bad svg { color: var(--amber); }
 
-    /* --- "this is us" badge and vs Adobe (lighter than #2d3d5f) --- */
-    .cmp-badge {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.03em;
-      padding: 4px 14px;
-      border-radius: 100px;
-      margin-bottom: 14px;
-      background: #1e3a8a;
-      color: #93c5fd;
-    }
+    .cmp-badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; padding: 4px 14px; border-radius: 100px; margin-bottom: 14px; background: #1e3a8a; color: #93c5fd; }
 
-    /* VS Adobe block – make it lighter than #2d3d5f (we use a lighter blue) */
-    .cmp-block.vs-adobe {
-      background: #4a5f7a;   /* lighter than #2d3d5f, still a cool blue-grey */
-      color: #ffffff;
-    }
+    .cmp-block.vs-adobe { background: #4a5f7a; color: #ffffff; }
     .cmp-block.vs-adobe .cmp-eyebrow { color: rgba(255,255,255,0.5); }
     .cmp-block.vs-adobe .cmp-price .unit { color: rgba(255,255,255,0.5); }
     .cmp-block.vs-adobe .cmp-price-team { color: rgba(255,255,255,0.6); }
@@ -392,100 +466,114 @@
     }
 
     /* comparison table */
-    .compare {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 72px 20px 100px;
-    }
-    .compare h2 {
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: -0.01em;
-      margin: 0 0 4px;
-    }
-    .compare .sub {
-      font-size: 13.5px;
-      color: #6b7280;
-      margin-bottom: 24px;
-    }
-    .compare-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table.feat-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13.5px;
-      min-width: 480px;
-    }
+    .compare { max-width: 1100px; margin: 0 auto; padding: 80px 20px 40px; }
+    .compare h2 { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 4px; }
+    .compare .sub { font-size: 13.5px; color: var(--gray-500); margin-bottom: 26px; }
+    .compare-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--gray-200); border-radius: var(--radius-lg); }
+    table.feat-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 520px; }
     thead th {
-      text-align: left;
-      padding: 12px 14px;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #9ca3af;
-      border-bottom: 1px solid #e5e7eb;
+      text-align: left; padding: 14px 16px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em; color: var(--gray-400);
+      border-bottom: 1px solid var(--gray-200); background: var(--gray-50);
+      position: sticky; top: 0;
     }
     thead th:not(:first-child) { text-align: center; }
-    tbody td {
-      padding: 13px 14px;
-      border-bottom: 1px solid #f3f4f6;
-      color: #374151;
-    }
+    thead th.col-pro { color: var(--indigo-deep); }
+    tbody td { padding: 13px 16px; border-bottom: 1px solid var(--gray-100); color: #374151; }
     tbody td:not(:first-child) { text-align: center; }
     tbody tr:last-child td { border-bottom: none; }
-    tbody td:first-child { color: #111827; font-weight: 500; white-space: nowrap; }
-    .chk { color: #10b981; }
-    .dash { color: #d1d5db; }
-    .grp { background: #f9fafb; }
-    .grp td {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #6b7280;
-      padding: 9px 14px;
+    tbody tr:not(.grp):hover { background: var(--gray-50); }
+    tbody tr { transition: background 0.15s var(--ease); }
+    tbody td:first-child { color: var(--ink); font-weight: 500; white-space: nowrap; }
+    .chk { color: var(--green); font-weight: 700; }
+    .pill { display: inline-block; padding: 2px 10px; border-radius: 100px; background: var(--green-l); color: #047857; font-weight: 700; font-size: 12px; }
+    .dash { color: var(--gray-200); }
+    .grp { background: var(--gray-50); }
+    .grp td { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--gray-500); padding: 10px 16px; }
+
+    /* FAQ */
+    .faq { max-width: 760px; margin: 20px auto 0; padding: 60px 20px 100px; }
+    .faq h2 { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 6px; text-align: center; }
+    .faq .sub { font-size: 13.5px; color: var(--gray-500); margin-bottom: 32px; text-align: center; }
+    .faq-item { border-bottom: 1px solid var(--gray-200); }
+    .faq-q {
+      width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      background: none; border: none; padding: 18px 2px; text-align: left;
+      font-size: 15px; font-weight: 600; color: var(--ink);
     }
+    .faq-q .icon { flex-shrink: 0; width: 20px; height: 20px; color: var(--gray-400); transition: transform 0.3s var(--ease); }
+    .faq-item[open] .faq-q .icon { transform: rotate(45deg); color: var(--indigo); }
+    .faq-a { padding: 0 2px 20px; font-size: 14px; line-height: 1.65; color: var(--ink-soft); max-width: 620px; }
+    .faq-item summary { list-style: none; cursor: pointer; }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item[open] .faq-a { animation: faqIn 0.28s var(--ease); }
+    @keyframes faqIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* final CTA */
+    .final-cta {
+      position: relative;
+      overflow: hidden;
+      margin: 0 auto;
+      max-width: 1100px;
+      padding: 0 20px 90px;
+    }
+    .final-cta-inner {
+      position: relative;
+      border-radius: 24px;
+      padding: 56px 32px;
+      text-align: center;
+      background: linear-gradient(135deg, #111827 0%, #1e2338 55%, #2d1f3d 100%);
+      overflow: hidden;
+    }
+    .final-cta-glow {
+      position: absolute; inset: 0;
+      background: radial-gradient(600px 260px at 20% 0%, rgba(99,102,241,0.35), transparent 60%),
+                  radial-gradient(500px 240px at 85% 100%, rgba(236,72,153,0.3), transparent 60%);
+      pointer-events: none;
+    }
+    .final-cta h2 { position: relative; font-size: clamp(24px, 3.4vw, 32px); font-weight: 800; color: #fff; letter-spacing: -0.01em; margin-bottom: 10px; }
+    .final-cta p { position: relative; font-size: 14.5px; color: rgba(255,255,255,0.68); max-width: 460px; margin: 0 auto 28px; }
+    .final-cta-buttons { position: relative; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .fc-btn { padding: 13px 26px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease); }
+    .fc-btn.primary { background: linear-gradient(135deg, #6366f1, #ec4899); color: #fff; box-shadow: 0 10px 30px rgba(99,102,241,0.4); }
+    .fc-btn.primary:hover { transform: translateY(-2px); box-shadow: 0 14px 36px rgba(99,102,241,0.55); }
+    .fc-btn.ghost { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.18); }
+    .fc-btn.ghost:hover { border-color: rgba(255,255,255,0.4); }
 
     footer {
-      border-top: 1px solid #e5e7eb;
-      padding: 20px 24px;
+      border-top: 1px solid var(--gray-200);
+      padding: 22px 24px;
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
       justify-content: space-between;
       font-size: 12px;
-      color: #9ca3af;
+      color: var(--gray-400);
     }
-    footer a { color: #9ca3af; text-decoration: none; }
+    footer a { color: var(--gray-400); text-decoration: none; transition: color 0.15s var(--ease); }
     footer a:hover { color: #374151; }
     .footer-links { display: flex; gap: 16px; flex-wrap: wrap; }
 
     /* reveal */
-    .reveal {
-      opacity: 0;
-      transform: translateY(28px);
-      transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1), transform 0.7s cubic-bezier(0.16,1,0.3,1);
-    }
+    .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
     .reveal.in-view { opacity: 1; transform: translateY(0); }
-    .reveal-stagger > * {
-      opacity: 0;
-      transform: translateY(22px);
-      transition: opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1);
-    }
+    .reveal-stagger > * { opacity: 0; transform: translateY(22px); transition: opacity 0.6s var(--ease), transform 0.6s var(--ease); }
     .reveal-stagger.in-view > * { opacity: 1; transform: translateY(0); }
     .reveal-stagger.in-view > *:nth-child(1) { transition-delay: 0.05s; }
     .reveal-stagger.in-view > *:nth-child(2) { transition-delay: 0.15s; }
     .reveal-stagger.in-view > *:nth-child(3) { transition-delay: 0.25s; }
     @media (prefers-reduced-motion: reduce) {
-      .reveal, .reveal-stagger > * { opacity: 1 !important; transform: none !important; transition: none !important; }
+      .reveal, .reveal-stagger > *, .plan, .plan.featured::before { opacity: 1 !important; transform: none !important; transition: none !important; animation: none !important; }
     }
 
     @media (max-width: 640px) {
       .nav { padding: 14px 16px; }
-      .hero { padding: 44px 16px 4px; }
+      .hero { padding: 48px 16px 4px; }
       .plans { grid-template-columns: 1fr; max-width: 420px; gap: 16px; }
       .plan.featured { order: -1; }
-      .toggle button { padding: 8px 12px; font-size: 12.5px; }
+      .toggle button { padding: 9px 12px; font-size: 12.5px; }
+      .nav-right .back-link { display: none; }
+      .final-cta-inner { padding: 44px 22px; }
     }
   </style>
 </head>
@@ -496,28 +584,42 @@
     <svg class="nav-logo-icon" viewBox="0 0 28 28" fill="none"><rect x="3" y="2" width="16" height="21" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="16" height="21" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="16" height="21" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
     <span class="nav-logo-text">PDF<span>ortis</span></span>
   </a>
-  <a class="back-link" href="/index.html">← Back to tools</a>
+  <div class="nav-right">
+    <a class="back-link" href="/index.html">← Back to tools</a>
+    <a class="nav-cta" href="#plans">See plans</a>
+  </div>
 </nav>
 
-<div class="hero reveal">
-  <div class="eyebrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg> Simple, honest pricing</div>
-  <h1>Pick the plan<br>that fits you</h1>
-  <p>Every tool runs locally in your browser — your files never leave your device. No trial tricks, no hidden fees, cancel anytime.</p>
-</div>
+<div class="hero-wrap">
+  <div class="hero-glow"></div>
+  <div class="hero reveal">
+    <div class="eyebrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg> Simple, honest pricing</div>
+    <h1>Pick the plan<br>that fits you</h1>
+    <p>Every tool runs locally in your browser — your files never leave your device. No trial tricks, no hidden fees, cancel anytime.</p>
+  </div>
 
-<div class="toggle-wrap reveal">
-  <div class="toggle" id="billingToggle">
-    <button type="button" class="active" data-mode="monthly">Monthly</button>
-    <button type="button" data-mode="yearly">Yearly <span class="save-badge">-20%</span></button>
+  <div class="trust-bar reveal">
+    <div class="trust-item"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 10l4 4 8-8"/></svg>Cancel anytime</div>
+    <div class="trust-item"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 10l4 4 8-8"/></svg>No hidden fees</div>
+    <div class="trust-item"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 10l4 4 8-8"/></svg>Files stay on your device</div>
+  </div>
+
+  <div class="toggle-wrap reveal">
+    <div class="toggle" id="billingToggle">
+      <button type="button" class="active" data-mode="monthly">Monthly</button>
+      <button type="button" data-mode="yearly">Yearly <span class="save-badge">-20%</span></button>
+      <div class="toggle-pill"></div>
+    </div>
   </div>
 </div>
 
-<div class="plans reveal-stagger">
+<div class="plans reveal-stagger" id="plans">
   <!-- FREE -->
   <div class="plan">
     <div class="plan-name">Free</div>
     <div class="plan-price"><span class="amt">$0</span></div>
     <div class="plan-sub">For occasional PDF tasks</div>
+    <div class="plan-save">&nbsp;</div>
     <a href="/index.html" class="plan-cta">Start for free</a>
     <ul class="feat-list">
       <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>3 downloads / day (signed in)</li>
@@ -536,6 +638,7 @@
     <div class="plan-name">Pro</div>
     <div class="plan-price"><span class="amt" data-monthly="$4.99" data-yearly="$3.99">$4.99</span><span class="per">/ month</span></div>
     <div class="plan-sub" data-monthly="Billed monthly" data-yearly="Billed yearly · $47.90/year">Billed monthly</div>
+    <div class="plan-save" data-yearly-text="You save $11.98 a year">&nbsp;</div>
     <a href="#" class="plan-cta primary" data-checkout="pro">Upgrade to Pro</a>
     <ul class="feat-list">
       <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg><strong>Unlimited</strong> downloads</li>
@@ -550,7 +653,8 @@
   <div class="plan">
     <div class="plan-name">Team</div>
     <div class="plan-price"><span class="amt" data-monthly="$14.99" data-yearly="$11.99">$14.99</span><span class="per">/ month</span></div>
-    <div class="plan-sub" data-monthly="Up to 5 seats · billed monthly" data-yearly="Up to 5 seats · billed yearly">Up to 5 seats · billed monthly</div>
+    <div class="plan-sub" data-monthly="Up to 5 seats · billed monthly" data-yearly="Up to 5 seats · billed yearly · $143.90/year">Up to 5 seats · billed monthly</div>
+    <div class="plan-save" data-yearly-text="You save $35.98 a year">&nbsp;</div>
     <a href="#" class="plan-cta" data-checkout="team">Start team trial</a>
     <ul class="feat-list">
       <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Everything in Pro, for 5 seats</li>
@@ -567,7 +671,7 @@
   <div class="inner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6z"/></svg> Same on every plan: your PDFs are never uploaded. Every core tool runs on your device — even on Free.</div>
 </div>
 
-<!-- VS ADOBE – lighter than #2d3d5f, with padding 25px 0 and "this is us" font style -->
+<!-- VS ADOBE -->
 <section class="cmp-block vs-adobe" style="padding: 30px 0;">
   <div class="cmp-inner reveal">
     <div>
@@ -587,7 +691,7 @@
   </div>
 </section>
 
-<!-- vs. Smallpdf (is-alt background #2d3d5f) with padding 25px 0 -->
+<!-- vs. Smallpdf -->
 <section class="cmp-block is-alt" style="padding: 30px 0;">
   <div class="cmp-inner reveal">
     <div>
@@ -607,7 +711,7 @@
   </div>
 </section>
 
-<!-- THIS IS US – dark block, with red "–XY%" (cheaper) -->
+<!-- THIS IS US -->
 <section class="cmp-block is-dark" style="padding: 30px 0;">
   <div class="cmp-inner reveal">
     <div>
@@ -617,7 +721,6 @@
         <div class="cmp-price">$4.99<span class="unit">/mo individual</span></div>
       </div>
       <div class="cmp-price-team">$14.99/mo for up to 5 seats</div>
-      <!-- red percentage: max saving vs Adobe monthly -->
       <div style="color: #f87171; font-weight: 700; font-size: 18px; margin-top: 6px;">–75% cheaper</div>
     </div>
     <div>
@@ -636,15 +739,15 @@
   <div class="sub">All the details, one place.</div>
   <div class="compare-scroll">
   <table class="feat-table">
-    <thead><tr><th>Feature</th><th>Free</th><th>Pro</th><th>Team</th></tr></thead>
+    <thead><tr><th>Feature</th><th>Free</th><th class="col-pro">Pro</th><th>Team</th></tr></thead>
     <tbody>
       <tr class="grp"><td colspan="4">Downloads &amp; limits</td></tr>
-      <tr><td>Downloads / day (signed in)</td><td>3</td><td class="chk">Unlimited</td><td class="chk">Unlimited</td></tr>
-      <tr><td>Try without an account</td><td>1 / day</td><td>—</td><td>—</td></tr>
+      <tr><td>Downloads / day (signed in)</td><td>3</td><td><span class="pill">Unlimited</span></td><td><span class="pill">Unlimited</span></td></tr>
+      <tr><td>Try without an account</td><td>1 / day</td><td class="dash">—</td><td class="dash">—</td></tr>
       <tr class="grp"><td colspan="4">Tools</td></tr>
       <tr><td>Merge &amp; split</td><td class="chk">✓</td><td class="chk">✓</td><td class="chk">✓</td></tr>
       <tr><td>Compress</td><td class="chk">✓</td><td class="chk">✓</td><td class="chk">✓</td></tr>
-      <tr><td>PDF translation</td><td>1 / day</td><td class="chk">Unlimited</td><td class="chk">Unlimited</td></tr>
+      <tr><td>PDF translation</td><td>1 / day</td><td><span class="pill">Unlimited</span></td><td><span class="pill">Unlimited</span></td></tr>
       <tr><td>PDF signing</td><td class="dash">—</td><td class="chk">✓</td><td class="chk">✓</td></tr>
       <tr><td>Edit history view</td><td class="dash">—</td><td class="dash">—</td><td class="chk">✓</td></tr>
       <tr class="grp"><td colspan="4">Team</td></tr>
@@ -659,6 +762,65 @@
   </div>
 </div>
 
+<div class="faq reveal">
+  <h2>Questions, answered</h2>
+  <div class="sub">Everything people usually ask before switching.</div>
+
+  <details class="faq-item" open>
+    <summary class="faq-q">Is it true my files never leave my device?
+      <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 4v12M4 10h12"/></svg>
+    </summary>
+    <div class="faq-a">Yes, on every plan — Free, Pro, and Team. Merging, splitting, compressing, signing, and translating all run locally in your browser, so nothing is uploaded to process it.</div>
+  </details>
+
+  <details class="faq-item">
+    <summary class="faq-q">What happens when I hit the Free plan's daily limit?
+      <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 4v12M4 10h12"/></svg>
+    </summary>
+    <div class="faq-a">You can keep using the tools, but downloads pause until the next day — 3 a day if you're signed in, 1 a day if you're not. Pro and Team remove that limit entirely.</div>
+  </details>
+
+  <details class="faq-item">
+    <summary class="faq-q">Does PDF translation cost extra on paid plans?
+      <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 4v12M4 10h12"/></svg>
+    </summary>
+    <div class="faq-a">No. Translation is included in Pro and Team at no extra cost, with no daily cap — unlike the Free plan's 1-per-day limit.</div>
+  </details>
+
+  <details class="faq-item">
+    <summary class="faq-q">Can I switch between monthly and yearly billing?
+      <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 4v12M4 10h12"/></svg>
+    </summary>
+    <div class="faq-a">Yes — toggle between them any time using the switch at the top of this page. Yearly billing is 20% cheaper on both Pro and Team.</div>
+  </details>
+
+  <details class="faq-item">
+    <summary class="faq-q">What's included in the Team plan beyond Pro?
+      <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 4v12M4 10h12"/></svg>
+    </summary>
+    <div class="faq-a">Team covers everything in Pro for up to 5 seats, plus team chat, an activity feed, 48-hour shared links, an admin dashboard, and a history view showing who changed what. It also starts with a 30-day free trial.</div>
+  </details>
+
+  <details class="faq-item">
+    <summary class="faq-q">Can I cancel anytime?
+      <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 4v12M4 10h12"/></svg>
+    </summary>
+    <div class="faq-a">Yes. There's no lock-in on any paid plan — cancel whenever you like, no hidden fees either way.</div>
+  </details>
+</div>
+
+<div class="final-cta reveal">
+  <div class="final-cta-inner">
+    <div class="final-cta-glow"></div>
+    <h2>Ready to get your files sorted?</h2>
+    <p>Start free, no account required for your first file. Upgrade whenever the daily limit starts to feel small.</p>
+    <div class="final-cta-buttons">
+      <a href="/index.html" class="fc-btn ghost">Start for free</a>
+      <a href="#" class="fc-btn primary" data-checkout="pro">Upgrade to Pro — $4.99/mo</a>
+    </div>
+  </div>
+</div>
+
 <footer>
   <span>© PDFortis</span>
   <div class="footer-links">
@@ -670,24 +832,33 @@
 </footer>
 
 <script>
-  if ('scrollRestoration' in history) {
-    history.scrollRestoration = 'manual';
-  }
+  if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; }
   window.scrollTo(0, 0);
 
   (function(){
     const toggle = document.getElementById('billingToggle');
+    const pill = toggle.querySelector('.toggle-pill');
+
     toggle.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-mode]');
       if (!btn) return;
       const mode = btn.dataset.mode;
-      toggle.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+      toggle.querySelectorAll('button[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
+      pill.classList.toggle('shift', mode === 'yearly');
 
       document.querySelectorAll('.plan-price .amt[data-monthly]').forEach(el => {
-        el.textContent = mode === 'yearly' ? el.dataset.yearly : el.dataset.monthly;
+        el.classList.add('swapping');
+        setTimeout(() => {
+          el.textContent = mode === 'yearly' ? el.dataset.yearly : el.dataset.monthly;
+          el.classList.remove('swapping');
+        }, 140);
       });
       document.querySelectorAll('.plan-sub[data-monthly]').forEach(el => {
         el.textContent = mode === 'yearly' ? el.dataset.yearly : el.dataset.monthly;
+      });
+      document.querySelectorAll('.plan-save[data-yearly-text]').forEach(el => {
+        el.textContent = mode === 'yearly' ? el.dataset.yearlyText : '\u00A0';
+        el.classList.toggle('show', mode === 'yearly');
       });
     });
 
@@ -695,6 +866,16 @@
       el.addEventListener('click', (e) => {
         e.preventDefault();
         alert('Checkout coming soon — not connected yet.');
+      });
+    });
+
+    document.querySelectorAll('.faq-item').forEach((item, i) => {
+      item.addEventListener('toggle', () => {
+        if (item.open) {
+          document.querySelectorAll('.faq-item').forEach(other => {
+            if (other !== item) other.removeAttribute('open');
+          });
+        }
       });
     });
 
