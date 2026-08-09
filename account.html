@@ -130,7 +130,7 @@ input:focus{outline:none;border-color:var(--blue)}
     <input type="text" id="in-email" disabled>
     <button class="btn btn-primary btn-full" onclick="saveProfile()">Save changes</button>
   </div>
-
+  <div class="card" id="subscription-card"></div>
   <div class="card" id="company-card">
     <!-- filled in by JS: either "your company" info or "add a token" form -->
   </div>
@@ -167,6 +167,28 @@ function toast(msg){
   t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), 2500);
 }
+function renderSubscriptionCard(){
+  const card = document.getElementById('subscription-card');
+  const tier = profile?.subscription_tier || 'free';
+  const status = profile?.subscription_status || 'inactive';
+  const isActivePaid = (tier === 'pro' || tier === 'team') && status === 'active';
+
+  if(isActivePaid){
+    const label = tier === 'team' ? 'Team' : 'Pro';
+    card.innerHTML = `
+      <h2>💳 Subscription</h2>
+      <div class="row"><span class="lbl">Plan</span><span class="val">${label}</span></div>
+      <div class="row"><span class="lbl">Status</span><span class="val" style="color:#16a34a">Active</span></div>
+      <a class="btn btn-ghost btn-full" style="margin-top:14px;display:block;text-align:center;text-decoration:none" href="/pricing.html">Manage plan</a>
+    `;
+  } else {
+    card.innerHTML = `
+      <h2>💳 Subscription</h2>
+      <div class="row"><span class="lbl">Plan</span><span class="val">Free</span></div>
+      <a class="btn btn-primary btn-full" style="margin-top:14px;display:block;text-align:center;text-decoration:none" href="/pricing.html">Upgrade to Pro</a>
+    `;
+  }
+}
 
 async function init(){
   if(!session){ window.location.href = '/index.html'; return; }
@@ -176,6 +198,7 @@ async function init(){
   document.getElementById('in-email').value = session.user.email || '';
 
   renderCompanyCard();
+  renderSubscriptionCard();
 }
 
 function renderCompanyCard(){
