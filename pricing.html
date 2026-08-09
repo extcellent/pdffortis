@@ -68,22 +68,39 @@ h1{font-size:clamp(28px,5vw,38px);line-height:1.15;letter-spacing:-.02em;margin:
 .privacy-strip .inner{background:var(--blue-l);border:1px solid #bfdbfe;border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;gap:12px;font-size:13.5px;color:#1e3a8a}
 .privacy-strip svg{flex-shrink:0;width:20px;height:20px;color:var(--blue)}
 
-/* competitor comparison */
-.vs{max-width:1100px;margin:0 auto;padding:0 20px}
-.vs h2{font-size:22px;font-weight:800;letter-spacing:-.01em;margin:0 0 4px}
-.vs .sub{font-size:13.5px;color:var(--gray-500);margin-bottom:24px}
-.vs-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--gray-200);border-radius:var(--radius)}
-.vs-table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:640px}
-.vs-table thead th{text-align:left;padding:14px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gray-400);border-bottom:1px solid var(--gray-200);background:var(--gray-50)}
-.vs-table td{padding:16px;border-bottom:1px solid var(--gray-100);vertical-align:top}
-.vs-table tr:last-child td{border-bottom:none}
-.vs-table .who{font-weight:700;color:var(--gray-900);white-space:nowrap}
-.vs-table .who.us{color:var(--blue)}
-.vs-table .weak{color:var(--gray-500);line-height:1.5}
-.row-us{background:var(--blue-l)}
+/* competitor comparison — one big block per competitor */
+.cmp-block{padding:88px 0}
+.cmp-block.is-alt{background:var(--gray-50)}
+.cmp-block.is-dark{background:var(--gray-900);color:var(--white)}
+.cmp-inner{max-width:1100px;margin:0 auto;padding:0 20px;display:grid;grid-template-columns:1.1fr 1fr;gap:56px;align-items:center}
+.cmp-eyebrow{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-400);margin-bottom:14px}
+.cmp-block.is-dark .cmp-eyebrow{color:rgba(255,255,255,.4)}
+.cmp-name{font-size:clamp(24px,3.2vw,32px);font-weight:800;letter-spacing:-.01em;margin:0 0 18px}
+.cmp-price-row{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;margin-bottom:20px}
+.cmp-price{font-size:clamp(44px,6vw,64px);font-weight:800;letter-spacing:-.03em;line-height:1}
+.cmp-price .unit{font-size:15px;font-weight:500;color:var(--gray-400);margin-left:4px}
+.cmp-block.is-dark .cmp-price .unit{color:rgba(255,255,255,.4)}
+.cmp-price-team{font-size:15px;color:var(--gray-500);font-weight:600}
+.cmp-block.is-dark .cmp-price-team{color:rgba(255,255,255,.6)}
+.cmp-desc{font-size:14.5px;line-height:1.65;color:var(--gray-600);max-width:440px}
+.cmp-block.is-dark .cmp-desc{color:rgba(255,255,255,.65)}
+.cmp-desc strong{color:var(--gray-900);font-weight:700}
+.cmp-block.is-dark .cmp-desc strong{color:var(--white)}
+.cmp-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px}
+.cmp-list li{display:flex;align-items:flex-start;gap:11px;font-size:14px;line-height:1.5;color:var(--gray-700)}
+.cmp-block.is-dark .cmp-list li{color:rgba(255,255,255,.85)}
+.cmp-list svg{flex-shrink:0;margin-top:2px;width:17px;height:17px}
+.cmp-list li.good svg{color:var(--green)}
+.cmp-list li.bad svg{color:#f59e0b}
+.cmp-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:4px 12px;border-radius:100px;margin-bottom:14px}
+.cmp-badge.us{background:#1e3a8a;color:#93c5fd}
+@media(max-width:800px){
+  .cmp-inner{grid-template-columns:1fr;gap:32px}
+  .cmp-block{padding:64px 0}
+}
 
 /* comparison table */
-.compare{max-width:1100px;margin:0 auto;padding:56px 20px 100px}
+.compare{max-width:1100px;margin:0 auto;padding:72px 20px 100px}
 .compare h2{font-size:22px;font-weight:800;letter-spacing:-.01em;margin:0 0 4px}
 .compare .sub{font-size:13.5px;color:var(--gray-500);margin-bottom:24px}
 .compare-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -109,14 +126,6 @@ footer a:hover{color:var(--gray-700)}
 .block-alt{background:var(--gray-50)}
 .block-dark{background:var(--gray-900)}
 .block-dark h2{color:var(--white)}
-.block-dark .vs .sub{color:rgba(255,255,255,.55)}
-.block-dark .vs-scroll{border-color:rgba(255,255,255,.12)}
-.block-dark .vs-table thead th{background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.1)}
-.block-dark .vs-table td{color:rgba(255,255,255,.8);border-color:rgba(255,255,255,.08)}
-.block-dark .vs-table .who{color:var(--white)}
-.block-dark .vs-table .who.us{color:#93c5fd}
-.block-dark .vs-table .weak{color:rgba(255,255,255,.5)}
-.block-dark .row-us{background:rgba(99,102,241,.14)}
 
 /* reveal-on-scroll */
 .reveal{opacity:0;transform:translateY(28px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
@@ -179,7 +188,7 @@ footer a:hover{color:var(--gray-700)}
       <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>3 downloads / day (signed in)</li>
       <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>1 download / day without an account</li>
       <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Merge, split, compress</li>
-      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>1 local translation / day</li>
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>1 PDF translation / day</li>
       <li class="dim"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 10h10"/></svg>PDF signing</li>
       <li class="dim"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 10h10"/></svg>Team workspace</li>
       <li class="dim"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 10h10"/></svg>Edit history view</li>
@@ -196,7 +205,7 @@ footer a:hover{color:var(--gray-700)}
     <ul class="feat-list">
       <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg><strong>Unlimited</strong> downloads</li>
       <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>PDF signing unlocked</li>
-      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Local translation, generous daily limit</li>
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Unlimited PDF translation</li>
       <li class="dim"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 10h10"/></svg>Team workspace</li>
       <li class="dim"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 10h10"/></svg>Edit history view</li>
     </ul>
@@ -227,39 +236,64 @@ footer a:hover{color:var(--gray-700)}
   </div>
 </div>
 
-<div class="block block-dark">
-<div class="vs reveal">
-  <h2>How PDFortis compares</h2>
-  <div class="sub">Same job, different trade-offs.</div>
-  <div class="vs-scroll">
-    <table class="vs-table">
-      <thead>
-        <tr><th>Tool</th><th>Individual</th><th>Team</th><th>The catch</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td class="who">Adobe Acrobat Pro</td>
-          <td>~$19.99/mo</td>
-          <td>~$23.99/user/mo</td>
-          <td class="weak">Heavy desktop install, steep learning curve, priced for enterprises</td>
-        </tr>
-        <tr>
-          <td class="who">Smallpdf / iLovePDF</td>
-          <td>$7–12/mo</td>
-          <td>$9–14/user/mo</td>
-          <td class="weak">Files are uploaded to their servers to process — a real concern for contracts, legal or financial documents</td>
-        </tr>
-        <tr class="row-us">
-          <td class="who us">PDFortis</td>
-          <td>$4.99/mo</td>
-          <td>$14.99/mo (5 seats)</td>
-          <td class="weak">100% client-side — nothing ever leaves your device, and it's the cheapest of the three</td>
-        </tr>
-      </tbody>
-    </table>
+<section class="cmp-block">
+  <div class="cmp-inner reveal">
+    <div>
+      <div class="cmp-eyebrow">vs. Adobe Acrobat Pro</div>
+      <div class="cmp-price-row">
+        <div class="cmp-price">$19.99<span class="unit">/mo individual</span></div>
+      </div>
+      <div class="cmp-price-team">~$23.99/user/mo for teams</div>
+    </div>
+    <div>
+      <p class="cmp-desc">The industry standard — and it feels like it. A <strong>heavy desktop install</strong> with a steep learning curve, built and priced for enterprises, not for someone who just needs to sign a contract this afternoon.</p>
+      <ul class="cmp-list">
+        <li class="bad"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l8 8M14 6l-8 8"/></svg>Full desktop app, slow to open</li>
+        <li class="bad"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l8 8M14 6l-8 8"/></svg>Enterprise pricing, enterprise complexity</li>
+      </ul>
+    </div>
   </div>
-</div>
-</div>
+</section>
+
+<section class="cmp-block is-alt">
+  <div class="cmp-inner reveal">
+    <div>
+      <div class="cmp-eyebrow">vs. Smallpdf / iLovePDF</div>
+      <div class="cmp-price-row">
+        <div class="cmp-price">$7–12<span class="unit">/mo individual</span></div>
+      </div>
+      <div class="cmp-price-team">$9–14/user/mo for teams</div>
+    </div>
+    <div>
+      <p class="cmp-desc">Fast, simple, browser-based — and that's exactly the problem. Every file you touch is <strong>uploaded to their servers</strong> to be processed. Fine for a flyer, harder to justify for a contract, payslip, or medical record.</p>
+      <ul class="cmp-list">
+        <li class="good"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Quick and browser-based</li>
+        <li class="bad"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l8 8M14 6l-8 8"/></svg>Files leave your device to be processed</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="cmp-block is-dark">
+  <div class="cmp-inner reveal">
+    <div>
+      <span class="cmp-badge us">THIS IS US</span>
+      <div class="cmp-eyebrow">PDFortis</div>
+      <div class="cmp-price-row">
+        <div class="cmp-price">$4.99<span class="unit">/mo individual</span></div>
+      </div>
+      <div class="cmp-price-team">$14.99/mo for up to 5 seats</div>
+    </div>
+    <div>
+      <p class="cmp-desc">The cheapest of the three — and the only one where your files <strong>never leave your device</strong>. Every core tool, including translation, runs entirely in your browser.</p>
+      <ul class="cmp-list">
+        <li class="good"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>100% client-side, always</li>
+        <li class="good"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Lightweight, no install</li>
+        <li class="good"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Cheapest of the three</li>
+      </ul>
+    </div>
+  </div>
+</section>
 
 <div class="compare reveal">
   <h2>Every feature, side by side</h2>
@@ -277,7 +311,7 @@ footer a:hover{color:var(--gray-700)}
       <tr class="grp"><td colspan="4">Tools</td></tr>
       <tr><td>Merge &amp; split</td><td class="chk">✓</td><td class="chk">✓</td><td class="chk">✓</td></tr>
       <tr><td>Compress</td><td class="chk">✓</td><td class="chk">✓</td><td class="chk">✓</td></tr>
-      <tr><td>Local translation</td><td>1 / day</td><td>Generous limit</td><td>Generous limit</td></tr>
+      <tr><td>PDF translation</td><td>1 / day</td><td class="chk">Unlimited</td><td class="chk">Unlimited</td></tr>
       <tr><td>PDF signing</td><td class="dash">—</td><td class="chk">✓</td><td class="chk">✓</td></tr>
       <tr><td>Edit history view</td><td class="dash">—</td><td class="dash">—</td><td class="chk">✓</td></tr>
 
