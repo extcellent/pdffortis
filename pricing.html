@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preise — PDFortis</title>
+<link rel="icon" href="/pdfortis_big.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --white:#ffffff;--off:#f8f8f8;--gray-50:#f9fafb;--gray-100:#f3f4f6;--gray-200:#e5e7eb;
+  --gray-300:#d1d5db;--gray-400:#9ca3af;--gray-500:#6b7280;--gray-600:#4b5563;--gray-700:#374151;--gray-900:#111827;
+  --radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08);--shadow-md:0 4px 16px rgba(0,0,0,.10);--shadow-lg:0 20px 60px rgba(0,0,0,.13);
+  --font:'Inter',system-ui,sans-serif;
+  --rb1:#6366f1;--rb3:#ec4899;--blue:#2563eb;--blue-l:#eff6ff;--green:#10b981;--green-l:#ecfdf5;
+}
+*{box-sizing:border-box}
+html,body{margin:0;font-family:var(--font);background:var(--white);color:var(--gray-900);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{font-family:var(--font);cursor:pointer}
+
+/* nav */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--gray-200)}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo-icon{width:28px;height:28px}
+.nav-logo-text{font-size:15px;font-weight:700;letter-spacing:-.3px}
+.nav-logo-text span{background:linear-gradient(135deg,var(--rb1),var(--rb3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.back-link{font-size:13px;color:var(--gray-500);text-decoration:none;font-weight:500}
+.back-link:hover{color:var(--gray-900)}
+
+/* hero */
+.hero{max-width:720px;margin:0 auto;padding:64px 24px 8px;text-align:center}
+.eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--blue);background:var(--blue-l);padding:5px 12px;border-radius:100px;margin-bottom:18px}
+.eyebrow svg{width:12px;height:12px}
+h1{font-size:38px;line-height:1.15;letter-spacing:-.02em;margin:0 0 14px;font-weight:800}
+.hero p{font-size:16px;color:var(--gray-500);line-height:1.6;margin:0 auto;max-width:520px}
+
+/* billing toggle */
+.toggle-wrap{display:flex;justify-content:center;margin:32px 0 8px}
+.toggle{display:inline-flex;align-items:center;background:var(--gray-100);border-radius:100px;padding:4px;gap:2px}
+.toggle button{border:none;background:none;padding:8px 18px;border-radius:100px;font-size:13px;font-weight:600;color:var(--gray-500);transition:all .15s}
+.toggle button.active{background:var(--white);color:var(--gray-900);box-shadow:var(--shadow)}
+.save-badge{font-size:11px;font-weight:700;color:var(--green);background:var(--green-l);padding:2px 7px;border-radius:100px;margin-left:6px}
+
+/* plan grid */
+.plans{max-width:1100px;margin:40px auto 0;padding:0 24px;display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.plan{border:1px solid var(--gray-200);border-radius:var(--radius);padding:28px 26px;display:flex;flex-direction:column;background:var(--white);position:relative}
+.plan.featured{border:2px solid var(--gray-900);box-shadow:var(--shadow-lg)}
+.plan-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--gray-900);color:var(--white);font-size:11px;font-weight:700;padding:4px 14px;border-radius:100px;letter-spacing:.02em}
+.plan-name{font-size:14px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
+.plan-price{display:flex;align-items:baseline;gap:5px;margin-bottom:4px}
+.plan-price .amt{font-size:40px;font-weight:800;letter-spacing:-.02em}
+.plan-price .per{font-size:14px;color:var(--gray-400);font-weight:500}
+.plan-sub{font-size:13px;color:var(--gray-400);margin-bottom:22px;min-height:18px}
+.plan-cta{width:100%;padding:11px;border-radius:8px;font-size:14px;font-weight:600;border:1px solid var(--gray-300);background:var(--white);color:var(--gray-900);margin-bottom:26px;transition:all .15s;text-align:center;text-decoration:none;display:block}
+.plan-cta:hover{border-color:var(--gray-900)}
+.plan-cta.primary{background:var(--gray-900);color:var(--white);border-color:var(--gray-900)}
+.plan-cta.primary:hover{background:#000}
+.feat-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.feat-list li{display:flex;align-items:flex-start;gap:9px;font-size:13.5px;color:var(--gray-700);line-height:1.5}
+.feat-list svg{flex-shrink:0;margin-top:2px;width:15px;height:15px;color:var(--green)}
+.feat-list li.dim{color:var(--gray-400)}
+.feat-list li.dim svg{color:var(--gray-300)}
+
+/* privacy strip */
+.privacy-strip{max-width:1100px;margin:44px auto 0;padding:0 24px}
+.privacy-strip .inner{background:var(--blue-l);border:1px solid #bfdbfe;border-radius:var(--radius);padding:16px 22px;display:flex;align-items:center;gap:12px;font-size:13.5px;color:#1e3a8a}
+.privacy-strip svg{flex-shrink:0;width:20px;height:20px;color:var(--blue)}
+
+/* comparison table */
+.compare{max-width:1100px;margin:72px auto 0;padding:0 24px 100px}
+.compare h2{font-size:22px;font-weight:800;letter-spacing:-.01em;margin:0 0 4px}
+.compare .sub{font-size:13.5px;color:var(--gray-500);margin-bottom:28px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+thead th{text-align:left;padding:12px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gray-400);border-bottom:1px solid var(--gray-200)}
+thead th:not(:first-child){text-align:center}
+tbody td{padding:13px 14px;border-bottom:1px solid var(--gray-100);color:var(--gray-700)}
+tbody td:not(:first-child){text-align:center}
+tbody tr:last-child td{border-bottom:none}
+tbody td:first-child{color:var(--gray-900);font-weight:500}
+.chk{color:var(--green)}
+.dash{color:var(--gray-300)}
+.grp{background:var(--gray-50)}
+.grp td{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gray-500);padding:9px 14px}
+
+footer{border-top:1px solid var(--gray-200);padding:20px 28px;display:flex;justify-content:space-between;font-size:12px;color:var(--gray-400)}
+footer a{color:var(--gray-400);text-decoration:none}
+footer a:hover{color:var(--gray-700)}
+.footer-links{display:flex;gap:18px}
+
+@media(max-width:820px){
+  .plans{grid-template-columns:1fr;max-width:420px}
+  h1{font-size:30px}
+  table{font-size:12.5px}
+  thead th,tbody td{padding:10px 8px}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-logo" href="/index.html">
+    <svg class="nav-logo-icon" viewBox="0 0 28 28" fill="none"><rect x="3" y="2" width="16" height="21" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="16" height="21" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="16" height="21" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <span class="nav-logo-text">PDF<span>ortis</span></span>
+  </a>
+  <a class="back-link" href="/index.html">← Zurück zu den Tools</a>
+</nav>
+
+<div class="hero">
+  <div class="eyebrow">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg>
+    Einfache, faire Preise
+  </div>
+  <h1>Wähle den Plan,<br>der zu dir passt</h1>
+  <p>Alle PDF-Tools laufen lokal in deinem Browser — deine Dokumente verlassen nie dein Gerät. Kein Trial, keine versteckten Kosten, jederzeit kündbar.</p>
+</div>
+
+<div class="toggle-wrap">
+  <div class="toggle" id="billingToggle">
+    <button type="button" class="active" data-mode="monthly">Monatlich</button>
+    <button type="button" data-mode="yearly">Jährlich <span class="save-badge">-20%</span></button>
+  </div>
+</div>
+
+<div class="plans">
+
+  <!-- FREE -->
+  <div class="plan">
+    <div class="plan-name">Free</div>
+    <div class="plan-price"><span class="amt">$0</span></div>
+    <div class="plan-sub">Für gelegentliche PDF-Aufgaben</div>
+    <a href="/index.html" class="plan-cta">Kostenlos starten</a>
+    <ul class="feat-list">
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>5 Downloads pro Tag</li>
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Zusammenfügen, Trennen, Komprimieren</li>
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Lokale Übersetzung</li>
+      <li class="dim"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 10h10"/></svg>PDF-Signierung</li>
+      <li class="dim"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 10h10"/></svg>Team-Workspace</li>
+    </ul>
+  </div>
+
+  <!-- PRO -->
+  <div class="plan featured">
+    <div class="plan-badge">Beliebt</div>
+    <div class="plan-name">Pro</div>
+    <div class="plan-price"><span class="amt" data-monthly="$4.99" data-yearly="$3.99">$4.99</span><span class="per">/ Monat</span></div>
+    <div class="plan-sub" data-monthly="Monatlich abgerechnet" data-yearly="Jährlich abgerechnet · $47.90/Jahr">Monatlich abgerechnet</div>
+    <a href="#" class="plan-cta primary" data-checkout="pro">Pro upgraden</a>
+    <ul class="feat-list">
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg><strong>Unbegrenzte</strong> Downloads</li>
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>PDF-Signierung freigeschaltet</li>
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Priorisierte Übersetzung</li>
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Keine Limit-Popups</li>
+      <li class="dim"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 10h10"/></svg>Team-Workspace</li>
+    </ul>
+  </div>
+
+  <!-- TEAM -->
+  <div class="plan">
+    <div class="plan-name">Team</div>
+    <div class="plan-price"><span class="amt" data-monthly="$14.99" data-yearly="$11.99">$14.99</span><span class="per">/ Monat</span></div>
+    <div class="plan-sub" data-monthly="Bis zu 5 Nutzer · monatlich" data-yearly="Bis zu 5 Nutzer · jährlich">Bis zu 5 Nutzer · monatlich</div>
+    <a href="#" class="plan-cta" data-checkout="team">Team-Testphase starten</a>
+    <ul class="feat-list">
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Alles aus Pro, für 5 Sitze</li>
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Team-Chat & Aktivitäten</li>
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Geteilte Links (48h gültig)</li>
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>Team-Dashboard & Admin</li>
+      <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>30 Tage kostenlos testen</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="privacy-strip">
+  <div class="inner">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6z"/></svg>
+    In jedem Plan gleich: Deine PDFs werden nie hochgeladen. Alle Kernwerkzeuge laufen clientseitig — auch im kostenlosen Plan.
+  </div>
+</div>
+
+<div class="compare">
+  <h2>Alle Funktionen im Vergleich</h2>
+  <div class="sub">Jedes Detail, jeder Plan.</div>
+  <table>
+    <thead>
+      <tr><th>Funktion</th><th>Free</th><th>Pro</th><th>Team</th></tr>
+    </thead>
+    <tbody>
+      <tr class="grp"><td colspan="4">Downloads &amp; Limits</td></tr>
+      <tr><td>Downloads pro Tag</td><td>5</td><td class="chk">Unbegrenzt</td><td class="chk">Unbegrenzt</td></tr>
+      <tr><td>Ohne Anmeldung testen</td><td>2 / Tag</td><td>—</td><td>—</td></tr>
+
+      <tr class="grp"><td colspan="4">Werkzeuge</td></tr>
+      <tr><td>Zusammenfügen &amp; Trennen</td><td class="chk">✓</td><td class="chk">✓</td><td class="chk">✓</td></tr>
+      <tr><td>Komprimieren</td><td class="chk">✓</td><td class="chk">✓</td><td class="chk">✓</td></tr>
+      <tr><td>Lokale Übersetzung</td><td class="chk">✓</td><td class="chk">✓ priorisiert</td><td class="chk">✓ priorisiert</td></tr>
+      <tr><td>PDF-Signierung</td><td class="dash">—</td><td class="chk">✓</td><td class="chk">✓</td></tr>
+
+      <tr class="grp"><td colspan="4">Team</td></tr>
+      <tr><td>Sitze inklusive</td><td class="dash">1</td><td class="dash">1</td><td>5</td></tr>
+      <tr><td>Team-Chat</td><td class="dash">—</td><td class="dash">—</td><td class="chk">✓</td></tr>
+      <tr><td>Geteilte Links</td><td class="dash">—</td><td class="dash">—</td><td class="chk">48h</td></tr>
+      <tr><td>Team-Dashboard</td><td class="dash">—</td><td class="dash">—</td><td class="chk">✓</td></tr>
+
+      <tr class="grp"><td colspan="4">Support</td></tr>
+      <tr><td>E-Mail-Support</td><td class="chk">✓</td><td class="chk">✓</td><td class="chk">Priorisiert</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<footer>
+  <span>© PDFortis</span>
+  <div class="footer-links">
+    <a href="/legal.html">Legal Notice</a>
+    <a href="/privacy.html">Privacy</a>
+    <a href="/tos.html">ToS</a>
+    <a href="/contact.html">Contact</a>
+  </div>
+</footer>
+
+<script>
+  // Billing toggle: swaps displayed price/sub-text between monthly/yearly.
+  // Purely visual for now — actual checkout variant selection happens
+  // when the checkout links are wired up to LemonSqueezy.
+  const toggle = document.getElementById('billingToggle');
+  toggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-mode]');
+    if (!btn) return;
+    const mode = btn.dataset.mode;
+    toggle.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+
+    document.querySelectorAll('.plan-price .amt[data-monthly]').forEach(el => {
+      el.textContent = mode === 'yearly' ? el.dataset.yearly : el.dataset.monthly;
+    });
+    document.querySelectorAll('.plan-sub[data-monthly]').forEach(el => {
+      el.textContent = mode === 'yearly' ? el.dataset.yearly : el.dataset.monthly;
+    });
+  });
+
+  // Checkout buttons — placeholder until LemonSqueezy is wired up.
+  document.querySelectorAll('[data-checkout]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      alert('Checkout folgt in Kürze — noch nicht verbunden.');
+    });
+  });
+</script>
+
+</body>
+</html>
