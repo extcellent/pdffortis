@@ -1336,8 +1336,15 @@ let currentPage=1, totalPages=0, fileName='';
 let editorMode='look', currentTab='edit', compressQ='medium';
 let sigDrawing=false, sigLX=0, sigLY=0;
 let currentUser=null, currentToken=null;
+let currentSubscription=null;
 let clientFP=null;
 let thumbCanvases=[];
+
+function isPaidUser(){
+  return CONFIG.ENABLE_PAYWALL && currentSubscription
+    && (currentSubscription.tier === 'pro' || currentSubscription.tier === 'team')
+    && currentSubscription.status === 'active';
+}
   
 const CONFIG = {
   ENABLE_PAYWALL: false,
@@ -2354,7 +2361,7 @@ async function compressAndSave(){
 // ═══════════════════════════════════════
 async function triggerDownload(){
   if(!pdfLibDoc){toast('No document loaded','err');return}
-  if(currentToken){await logTokenUsage('download');await performDownload();return}
+  if(currentToken || isPaidUser()){await logTokenUsage('download');await performDownload();return}
 
   if(!isLoggedIn()){
     // Guest path — mirrors translate: 1 free, then sign-up wall
@@ -2373,7 +2380,7 @@ async function triggerDownload(){
   let sbCount=0;
   try{sbCount=await sbGetDLCount(await getFingerprint())}catch(e){}
   const used=Math.max(lsCount,sbCount);
-  if(used>=MAX_DL){showLimitModal();return}
+  if(!isPaidUser() && used>=MAX_DL){showLimitModal();return}
   logLSDL();
   try{await sbLogDL(await getFingerprint())}catch(e){}
   updateDLDisplay();
@@ -2588,7 +2595,7 @@ function logLSDL(){
   localStorage.setItem(LS_DL,JSON.stringify(d.filter(t=>t>cut)));
 }
 function updateDLDisplay(){
-  if(currentToken){document.getElementById('dl-count-display').textContent='∞';return}
+  if(currentToken || isPaidUser()){document.getElementById('dl-count-display').textContent='∞';return}
   if(!isLoggedIn()){
     const left=Math.max(0,CONFIG.GUEST_DL_LIMIT-guestDLUsed());
     document.getElementById('dl-count-display').textContent=`${left} left`;
@@ -2711,6 +2718,11 @@ async function doLogin(){
         display_name: d.user.user_metadata?.name || email.split('@')[0]
       }, d.access_token);
     }
+    
+    currentSubscription = {
+      tier: profile?.subscription_tier || 'free',
+      status: profile?.subscription_status || 'inactive'
+    };    
 
     currentUser = {
       id: d.user.id,
@@ -2876,7 +2888,7 @@ async function logout(){
   toast(lang==='de'?'Abgemeldet':'Logged out');
 }
   
-function restoreSessionFromStorage(){
+async function restoreSessionFromStorage(){
   try{
     const raw=localStorage.getItem('pf_session');
     if(!raw) return;
@@ -2892,6 +2904,15 @@ function restoreSessionFromStorage(){
       name: s.user.user_metadata?.name || s.user.email?.split('@')[0] || 'User',
       token: s.user.access_token
     };
+    // Subscription-Status nachladen, damit isPaidUser() nach Reload/Redirect korrekt ist
+    try{
+      const profile = await sbGetProfile(currentUser.id, currentUser.token);
+      currentSubscription = {
+        tier: profile?.subscription_tier || 'free',
+        status: profile?.subscription_status || 'inactive'
+      };
+      currentUser.company_token = profile?.company_token || null;
+    }catch(e){ console.warn('subscription restore failed', e); }
     applyUserUI();
   }catch(e){ console.warn('session restore failed', e); }
 }
