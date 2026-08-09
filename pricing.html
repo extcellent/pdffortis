@@ -69,7 +69,7 @@ h1{font-size:clamp(28px,5vw,38px);line-height:1.15;letter-spacing:-.02em;margin:
 .privacy-strip svg{flex-shrink:0;width:20px;height:20px;color:var(--blue)}
 
 /* competitor comparison */
-.vs{max-width:1100px;margin:72px auto 0;padding:0 20px}
+.vs{max-width:1100px;margin:0 auto;padding:0 20px}
 .vs h2{font-size:22px;font-weight:800;letter-spacing:-.01em;margin:0 0 4px}
 .vs .sub{font-size:13.5px;color:var(--gray-500);margin-bottom:24px}
 .vs-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--gray-200);border-radius:var(--radius)}
@@ -83,7 +83,7 @@ h1{font-size:clamp(28px,5vw,38px);line-height:1.15;letter-spacing:-.02em;margin:
 .row-us{background:var(--blue-l)}
 
 /* comparison table */
-.compare{max-width:1100px;margin:56px auto 0;padding:0 20px 100px}
+.compare{max-width:1100px;margin:0 auto;padding:56px 20px 100px}
 .compare h2{font-size:22px;font-weight:800;letter-spacing:-.01em;margin:0 0 4px}
 .compare .sub{font-size:13.5px;color:var(--gray-500);margin-bottom:24px}
 .compare-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -103,6 +103,32 @@ footer{border-top:1px solid var(--gray-200);padding:20px 20px;display:flex;flex-
 footer a{color:var(--gray-400);text-decoration:none}
 footer a:hover{color:var(--gray-700)}
 .footer-links{display:flex;gap:16px;flex-wrap:wrap}
+
+/* section blocks — each major section gets its own visual "slab" */
+.block{padding:72px 0}
+.block-alt{background:var(--gray-50)}
+.block-dark{background:var(--gray-900)}
+.block-dark h2{color:var(--white)}
+.block-dark .vs .sub{color:rgba(255,255,255,.55)}
+.block-dark .vs-scroll{border-color:rgba(255,255,255,.12)}
+.block-dark .vs-table thead th{background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.1)}
+.block-dark .vs-table td{color:rgba(255,255,255,.8);border-color:rgba(255,255,255,.08)}
+.block-dark .vs-table .who{color:var(--white)}
+.block-dark .vs-table .who.us{color:#93c5fd}
+.block-dark .vs-table .weak{color:rgba(255,255,255,.5)}
+.block-dark .row-us{background:rgba(99,102,241,.14)}
+
+/* reveal-on-scroll */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
+.reveal.in-view{opacity:1;transform:translateY(0)}
+.reveal-stagger > *{opacity:0;transform:translateY(22px);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1)}
+.reveal-stagger.in-view > *{opacity:1;transform:translateY(0)}
+.reveal-stagger.in-view > *:nth-child(1){transition-delay:.05s}
+.reveal-stagger.in-view > *:nth-child(2){transition-delay:.15s}
+.reveal-stagger.in-view > *:nth-child(3){transition-delay:.25s}
+@media(prefers-reduced-motion:reduce){
+  .reveal,.reveal-stagger > *{opacity:1!important;transform:none!important;transition:none!important}
+}
 
 @media(max-width:640px){
   .nav{padding:14px 16px}
@@ -125,7 +151,7 @@ footer a:hover{color:var(--gray-700)}
   <a class="back-link" href="/index.html">← Back to tools</a>
 </nav>
 
-<div class="hero">
+<div class="hero reveal">
   <div class="eyebrow">
     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg>
     Simple, honest pricing
@@ -134,14 +160,14 @@ footer a:hover{color:var(--gray-700)}
   <p>Every tool runs locally in your browser — your files never leave your device. No trial tricks, no hidden fees, cancel anytime.</p>
 </div>
 
-<div class="toggle-wrap">
+<div class="toggle-wrap reveal">
   <div class="toggle" id="billingToggle">
     <button type="button" class="active" data-mode="monthly">Monthly</button>
     <button type="button" data-mode="yearly">Yearly <span class="save-badge">-20%</span></button>
   </div>
 </div>
 
-<div class="plans">
+<div class="plans reveal-stagger">
 
   <!-- FREE -->
   <div class="plan">
@@ -194,14 +220,15 @@ footer a:hover{color:var(--gray-700)}
 
 </div>
 
-<div class="privacy-strip">
+<div class="privacy-strip reveal">
   <div class="inner">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6z"/></svg>
     Same on every plan: your PDFs are never uploaded. Every core tool runs on your device — even on Free.
   </div>
 </div>
 
-<div class="vs">
+<div class="block block-dark">
+<div class="vs reveal">
   <h2>How PDFortis compares</h2>
   <div class="sub">Same job, different trade-offs.</div>
   <div class="vs-scroll">
@@ -232,8 +259,9 @@ footer a:hover{color:var(--gray-700)}
     </table>
   </div>
 </div>
+</div>
 
-<div class="compare">
+<div class="compare reveal">
   <h2>Every feature, side by side</h2>
   <div class="sub">All the details, one place.</div>
   <div class="compare-scroll">
@@ -299,6 +327,18 @@ footer a:hover{color:var(--gray-700)}
       alert('Checkout coming soon — not connected yet.');
     });
   });
+
+  // Scroll-reveal: fade + rise each section in as it enters the viewport.
+  const revealEls = document.querySelectorAll('.reveal, .reveal-stagger');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
+  revealEls.forEach(el => io.observe(el));
 </script>
 
 </body>
