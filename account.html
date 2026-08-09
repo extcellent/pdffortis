@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Account Settings — PDFortis</title>
 <link rel="icon" href="/pdfortis_big.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
   // Anti-flicker: bounce to home immediately if not logged in
   (function(){
@@ -14,98 +17,202 @@
       var s = JSON.parse(raw);
       if(!s || !s.user || (s.expires_at && s.expires_at < Date.now())){
         window.location.href = '/index.html'; return;
-      }    height: 52px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 28px;
-    border-bottom: 1px solid var(--gray-100);
-    flex-shrink: 0;
-    background: rgba(255, 255, 255, .92);
-    backdrop-filter: blur(8px);
-    position: relative;
-    z-index: 100;
+      }
     }catch(e){ window.location.href = '/index.html'; }
   })();
 </script>
 <style>
 :root{
-  --white:#ffffff;
-  --off:#f8f8f8;
-  --gray-50:#f9fafb;
-  --gray-100:#f3f4f6;
-  --gray-200:#e5e7eb;
-  --gray-300:#d1d5db;
-  --gray-400:#9ca3af;
-  --gray-500:#6b7280;
-  --gray-600:#4b5563;
-  --gray-700:#374151;
-  --gray-900:#111827;
-  --blue:#2563eb;
-  --blue-l:#eff6ff;
-  --radius:8px;
-  --shadow:0 1px 4px rgba(0,0,0,.08);
-  --shadow-md:0 4px 16px rgba(0,0,0,.10);
-  --shadow-lg:0 20px 60px rgba(0,0,0,.13);
-  --font:'Inter',system-ui,sans-serif;
-  --red:#dc2626;--red-l:#fef2f2;
-  --rb1:#6366f1;--rb2:#8b5cf6;--rb3:#ec4899;--rb4:#f59e0b;--rb5:#10b981;--rb6:#3b82f6;
+  --bg:#f6f5f9;
+  --surface:#ffffff;
+  --border:#e7e5ee;
+  --border-soft:#efeef4;
+  --ink:#15121f;
+  --ink-soft:#5c5872;
+  --ink-faint:#918da3;
+
+  --brand-1:#6366f1;
+  --brand-2:#8b5cf6;
+  --brand-3:#ec4899;
+  --brand-tint:#f1efff;
+  --brand-tint-border:#e3ddff;
+
+  --green:#15803d;
+  --green-tint:#f0fdf4;
+  --green-border:#bbf7d0;
+
+  --red:#dc2626;
+  --red-strong:#b91c1c;
+  --red-tint:#fef2f2;
+  --red-border:#fecaca;
+
+  --radius-sm:8px;
+  --radius:12px;
+  --radius-lg:18px;
+
+  --shadow-sm:0 1px 2px rgba(21,18,31,.05);
+  --shadow-md:0 6px 20px -4px rgba(21,18,31,.10);
+  --shadow-lg:0 24px 60px -12px rgba(21,18,31,.28);
+
+  --font-display:'Manrope',system-ui,sans-serif;
+  --font-body:'Inter',system-ui,sans-serif;
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;font-family:var(--font);background:var(--off);color:var(--gray-900)}
+html,body{margin:0;min-height:100%;font-family:var(--font-body);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+body{
+  background-image: radial-gradient(720px 360px at 12% -8%, rgba(99,102,241,.08), transparent 60%),
+                     radial-gradient(640px 320px at 92% 0%, rgba(236,72,153,.06), transparent 55%);
+  background-repeat:no-repeat;
+}
 a{color:inherit}
+::selection{background:var(--brand-tint);color:var(--brand-1)}
+
+:focus-visible{outline:2px solid var(--brand-1);outline-offset:2px;border-radius:6px}
+
+/* ---------- nav ---------- */
 .nav{
-    height: 52px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 28px;
-    border-bottom: 1px solid var(--gray-100);
-    flex-shrink: 0;
-    background: rgba(255, 255, 255, .92);
-    backdrop-filter: blur(8px);
-    position: relative;
-    z-index: 100;
+  height:56px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 28px;
+  border-bottom:1px solid var(--border-soft);
+  background:rgba(255,255,255,.85);
+  backdrop-filter:blur(10px);
+  position:sticky;
+  top:0;
+  z-index:100;
 }
 .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
-.nav-logo-icon{width:28px;height:28px}
-.nav-logo-text{font-size:15px;font-weight:700;color:var(--gray-900);letter-spacing:-.3px}
-.nav-logo-text span{background:linear-gradient(135deg,var(--rb1),var(--rb3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.back-link{font-size:13px;color:var(--gray-500);text-decoration:none;font-weight:500}
-.back-link:hover{color:var(--gray-900)}
-.wrap{max-width:640px;margin:0 auto;padding:40px 24px 80px}
-h1{font-size:22px;margin:0 0 6px}
-.sub{color:var(--gray-500);font-size:13px;margin:0 0 28px}
-.card{background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:22px;box-shadow:var(--shadow);margin-bottom:18px}
-.card h2{font-size:14px;margin:0 0 16px;display:flex;align-items:center;gap:8px}
-label{display:block;font-size:12px;font-weight:600;color:var(--gray-600);margin-bottom:6px}
-input{width:100%;padding:10px 12px;border:1px solid var(--gray-300);border-radius:8px;font-size:13px;font-family:var(--font);margin-bottom:14px}
-input:disabled{background:var(--gray-50);color:var(--gray-500)}
-input:focus{outline:none;border-color:var(--blue)}
-.row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray-100);font-size:13px}
-.row:last-child{border-bottom:none}
-.row .lbl{color:var(--gray-500);font-size:12px}
-.row .val{font-weight:600;font-size:12px}
-.btn{padding:10px 16px;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)}
-.btn-primary{background:var(--gray-900);color:white}
-.btn-primary:hover{background:#000}
-.btn-ghost{background:var(--gray-100);color:var(--gray-700)}
-.btn-ghost:hover{background:var(--gray-200)}
-.btn-danger{background:var(--red);color:white}
-.btn-danger:hover{background:#b91c1c}
+.nav-logo-icon{width:26px;height:26px}
+.nav-logo-text{font-family:var(--font-display);font-size:15px;font-weight:800;color:var(--ink);letter-spacing:-.2px}
+.nav-logo-text span{background:linear-gradient(135deg,var(--brand-1),var(--brand-3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.back-link{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft);text-decoration:none;font-weight:600;padding:6px 10px;border-radius:8px;transition:background .15s,color .15s}
+.back-link:hover{color:var(--ink);background:var(--border-soft)}
+.back-link svg{width:14px;height:14px}
+
+/* ---------- layout ---------- */
+.wrap{max-width:600px;margin:0 auto;padding:44px 24px 100px}
+.page-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:32px}
+.avatar{
+  width:52px;height:52px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-weight:800;font-size:19px;color:#fff;
+  background:linear-gradient(135deg,var(--brand-1),var(--brand-2) 55%,var(--brand-3));
+  box-shadow:0 4px 14px -2px rgba(99,102,241,.45);
+}
+h1{font-family:var(--font-display);font-size:23px;font-weight:800;margin:2px 0 4px;letter-spacing:-.3px}
+.sub{color:var(--ink-faint);font-size:13.5px;margin:0}
+
+/* ---------- cards ---------- */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:24px;
+  box-shadow:var(--shadow-sm);
+  margin-bottom:16px;
+  transition:box-shadow .2s;
+}
+.card-head{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.icon-badge{
+  width:30px;height:30px;border-radius:9px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--brand-tint);border:1px solid var(--brand-tint-border);
+}
+.icon-badge svg{width:16px;height:16px;stroke:var(--brand-1)}
+.icon-badge.green{background:var(--green-tint);border-color:var(--green-border)}
+.icon-badge.green svg{stroke:var(--green)}
+.icon-badge.red{background:var(--red-tint);border-color:var(--red-border)}
+.icon-badge.red svg{stroke:var(--red)}
+.card h2{font-family:var(--font-display);font-size:14.5px;font-weight:800;margin:0;letter-spacing:-.1px}
+.card-desc{font-size:12.5px;color:var(--ink-faint);margin:-12px 0 18px;padding-left:40px}
+
+label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;letter-spacing:.1px}
+input[type="text"]{
+  width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;
+  font-size:13.5px;font-family:var(--font-body);margin-bottom:16px;color:var(--ink);
+  background:var(--surface);transition:border-color .15s, box-shadow .15s;
+}
+input[type="text"]:disabled{background:#faf9fc;color:var(--ink-faint);border-color:var(--border-soft)}
+input[type="text"]:not(:disabled):hover{border-color:#c9c6d8}
+input[type="text"]:focus{outline:none;border-color:var(--brand-1);box-shadow:0 0 0 3.5px rgba(99,102,241,.14)}
+.field-hint{font-size:11.5px;color:var(--ink-faint);margin:-12px 0 16px}
+
+.row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-soft);font-size:13px}
+.row:last-of-type{border-bottom:none}
+.row .lbl{color:var(--ink-faint);font-size:12.5px}
+.row .val{font-weight:700;font-size:12.5px}
+.badge-live{display:inline-flex;align-items:center;gap:5px;color:var(--green);font-weight:700}
+.badge-live::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green)}
+
+/* ---------- buttons ---------- */
+.btn{
+  padding:10px 16px;border-radius:9px;border:1px solid transparent;font-size:13.5px;font-weight:700;
+  cursor:pointer;font-family:var(--font-body);transition:transform .08s,box-shadow .15s,background .15s,border-color .15s;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.6;cursor:default;transform:none}
+.btn-primary{background:var(--ink);color:#fff;box-shadow:var(--shadow-sm)}
+.btn-primary:hover:not(:disabled){background:#000;box-shadow:var(--shadow-md)}
+.btn-ghost{background:var(--surface);color:var(--ink-soft);border-color:var(--border)}
+.btn-ghost:hover:not(:disabled){background:var(--border-soft);color:var(--ink)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover:not(:disabled){background:var(--red-strong)}
 .btn-full{width:100%}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--gray-900);color:white;padding:11px 20px;border-radius:8px;font-size:13px;box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;transition:opacity .2s}
-.toast.show{opacity:1}
-.danger-card{border-color:#fecaca}
-.danger-card h2{color:var(--red)}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:100}
-.modal-overlay.open{display:flex}
-.modal{background:white;border-radius:14px;padding:26px;max-width:380px;width:90%;box-shadow:var(--shadow-lg)}
-.modal h3{margin:0 0 10px;font-size:16px;color:var(--red)}
-.modal p{font-size:13px;color:var(--gray-600);margin:0 0 16px;line-height:1.5}
+.btn-upgrade{background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#fff}
+.btn-upgrade:hover:not(:disabled){box-shadow:0 6px 18px -4px rgba(99,102,241,.55)}
+
+.spinner{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- skeleton ---------- */
+.skel{background:linear-gradient(90deg,var(--border-soft) 25%,#f2f1f7 37%,var(--border-soft) 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite;border-radius:5px;display:inline-block;height:12px;width:110px}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:0 0}}
+
+/* ---------- toast ---------- */
+.toast{
+  position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(6px);
+  background:var(--ink);color:#fff;padding:12px 20px;border-radius:10px;font-size:13.5px;font-weight:600;
+  box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;
+  display:flex;align-items:center;gap:8px;max-width:88vw;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.error{background:var(--red-strong)}
+
+/* ---------- danger zone ---------- */
+.danger-card{border-color:var(--red-border);background:linear-gradient(180deg,var(--red-tint),var(--surface) 55%)}
+.danger-card .row{border-color:rgba(220,38,38,.12)}
+.danger-title-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.danger-title-row .val{color:var(--red-strong)}
+
+/* ---------- modal ---------- */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(20,18,28,.5);backdrop-filter:blur(2px);
+  display:flex;align-items:center;justify-content:center;z-index:200;
+  opacity:0;pointer-events:none;transition:opacity .18s;
+}
+.modal-overlay.open{opacity:1;pointer-events:auto}
+.modal{
+  background:#fff;border-radius:18px;padding:26px;max-width:380px;width:90%;
+  box-shadow:var(--shadow-lg);transform:translateY(6px) scale(.98);transition:transform .18s;
+}
+.modal-overlay.open .modal{transform:translateY(0) scale(1)}
+.modal-icon{width:38px;height:38px;border-radius:11px;background:var(--red-tint);border:1px solid var(--red-border);display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.modal-icon svg{width:19px;height:19px;stroke:var(--red)}
+.modal h3{font-family:var(--font-display);margin:0 0 8px;font-size:16.5px;font-weight:800;color:var(--ink)}
+.modal p{font-size:13px;color:var(--ink-soft);margin:0 0 16px;line-height:1.55}
+.modal p strong{color:var(--ink);font-family:var(--font-body);letter-spacing:.5px}
 .modal input{margin-bottom:16px}
 .modal-actions{display:flex;gap:10px}
 .modal-actions .btn{flex:1}
+
+@media (max-width:480px){
+  .wrap{padding:32px 16px 90px}
+  .card{padding:20px}
+  .nav{padding:0 16px}
+}
 </style>
 </head>
 <body>
@@ -115,30 +222,52 @@ input:focus{outline:none;border-color:var(--blue)}
     <svg class="nav-logo-icon" viewBox="0 0 28 28" fill="none"><rect x="3" y="2" width="16" height="21" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="16" height="21" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="16" height="21" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
     <span class="nav-logo-text">PDF<span>ortis</span></span>
   </a>
-  <a class="back-link" href="/index.html">← Back to tools</a>
+  <a class="back-link" href="/index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to tools
+  </a>
 </nav>
 
 <div class="wrap">
-  <h1>Account Settings</h1>
-  <p class="sub">Manage your profile, company, and account.</p>
+  <div class="page-head">
+    <div class="avatar" id="avatar-initial">–</div>
+    <div>
+      <h1>Account settings</h1>
+      <p class="sub">Manage your profile, company, and subscription.</p>
+    </div>
+  </div>
 
   <div class="card">
-    <h2>👤 Profile</h2>
-    <label>Name</label>
+    <div class="card-head">
+      <div class="icon-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <h2>Profile</h2>
+    </div>
+    <label for="in-name">Name</label>
     <input type="text" id="in-name" placeholder="Your name">
-    <label>Email</label>
+    <label for="in-email">Email</label>
     <input type="text" id="in-email" disabled>
-    <button class="btn btn-primary btn-full" onclick="saveProfile()">Save changes</button>
+    <p class="field-hint">Your email is tied to your login and can't be changed here.</p>
+    <button class="btn btn-primary btn-full" id="save-profile-btn" onclick="saveProfile()">Save changes</button>
   </div>
+
   <div class="card" id="subscription-card"></div>
   <div class="card" id="company-card">
     <!-- filled in by JS: either "your company" info or "add a token" form -->
   </div>
 
   <div class="card danger-card">
-    <h2>⚠️ Danger zone</h2>
-    <div class="row"><span class="lbl">Delete your account and all associated data</span></div>
-    <button class="btn btn-danger btn-full" style="margin-top:10px" onclick="openDeleteModal()">Delete account</button>
+    <div class="card-head">
+      <div class="icon-badge red">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
+      </div>
+      <h2>Danger zone</h2>
+    </div>
+    <div class="row danger-title-row">
+      <span class="lbl">Delete your account and all associated data</span>
+    </div>
+    <button class="btn btn-danger btn-full" style="margin-top:12px" onclick="openDeleteModal()">Delete account</button>
   </div>
 </div>
 
@@ -146,12 +275,15 @@ input:focus{outline:none;border-color:var(--blue)}
 
 <div class="modal-overlay" id="delete-modal">
   <div class="modal">
+    <div class="modal-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
+    </div>
     <h3>Delete your account?</h3>
     <p>This permanently deletes your profile, messages, and activity. This cannot be undone. Type <strong>DELETE</strong> below to confirm.</p>
     <input type="text" id="delete-confirm-input" placeholder="Type DELETE">
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeDeleteModal()">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmDelete()">Delete forever</button>
+      <button class="btn btn-danger" id="confirm-delete-btn" onclick="confirmDelete()">Delete forever</button>
     </div>
   </div>
 </div>
@@ -161,31 +293,58 @@ input:focus{outline:none;border-color:var(--blue)}
 let session = pfGetSession();
 let profile = null;
 
-function toast(msg){
+function toast(msg, isError){
   const t = document.getElementById('toast');
   t.textContent = msg;
+  t.classList.toggle('error', !!isError);
   t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2500);
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(()=>t.classList.remove('show'), 2500);
 }
+
+function setBtnLoading(btn, loading, loadingLabel, idleLabel){
+  if(!btn) return;
+  btn.disabled = loading;
+  btn.innerHTML = loading
+    ? `<span class="spinner"></span>${loadingLabel}`
+    : idleLabel;
+}
+
+function initials(name, email){
+  const src = (name || '').trim() || (email || '').trim();
+  if(!src) return '–';
+  const parts = src.split(/\s+/).filter(Boolean);
+  if(parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return src.slice(0, 2).toUpperCase();
+}
+
 function renderSubscriptionCard(){
   const card = document.getElementById('subscription-card');
   const tier = profile?.subscription_tier || 'free';
   const status = profile?.subscription_status || 'inactive';
   const isActivePaid = (tier === 'pro' || tier === 'team') && status === 'active';
 
+  const iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/></svg>`;
+
   if(isActivePaid){
     const label = tier === 'team' ? 'Team' : 'Pro';
     card.innerHTML = `
-      <h2>💳 Subscription</h2>
+      <div class="card-head">
+        <div class="icon-badge green">${iconSvg}</div>
+        <h2>Subscription</h2>
+      </div>
       <div class="row"><span class="lbl">Plan</span><span class="val">${label}</span></div>
-      <div class="row"><span class="lbl">Status</span><span class="val" style="color:#16a34a">Active</span></div>
-      <a class="btn btn-ghost btn-full" style="margin-top:14px;display:block;text-align:center;text-decoration:none" href="/pricing.html">Manage plan</a>
+      <div class="row"><span class="lbl">Status</span><span class="val badge-live">Active</span></div>
+      <a class="btn btn-ghost btn-full" style="margin-top:16px;display:flex;text-decoration:none" href="/pricing.html">Manage plan</a>
     `;
   } else {
     card.innerHTML = `
-      <h2>💳 Subscription</h2>
+      <div class="card-head">
+        <div class="icon-badge">${iconSvg}</div>
+        <h2>Subscription</h2>
+      </div>
       <div class="row"><span class="lbl">Plan</span><span class="val">Free</span></div>
-      <a class="btn btn-primary btn-full" style="margin-top:14px;display:block;text-align:center;text-decoration:none" href="/pricing.html">Upgrade to Pro</a>
+      <a class="btn btn-upgrade btn-full" style="margin-top:16px;display:flex;text-decoration:none" href="/pricing.html">Upgrade to Pro</a>
     `;
   }
 }
@@ -194,58 +353,87 @@ async function init(){
   if(!session){ window.location.href = '/index.html'; return; }
   profile = await sbGetProfile(session.user.id, session.user.access_token);
 
-  document.getElementById('in-name').value = profile?.display_name || '';
-  document.getElementById('in-email').value = session.user.email || '';
+  const name = profile?.display_name || '';
+  const email = session.user.email || '';
+  document.getElementById('in-name').value = name;
+  document.getElementById('in-email').value = email;
+  document.getElementById('avatar-initial').textContent = initials(name, email);
 
   renderCompanyCard();
   renderSubscriptionCard();
 }
 
+const companyIconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M6 21V7l6-4 6 4v14M9 9h1M9 13h1M14 9h1M14 13h1M10 21v-4h4v4"/></svg>`;
+
 function renderCompanyCard(){
   const card = document.getElementById('company-card');
   if(profile?.company_token){
     card.innerHTML = `
-      <h2>🏢 Company</h2>
-      <div class="row"><span class="lbl">Company</span><span class="val" id="co-name">—</span></div>
-      <div class="row"><span class="lbl">Address</span><span class="val" id="co-addr">—</span></div>
-      <button class="btn btn-ghost btn-full" style="margin-top:14px" onclick="leaveCompany()">Leave this company</button>
+      <div class="card-head">
+        <div class="icon-badge">${companyIconSvg}</div>
+        <h2>Company</h2>
+      </div>
+      <div class="row"><span class="lbl">Company</span><span class="val" id="co-name"><span class="skel"></span></span></div>
+      <div class="row"><span class="lbl">Address</span><span class="val" id="co-addr"><span class="skel"></span></span></div>
+      <button class="btn btn-ghost btn-full" style="margin-top:16px" onclick="leaveCompany()">Leave this company</button>
     `;
     sbValidateToken(profile.company_token).then(tk=>{
+      const nameEl = document.getElementById('co-name');
+      const addrEl = document.getElementById('co-addr');
+      if(!nameEl || !addrEl) return;
       if(tk){
-        document.getElementById('co-name').textContent = tk.company_name || '—';
-        document.getElementById('co-addr').textContent = tk.company_address || '—';
+        nameEl.textContent = tk.company_name || '—';
+        addrEl.textContent = tk.company_address || '—';
+      } else {
+        nameEl.textContent = '—';
+        addrEl.textContent = '—';
       }
     });
   } else {
     card.innerHTML = `
-      <h2>🏢 Company</h2>
-      <label>Have a company token?</label>
+      <div class="card-head">
+        <div class="icon-badge">${companyIconSvg}</div>
+        <h2>Company</h2>
+      </div>
+      <p class="card-desc">Link a company token to share billing and branding with your team.</p>
+      <label for="in-token">Company token</label>
       <input type="text" id="in-token" placeholder="Enter your company token">
-      <button class="btn btn-primary btn-full" onclick="addToken()">Link company token</button>
+      <button class="btn btn-primary btn-full" id="add-token-btn" onclick="addToken()">Link company token</button>
     `;
   }
 }
 
 async function saveProfile(){
   const name = document.getElementById('in-name').value.trim();
-  if(!name){ toast('Name cannot be empty'); return; }
+  if(!name){ toast('Name cannot be empty', true); return; }
+  const btn = document.getElementById('save-profile-btn');
+  setBtnLoading(btn, true, 'Saving…', 'Save changes');
   const updated = await sbUpsertProfile(session.user.id, { display_name: name }, session.user.access_token);
+  setBtnLoading(btn, false, '', 'Save changes');
   if(updated){
     profile = updated;
+    document.getElementById('avatar-initial').textContent = initials(name, session.user.email || '');
     // Keep the cached session in sync so the nav avatar/name updates immediately
     session.user.user_metadata = { ...(session.user.user_metadata||{}), name: name };
     localStorage.setItem('pf_session', JSON.stringify(session));
     toast('Profile updated');
   } else {
-    toast('Something went wrong — try again');
+    toast('Something went wrong — try again', true);
   }
 }
 
 async function addToken(){
-  const val = document.getElementById('in-token').value.trim();
-  if(!val){ toast('Enter a token first'); return; }
+  const input = document.getElementById('in-token');
+  const val = input.value.trim();
+  if(!val){ toast('Enter a token first', true); return; }
+  const btn = document.getElementById('add-token-btn');
+  setBtnLoading(btn, true, 'Linking…', 'Link company token');
   const tk = await sbValidateToken(val);
-  if(!tk){ toast('Invalid token'); return; }
+  if(!tk){
+    setBtnLoading(btn, false, '', 'Link company token');
+    toast('Invalid token', true);
+    return;
+  }
   const updated = await sbUpsertProfile(session.user.id, { company_token: tk.token }, session.user.access_token);
   profile = updated || { ...profile, company_token: tk.token };
   toast('Company linked');
@@ -262,21 +450,32 @@ async function leaveCompany(){
 function openDeleteModal(){
   document.getElementById('delete-modal').classList.add('open');
   document.getElementById('delete-confirm-input').value = '';
+  document.getElementById('delete-confirm-input').focus();
 }
 function closeDeleteModal(){
   document.getElementById('delete-modal').classList.remove('open');
 }
 async function confirmDelete(){
   const val = document.getElementById('delete-confirm-input').value.trim();
-  if(val !== 'DELETE'){ toast('Type DELETE exactly to confirm'); return; }
+  if(val !== 'DELETE'){ toast('Type DELETE exactly to confirm', true); return; }
+  const btn = document.getElementById('confirm-delete-btn');
+  setBtnLoading(btn, true, 'Deleting…', 'Delete forever');
   const ok = await sbDeleteAccount(session.user.access_token);
   if(ok){
     pfClearSession();
     window.location.href = '/index.html';
   } else {
-    toast('Something went wrong — try again');
+    setBtnLoading(btn, false, '', 'Delete forever');
+    toast('Something went wrong — try again', true);
   }
 }
+
+document.getElementById('delete-modal').addEventListener('click', (e)=>{
+  if(e.target.id === 'delete-modal') closeDeleteModal();
+});
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape') closeDeleteModal();
+});
 
 init();
 </script>
