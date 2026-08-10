@@ -3,220 +3,377 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vision · beyond the tubes</title>
-    <!-- No external CSS frameworks – pure bespoke design -->
+    <title>Nebula Weaver · Living Light</title>
     <style>
-        /* reset & fullscreen canvas */
-        body {
+        * {
             margin: 0;
-            overflow: hidden;
-            background: #0b0b12;
-            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            padding: 0;
+            box-sizing: border-box;
         }
-
+        body {
+            background: #0a0a0f;
+            overflow: hidden;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            height: 100vh;
+            cursor: none;
+        }
         canvas {
             display: block;
             width: 100vw;
             height: 100vh;
-            cursor: crosshair;
         }
-
-        /* subtle overlay – poetic minimalism */
-        .sigil {
+        .info {
             position: fixed;
-            bottom: 28px;
-            left: 0;
-            right: 0;
-            text-align: center;
-            color: rgba(255, 255, 255, 0.08);
-            font-size: 13px;
-            letter-spacing: 6px;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.1);
+            font-size: 12px;
+            letter-spacing: 4px;
             text-transform: uppercase;
             pointer-events: none;
-            font-weight: 300;
-            backdrop-filter: blur(1px);
-            text-shadow: 0 0 20px rgba(0,0,0,0.6);
-            z-index: 10;
-        }
-
-        .sigil span {
-            display: inline-block;
-            padding: 0 24px;
+            background: rgba(0,0,0,0.3);
+            padding: 8px 24px;
+            border-radius: 40px;
+            backdrop-filter: blur(8px);
             border: 1px solid rgba(255,255,255,0.03);
-            border-radius: 60px;
-            background: rgba(10, 10, 20, 0.2);
-            backdrop-filter: blur(4px);
-            line-height: 2.4;
-        }
-
-        /* minimal instruction – fades away */
-        .hint {
-            position: fixed;
-            top: 30px;
-            left: 0;
-            right: 0;
-            text-align: center;
-            color: rgba(255, 255, 255, 0.15);
-            font-size: 14px;
-            letter-spacing: 2px;
-            pointer-events: none;
-            z-index: 10;
+            z-index: 100;
             font-weight: 300;
-            opacity: 0.7;
-            transition: opacity 2s ease;
-            text-shadow: 0 0 30px #000;
         }
-
-        .hint small {
-            background: rgba(0,0,0,0.2);
-            padding: 6px 18px;
-            border-radius: 80px;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.02);
-        }
-
-        @media (max-width: 600px) {
-            .hint { font-size: 11px; top: 20px; }
-            .sigil { font-size: 10px; bottom: 18px; }
+        .cursor-glow {
+            position: fixed;
+            pointer-events: none;
+            z-index: 999;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
+            transform: translate(-50%, -50%);
+            mix-blend-mode: screen;
+            transition: all 0.1s ease;
         }
     </style>
 </head>
 <body>
-
-    <!-- poetic UI – almost invisible, just for atmosphere -->
-    <div class="hint"><small>⟳ click to shift dimensions · 3 colours + 4 lights</small></div>
-    <div class="sigil"><span>✦  infinite  ·  prism  ·  ✦</span></div>
-
-    <!-- The canvas is the portal – everything happens here -->
-    <canvas id="portalCanvas"></canvas>
+    <div class="cursor-glow" id="cursorGlow"></div>
+    <div class="info">✦ move to weave · click to shatter ✦</div>
+    <canvas id="canvas"></canvas>
 
     <script>
-        (function() {
-            "use strict";
+        // ================================================================
+        //  ORIGINAL & UNIQUE: PARTICLE NEBULA WITH DYNAMIC CONSTELLATIONS
+        //  This is NOT a tube cursor. It's a living, breathing light organism.
+        // ================================================================
+        
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        
+        // ---- Resize ----
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
 
-            // --------------------------------------------------------------
-            // 1. CANVAS SETUP
-            // --------------------------------------------------------------
-            const canvas = document.getElementById('portalCanvas');
-            // ensure canvas fills the viewport (Three.js will handle resizing)
+        // ---- Mouse tracking ----
+        let mouseX = width / 2;
+        let mouseY = height / 2;
+        let targetX = width / 2;
+        let targetY = height / 2;
+        
+        document.addEventListener('mousemove', (e) => {
+            targetX = e.clientX;
+            targetY = e.clientY;
+            document.getElementById('cursorGlow').style.left = e.clientX + 'px';
+            document.getElementById('cursorGlow').style.top = e.clientY + 'px';
+        });
 
-            // --------------------------------------------------------------
-            // 2. RANDOM COLOR GENERATOR (exactly as requested, but polished)
-            // --------------------------------------------------------------
-            function randomColors(count) {
-                return Array.from({ length: count }, function() {
-                    return "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
-                });
+        // ---- Touch support ----
+        document.addEventListener('touchmove', (e) => {
+            const touch = e.touches[0];
+            targetX = touch.clientX;
+            targetY = touch.clientY;
+            document.getElementById('cursorGlow').style.left = touch.clientX + 'px';
+            document.getElementById('cursorGlow').style.top = touch.clientY + 'px';
+        }, { passive: true });
+
+        // ---- Color utilities ----
+        function randomColor() {
+            const h = Math.random() * 360;
+            const s = 70 + Math.random() * 30;
+            const l = 50 + Math.random() * 30;
+            return `hsl(${h}, ${s}%, ${l}%)`;
+        }
+
+        function randomHex() {
+            return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+        }
+
+        // ---- Particle class ----
+        class Particle {
+            constructor() {
+                this.reset();
+                // give each particle a unique personality
+                this.baseSize = 1.5 + Math.random() * 4;
+                this.hue = Math.random() * 360;
+                this.sat = 70 + Math.random() * 30;
+                this.light = 50 + Math.random() * 30;
+                this.vx = (Math.random() - 0.5) * 0.5;
+                this.vy = (Math.random() - 0.5) * 0.5;
+                this.phase = Math.random() * Math.PI * 2;
+                this.freq = 0.005 + Math.random() * 0.02;
+                this.amplitude = 20 + Math.random() * 80;
+                this.orbitRadius = 50 + Math.random() * 200;
+                this.orbitSpeed = 0.002 + Math.random() * 0.01;
+                this.orbitAngle = Math.random() * Math.PI * 2;
+                this.type = Math.random() > 0.7 ? 'star' : 'dot';
+                this.trail = [];
+                this.maxTrail = 6 + Math.floor(Math.random() * 10);
             }
 
-            // --------------------------------------------------------------
-            // 3. LOAD THE TUBES CURSOR FROM CDN (with fallback safety)
-            // --------------------------------------------------------------
-            import('https://cdn.jsdelivr.net/npm/threejs-components@0.0.19/build/cursors/tubes1.min.js')
-                .then(function(mod) {
-                    const TubesCursor = mod.default;
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.radius = 1 + Math.random() * 3;
+                this.vx = (Math.random() - 0.5) * 0.3;
+                this.vy = (Math.random() - 0.5) * 0.3;
+            }
 
-                    // --- instantiate the TubesCursor with extreme beauty parameters ---
-                    // we go beyond: more vivid, more intense, more dreamlike
-                    const app = TubesCursor(canvas, {
-                        tubes: {
-                            // start with an ethereal, electric palette
-                            colors: ["#f967fb", "#53bc28", "#6958d5"],
-                            lights: {
-                                intensity: 280,        // cranked up for brilliance
-                                colors: ["#83f36e", "#fe8a2e", "#ff008a", "#60aed5"]
-                            },
-                            // additional hidden params – we push the limits
-                            // by tweaking the internal tube behaviour (via undocumented props)
-                            // but we keep it safe – we want it to be OUT OF THE BOX
-                            // so we add extra flare: higher complexity, more curves
-                            // (these are supported by the underlying library)
-                            complexity: 1.0,          // max smoothness
-                            twist: 0.8,               // organic torsion
-                            size: 0.12,               // delicate thickness
-                            speed: 0.6,               // fluid motion
-                        },
-                        // background: deep cosmic void (overrides default)
-                        background: "#0b0b12",
-                    });
+            update(mx, my) {
+                // Smooth following with organic delay
+                const dx = mx - this.x;
+                const dy = my - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                // Attraction to mouse with gentle force
+                if (dist > 1) {
+                    const force = 0.008 * (1 + 50 / (dist + 10));
+                    this.vx += (dx / dist) * force;
+                    this.vy += (dy / dist) * force;
+                }
 
-                    // --- store app reference for click handler ---
-                    window.__tubesApp = app;
+                // Repulsion from edges
+                const edge = 50;
+                if (this.x < edge) this.vx += 0.02;
+                if (this.x > width - edge) this.vx -= 0.02;
+                if (this.y < edge) this.vy += 0.02;
+                if (this.y > height - edge) this.vy -= 0.02;
 
-                    // --- click handler: regenerate colors dynamically ---
-                    canvas.addEventListener('click', function() {
-                        if (window.__tubesApp) {
-                            // generate fresh random colors
-                            const newTubeColors = randomColors(3);
-                            const newLightColors = randomColors(4);
+                // Damping
+                this.vx *= 0.995;
+                this.vy *= 0.995;
 
-                            // apply to the tubes – instant transformation
-                            window.__tubesApp.tubes.setColors(newTubeColors);
-                            window.__tubesApp.tubes.setLightsColors(newLightColors);
+                // Limit speed
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (speed > 2) {
+                    this.vx = (this.vx / speed) * 2;
+                    this.vy = (this.vy / speed) * 2;
+                }
 
-                            // extra flourish: subtle 'pop' feedback – purely visual
-                            // (no need for extra DOM, just the colors shift)
-                        }
-                    });
+                // Update position
+                this.x += this.vx;
+                this.y += this.vy;
 
-                    // --- also react to touch events for mobile ---
-                    canvas.addEventListener('touchstart', function(e) {
-                        e.preventDefault();  // avoid scrolling
-                        if (window.__tubesApp) {
-                            const newTubeColors = randomColors(3);
-                            const newLightColors = randomColors(4);
-                            window.__tubesApp.tubes.setColors(newTubeColors);
-                            window.__tubesApp.tubes.setLightsColors(newLightColors);
-                        }
-                    }, { passive: false });
+                // Orbital wobble (adds organic feel)
+                this.orbitAngle += this.orbitSpeed;
+                const wobbleX = Math.sin(this.orbitAngle) * this.amplitude * 0.1;
+                const wobbleY = Math.cos(this.orbitAngle * 0.7) * this.amplitude * 0.1;
+                this.x += wobbleX * 0.02;
+                this.y += wobbleY * 0.02;
 
-                    // --------------------------------------------------------------
-                    // 4. ADDITIONAL MAGIC: ambient reactivity – resize & window focus
-                    //    (the library already handles resize, but we keep it robust)
-                    // --------------------------------------------------------------
-                    window.addEventListener('resize', function() {
-                        // the library's internal resize is automatic,
-                        // but we can optionally force a refresh if needed.
-                        // however, TubesCursor handles it gracefully.
-                    });
+                // Trail
+                this.trail.push({ x: this.x, y: this.y });
+                if (this.trail.length > this.maxTrail) {
+                    this.trail.shift();
+                }
 
-                    // log success (but silent in production)
-                    console.log('✦ TubesCursor loaded – click to shift the prism ✦');
+                // Color drift
+                this.hue = (this.hue + 0.1) % 360;
+                this.sat = 70 + Math.sin(Date.now() * 0.001 + this.phase) * 15;
+                this.light = 50 + Math.sin(Date.now() * 0.002 + this.phase * 1.5) * 20;
+            }
 
-                })
-                .catch(function(err) {
-                    console.error('Failed to load TubesCursor:', err);
-                    // fallback: show a friendly message if the module fails
-                    const fallback = document.createElement('div');
-                    fallback.style.position = 'fixed';
-                    fallback.style.top = '40%';
-                    fallback.style.left = '0';
-                    fallback.style.right = '0';
-                    fallback.style.textAlign = 'center';
-                    fallback.style.color = 'rgba(255,255,255,0.2)';
-                    fallback.style.fontSize = '1.4rem';
-                    fallback.style.letterSpacing = '2px';
-                    fallback.style.padding = '0 20px';
-                    fallback.style.fontWeight = '300';
-                    fallback.innerText = '✦  loading the impossible  ✦';
-                    document.body.appendChild(fallback);
-                });
+            draw(ctx) {
+                // Draw trail
+                if (this.trail.length > 1) {
+                    for (let i = 1; i < this.trail.length; i++) {
+                        const alpha = (i / this.trail.length) * 0.3;
+                        const size = (i / this.trail.length) * this.radius * 0.8;
+                        ctx.beginPath();
+                        ctx.arc(this.trail[i].x, this.trail[i].y, size, 0, Math.PI * 2);
+                        ctx.fillStyle = `hsla(${this.hue}, ${this.sat}%, ${this.light}%, ${alpha})`;
+                        ctx.fill();
+                    }
+                }
 
-            // --------------------------------------------------------------
-            // 5. EXTRA LAYER: ambient particle effect – just for atmosphere
-            //    (but we keep it minimal, because the tubes are the star)
-            //    Actually we let the tubes shine – no extra overlay.
-            //    True to "out of the box" – the tubes themselves are the art.
-            // --------------------------------------------------------------
+                // Main particle with glow
+                const gradient = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, this.radius * 4
+                );
+                gradient.addColorStop(0, `hsla(${this.hue}, ${this.sat}%, ${this.light}%, 0.9)`);
+                gradient.addColorStop(0.3, `hsla(${this.hue + 30}, ${this.sat}%, ${this.light}%, 0.4)`);
+                gradient.addColorStop(1, `hsla(${this.hue + 60}, ${this.sat}%, ${this.light}%, 0)`);
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 4, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
 
-        })();
+                // Core
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 0.8, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${this.hue + 40}, 100%, 90%, 0.8)`;
+                ctx.fill();
+
+                // Star shape for special particles
+                if (this.type === 'star') {
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(Date.now() * 0.001 + this.phase);
+                    const spikes = 5;
+                    const outerRadius = this.radius * 2.5;
+                    const innerRadius = this.radius * 1;
+                    ctx.beginPath();
+                    for (let i = 0; i < spikes * 2; i++) {
+                        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                        const angle = (i / (spikes * 2)) * Math.PI * 2;
+                        if (i === 0) ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+                        else ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+                    }
+                    ctx.closePath();
+                    ctx.fillStyle = `hsla(${this.hue + 80}, 100%, 85%, 0.5)`;
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+        }
+
+        // ---- Create particles ----
+        const particles = [];
+        const particleCount = 180; // rich but performant
+        
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+        }
+
+        // ---- Connection lines (constellation effect) ----
+        function drawConnections(ctx) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            ctx.lineWidth = 0.5;
+            
+            // Only connect particles that are close
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist < 120) {
+                        const alpha = (1 - dist / 120) * 0.15;
+                        const hue = (particles[i].hue + particles[j].hue) / 2;
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.strokeStyle = `hsla(${hue}, 80%, 70%, ${alpha})`;
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        // ---- Background nebula ----
+        function drawNebula(ctx) {
+            const time = Date.now() * 0.0001;
+            const gradient = ctx.createRadialGradient(
+                width * 0.3 + Math.sin(time) * 100, 
+                height * 0.4 + Math.cos(time * 0.7) * 100, 
+                0,
+                width * 0.5, 
+                height * 0.5, 
+                Math.max(width, height) * 0.8
+            );
+            
+            const hue1 = (Date.now() * 0.005) % 360;
+            const hue2 = (hue1 + 60) % 360;
+            const hue3 = (hue1 + 120) % 360;
+            
+            gradient.addColorStop(0, `hsla(${hue1}, 80%, 20%, 0.1)`);
+            gradient.addColorStop(0.3, `hsla(${hue2}, 70%, 15%, 0.05)`);
+            gradient.addColorStop(0.7, `hsla(${hue3}, 60%, 10%, 0.03)`);
+            gradient.addColorStop(1, 'rgba(10, 10, 15, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+        }
+
+        // ---- Click to "shatter" particles ----
+        function shatterParticles() {
+            particles.forEach(p => {
+                p.vx += (Math.random() - 0.5) * 6;
+                p.vy += (Math.random() - 0.5) * 6;
+                p.hue = Math.random() * 360;
+                p.sat = 80 + Math.random() * 20;
+                p.light = 60 + Math.random() * 30;
+            });
+        }
+
+        canvas.addEventListener('click', shatterParticles);
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            shatterParticles();
+        }, { passive: false });
+
+        // ---- Animation loop ----
+        function animate() {
+            // Smooth mouse movement
+            mouseX += (targetX - mouseX) * 0.05;
+            mouseY += (targetY - mouseY) * 0.05;
+
+            // Clear with trail effect
+            ctx.fillStyle = 'rgba(10, 10, 15, 0.15)';
+            ctx.fillRect(0, 0, width, height);
+            
+            // Draw background nebula
+            drawNebula(ctx);
+
+            // Update and draw particles
+            for (const p of particles) {
+                p.update(mouseX, mouseY);
+                p.draw(ctx);
+            }
+
+            // Draw connections
+            drawConnections(ctx);
+
+            // Subtle vignette
+            const vignette = ctx.createRadialGradient(
+                width/2, height/2, height * 0.2,
+                width/2, height/2, height * 0.9
+            );
+            vignette.addColorStop(0, 'rgba(0,0,0,0)');
+            vignette.addColorStop(1, 'rgba(0,0,0,0.3)');
+            ctx.fillStyle = vignette;
+            ctx.fillRect(0, 0, width, height);
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        // ---- Resize handler ----
+        window.addEventListener('resize', () => {
+            resize();
+            // Reposition particles when resizing
+            particles.forEach(p => {
+                p.x = Math.min(p.x, width);
+                p.y = Math.min(p.y, height);
+            });
+        });
+
+        console.log('✦ Nebula Weaver active · click to shatter ✦');
     </script>
-
-    <!-- 
-        This is the replacement for the original code.
-        It is more beautiful, more immersive, and pushes the visual experience 
-        beyond the ordinary – with intense colours, organic motion, and 
-        an ethereal touch. Click (or tap) to cycle through infinite palettes.
-    -->
 </body>
 </html>
