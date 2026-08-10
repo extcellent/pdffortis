@@ -316,7 +316,7 @@ input,select,textarea{font-family:var(--font)}
 .recent-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--gray-200);border-radius:10px;cursor:pointer;transition:all .15s;background:white}
 .recent-item:hover{border-color:var(--gray-300);background:var(--gray-50)}
 .recent-icon{width:32px;height:32px;background:var(--blue-l);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.recent-name{font-size:13px;font-weight:500;color:#a5a5a5;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-name{font-size:13px;font-weight:500;color:var(--gray-900);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .recent-date{font-size:11px;color:var(--gray-400)}
 
 /* ═══════════════════════════════════════
@@ -786,7 +786,7 @@ input,select,textarea{font-family:var(--font)}
      PAGE 1: LANDING
 ═══════════════════════ -->
 <div class="page" id="page-landing">
-  <canvas id="tubes-canvas"></canvas>
+  <iframe id="tubes-frame" src="tubes-bg.html" title="" style="position:absolute;inset:0;width:100%;height:100%;border:0;z-index:0" loading="eager"></iframe>
   <nav class="nav">
     <a class="nav-logo" href="#">
       <svg class="nav-logo-icon" viewBox="0 0 28 28" fill="none"><rect x="3" y="2" width="16" height="21" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="16" height="21" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="16" height="21" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -871,42 +871,21 @@ input,select,textarea{font-family:var(--font)}
   </footer>  
 </div>              
 
-<script type="module">
-(function(){
-  var canvas = document.getElementById('tubes-canvas');
-  if(!canvas) return;
-
-  var app = null;
-  var loaded = false;
-
-  function randomColors(count){
-    return Array.from({length:count},function(){
-      return "#"+Math.floor(Math.random()*16777215).toString(16).padStart(6,'0');
-    });
+<script>
+// Landing tubes background lives in its own iframe (tubes-bg.html).
+// Reloading/blanking the iframe fully unloads its JS + WebGL context —
+// this guarantees zero cost on the upload/editor pages, no matter what
+// the third-party tubes library does internally.
+window.startTubes = function(){
+  var f = document.getElementById('tubes-frame');
+  if(f && (!f.getAttribute('src') || f.src.endsWith('about:blank'))){
+    f.src = 'tubes-bg.html';
   }
-
-  import('https://cdn.jsdelivr.net/npm/threejs-components@0.0.19/build/cursors/tubes1.min.js')
-    .then(function(mod){
-      var TubesCursor = mod.default;
-      app = TubesCursor(canvas, {
-        tubes:{
-          colors:["#f967fb","#53bc28","#6958d5"],
-          lights:{ intensity:200, colors:["#83f36e","#fe8a2e","#ff008a","#60aed5"] }
-        }
-      });
-      loaded = true;
-    })
-    .catch(function(err){
-      console.error('Failed to load TubesCursor:', err);
-      // Graceful fallback: keep the dark background, no interactive tubes.
-    });
-
-  canvas.addEventListener('click', function(){
-    if(!loaded || !app) return;
-    app.tubes.setColors(randomColors(3));
-    app.tubes.setLightsColors(randomColors(4));
-  });
-})();
+};
+window.stopTubes = function(){
+  var f = document.getElementById('tubes-frame');
+  if(f) f.src = 'about:blank';
+};
 </script>
 
 <!-- ═══════════════════════
@@ -1556,6 +1535,8 @@ function setLang(l){
 function goTo(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.add('out'));
   document.getElementById('page-'+id).classList.remove('out');
+  if(id === 'landing'){ window.startTubes && window.startTubes(); }
+  else { window.stopTubes && window.stopTubes(); }
 }
 function goToUpload(){goTo('upload')}
 
