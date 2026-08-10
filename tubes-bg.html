@@ -13,33 +13,14 @@
         body {
             background: #0a0a0f;
             overflow: hidden;
-            font-family: 'Segoe UI', system-ui, sans-serif;
             height: 100vh;
-            cursor: default; /* FIXED: cursor stays visible */
+            cursor: default;
         }
         canvas {
             display: block;
             width: 100vw;
             height: 100vh;
-            cursor: crosshair; /* FIXED: nice visible crosshair */
-        }
-        .info {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: rgba(255, 255, 255, 0.15);
-            font-size: 12px;
-            letter-spacing: 4px;
-            text-transform: uppercase;
-            pointer-events: none;
-            background: rgba(0,0,0,0.3);
-            padding: 8px 24px;
-            border-radius: 40px;
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255,255,255,0.03);
-            z-index: 100;
-            font-weight: 300;
+            cursor: crosshair;
         }
         .cursor-glow {
             position: fixed;
@@ -53,18 +34,16 @@
             mix-blend-mode: screen;
             transition: all 0.05s ease;
         }
-        /* FIXED: removed cursor: none from body */
     </style>
 </head>
 <body>
     <div class="cursor-glow" id="cursorGlow"></div>
-    <div class="info">✦ move to weave · click to shatter ✦</div>
     <canvas id="canvas"></canvas>
 
     <script>
         // ================================================================
         //  ORIGINAL & UNIQUE: PARTICLE NEBULA WITH DYNAMIC CONSTELLATIONS
-        //  This is NOT a tube cursor. It's a living, breathing light organism.
+        //  Pure visual experience - no text, no distractions
         // ================================================================
         
         const canvas = document.getElementById('canvas');
@@ -117,15 +96,10 @@
             return `hsl(${h}, ${s}%, ${l}%)`;
         }
 
-        function randomHex() {
-            return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
-        }
-
         // ---- Particle class ----
         class Particle {
             constructor() {
                 this.reset();
-                // give each particle a unique personality
                 this.baseSize = 1.5 + Math.random() * 4;
                 this.hue = Math.random() * 360;
                 this.sat = 70 + Math.random() * 30;
@@ -153,54 +127,45 @@
             }
 
             update(mx, my) {
-                // Smooth following with organic delay
                 const dx = mx - this.x;
                 const dy = my - this.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 
-                // Attraction to mouse with gentle force
                 if (dist > 1) {
                     const force = 0.008 * (1 + 50 / (dist + 10));
                     this.vx += (dx / dist) * force;
                     this.vy += (dy / dist) * force;
                 }
 
-                // Repulsion from edges
                 const edge = 50;
                 if (this.x < edge) this.vx += 0.02;
                 if (this.x > width - edge) this.vx -= 0.02;
                 if (this.y < edge) this.vy += 0.02;
                 if (this.y > height - edge) this.vy -= 0.02;
 
-                // Damping
                 this.vx *= 0.995;
                 this.vy *= 0.995;
 
-                // Limit speed
                 const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
                 if (speed > 2) {
                     this.vx = (this.vx / speed) * 2;
                     this.vy = (this.vy / speed) * 2;
                 }
 
-                // Update position
                 this.x += this.vx;
                 this.y += this.vy;
 
-                // Orbital wobble (adds organic feel)
                 this.orbitAngle += this.orbitSpeed;
                 const wobbleX = Math.sin(this.orbitAngle) * this.amplitude * 0.1;
                 const wobbleY = Math.cos(this.orbitAngle * 0.7) * this.amplitude * 0.1;
                 this.x += wobbleX * 0.02;
                 this.y += wobbleY * 0.02;
 
-                // Trail
                 this.trail.push({ x: this.x, y: this.y });
                 if (this.trail.length > this.maxTrail) {
                     this.trail.shift();
                 }
 
-                // Color drift
                 this.hue = (this.hue + 0.1) % 360;
                 this.sat = 70 + Math.sin(Date.now() * 0.001 + this.phase) * 15;
                 this.light = 50 + Math.sin(Date.now() * 0.002 + this.phase * 1.5) * 20;
@@ -210,7 +175,6 @@
             draw(ctx) {
                 const pulseSize = 1 + Math.sin(this.pulse) * 0.2;
                 
-                // Draw trail
                 if (this.trail.length > 1) {
                     for (let i = 1; i < this.trail.length; i++) {
                         const alpha = (i / this.trail.length) * 0.3;
@@ -222,7 +186,6 @@
                     }
                 }
 
-                // Main particle with glow
                 const gradient = ctx.createRadialGradient(
                     this.x, this.y, 0,
                     this.x, this.y, this.radius * 4 * pulseSize
@@ -236,13 +199,11 @@
                 ctx.fillStyle = gradient;
                 ctx.fill();
 
-                // Core
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius * 0.8 * pulseSize, 0, Math.PI * 2);
                 ctx.fillStyle = `hsla(${this.hue + 40}, 100%, 90%, 0.8)`;
                 ctx.fill();
 
-                // Star shape for special particles
                 if (this.type === 'star') {
                     ctx.save();
                     ctx.translate(this.x, this.y);
@@ -267,7 +228,7 @@
 
         // ---- Create particles ----
         const particles = [];
-        const particleCount = 200; // rich but performant
+        const particleCount = 200;
         
         for (let i = 0; i < particleCount; i++) {
             particles.push(new Particle());
@@ -278,7 +239,6 @@
             ctx.strokeStyle = 'rgba(255,255,255,0.03)';
             ctx.lineWidth = 0.5;
             
-            // Only connect particles that are close
             for (let i = 0; i < particles.length; i++) {
                 for (let j = i + 1; j < particles.length; j++) {
                     const dx = particles[i].x - particles[j].x;
@@ -343,27 +303,21 @@
 
         // ---- Animation loop ----
         function animate() {
-            // Smooth mouse movement
             mouseX += (targetX - mouseX) * 0.05;
             mouseY += (targetY - mouseY) * 0.05;
 
-            // Clear with trail effect
             ctx.fillStyle = 'rgba(10, 10, 15, 0.15)';
             ctx.fillRect(0, 0, width, height);
             
-            // Draw background nebula
             drawNebula(ctx);
 
-            // Update and draw particles
             for (const p of particles) {
                 p.update(mouseX, mouseY);
                 p.draw(ctx);
             }
 
-            // Draw connections
             drawConnections(ctx);
 
-            // Subtle vignette
             const vignette = ctx.createRadialGradient(
                 width/2, height/2, height * 0.2,
                 width/2, height/2, height * 0.9
@@ -378,17 +332,13 @@
 
         animate();
 
-        // ---- Resize handler ----
         window.addEventListener('resize', () => {
             resize();
-            // Reposition particles when resizing
             particles.forEach(p => {
                 p.x = Math.min(p.x, width);
                 p.y = Math.min(p.y, height);
             });
         });
-
-        console.log('✦ Nebula Weaver active · click to shatter ✦');
     </script>
 </body>
 </html>
