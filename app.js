@@ -1,5 +1,3 @@
-<script>
-
 // ═══════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════
@@ -2261,4 +2259,4 @@ Object.defineProperty(window, 'currentPageNum', { get: () => currentPage });
 Object.defineProperty(window, 'currentPdfDocLocal', { get: () => pdfDoc });   // NEU
 window.openAuthModal = () => document.getElementById('auth-modal')?.classList.remove('hidden');
 
-</script>
+
