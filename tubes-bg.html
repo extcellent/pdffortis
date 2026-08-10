@@ -15,19 +15,20 @@
             overflow: hidden;
             font-family: 'Segoe UI', system-ui, sans-serif;
             height: 100vh;
-            cursor: none;
+            cursor: default; /* FIXED: cursor stays visible */
         }
         canvas {
             display: block;
             width: 100vw;
             height: 100vh;
+            cursor: crosshair; /* FIXED: nice visible crosshair */
         }
         .info {
             position: fixed;
             bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            color: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.15);
             font-size: 12px;
             letter-spacing: 4px;
             text-transform: uppercase;
@@ -44,14 +45,15 @@
             position: fixed;
             pointer-events: none;
             z-index: 999;
-            width: 300px;
-            height: 300px;
+            width: 200px;
+            height: 200px;
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
             transform: translate(-50%, -50%);
             mix-blend-mode: screen;
-            transition: all 0.1s ease;
+            transition: all 0.05s ease;
         }
+        /* FIXED: removed cursor: none from body */
     </style>
 </head>
 <body>
@@ -86,17 +88,25 @@
         document.addEventListener('mousemove', (e) => {
             targetX = e.clientX;
             targetY = e.clientY;
-            document.getElementById('cursorGlow').style.left = e.clientX + 'px';
-            document.getElementById('cursorGlow').style.top = e.clientY + 'px';
+            const glow = document.getElementById('cursorGlow');
+            if (glow) {
+                glow.style.left = e.clientX + 'px';
+                glow.style.top = e.clientY + 'px';
+            }
         });
 
         // ---- Touch support ----
         document.addEventListener('touchmove', (e) => {
             const touch = e.touches[0];
-            targetX = touch.clientX;
-            targetY = touch.clientY;
-            document.getElementById('cursorGlow').style.left = touch.clientX + 'px';
-            document.getElementById('cursorGlow').style.top = touch.clientY + 'px';
+            if (touch) {
+                targetX = touch.clientX;
+                targetY = touch.clientY;
+                const glow = document.getElementById('cursorGlow');
+                if (glow) {
+                    glow.style.left = touch.clientX + 'px';
+                    glow.style.top = touch.clientY + 'px';
+                }
+            }
         }, { passive: true });
 
         // ---- Color utilities ----
@@ -131,6 +141,7 @@
                 this.type = Math.random() > 0.7 ? 'star' : 'dot';
                 this.trail = [];
                 this.maxTrail = 6 + Math.floor(Math.random() * 10);
+                this.pulse = Math.random() * Math.PI * 2;
             }
 
             reset() {
@@ -193,14 +204,17 @@
                 this.hue = (this.hue + 0.1) % 360;
                 this.sat = 70 + Math.sin(Date.now() * 0.001 + this.phase) * 15;
                 this.light = 50 + Math.sin(Date.now() * 0.002 + this.phase * 1.5) * 20;
+                this.pulse += 0.02;
             }
 
             draw(ctx) {
+                const pulseSize = 1 + Math.sin(this.pulse) * 0.2;
+                
                 // Draw trail
                 if (this.trail.length > 1) {
                     for (let i = 1; i < this.trail.length; i++) {
                         const alpha = (i / this.trail.length) * 0.3;
-                        const size = (i / this.trail.length) * this.radius * 0.8;
+                        const size = (i / this.trail.length) * this.radius * 0.8 * pulseSize;
                         ctx.beginPath();
                         ctx.arc(this.trail[i].x, this.trail[i].y, size, 0, Math.PI * 2);
                         ctx.fillStyle = `hsla(${this.hue}, ${this.sat}%, ${this.light}%, ${alpha})`;
@@ -211,20 +225,20 @@
                 // Main particle with glow
                 const gradient = ctx.createRadialGradient(
                     this.x, this.y, 0,
-                    this.x, this.y, this.radius * 4
+                    this.x, this.y, this.radius * 4 * pulseSize
                 );
                 gradient.addColorStop(0, `hsla(${this.hue}, ${this.sat}%, ${this.light}%, 0.9)`);
                 gradient.addColorStop(0.3, `hsla(${this.hue + 30}, ${this.sat}%, ${this.light}%, 0.4)`);
                 gradient.addColorStop(1, `hsla(${this.hue + 60}, ${this.sat}%, ${this.light}%, 0)`);
                 
                 ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius * 4, 0, Math.PI * 2);
+                ctx.arc(this.x, this.y, this.radius * 4 * pulseSize, 0, Math.PI * 2);
                 ctx.fillStyle = gradient;
                 ctx.fill();
 
                 // Core
                 ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius * 0.8, 0, Math.PI * 2);
+                ctx.arc(this.x, this.y, this.radius * 0.8 * pulseSize, 0, Math.PI * 2);
                 ctx.fillStyle = `hsla(${this.hue + 40}, 100%, 90%, 0.8)`;
                 ctx.fill();
 
@@ -234,8 +248,8 @@
                     ctx.translate(this.x, this.y);
                     ctx.rotate(Date.now() * 0.001 + this.phase);
                     const spikes = 5;
-                    const outerRadius = this.radius * 2.5;
-                    const innerRadius = this.radius * 1;
+                    const outerRadius = this.radius * 2.5 * pulseSize;
+                    const innerRadius = this.radius * 1 * pulseSize;
                     ctx.beginPath();
                     for (let i = 0; i < spikes * 2; i++) {
                         const radius = i % 2 === 0 ? outerRadius : innerRadius;
@@ -253,7 +267,7 @@
 
         // ---- Create particles ----
         const particles = [];
-        const particleCount = 180; // rich but performant
+        const particleCount = 200; // rich but performant
         
         for (let i = 0; i < particleCount; i++) {
             particles.push(new Particle());
@@ -317,6 +331,7 @@
                 p.hue = Math.random() * 360;
                 p.sat = 80 + Math.random() * 20;
                 p.light = 60 + Math.random() * 30;
+                p.maxTrail = 8 + Math.floor(Math.random() * 15);
             });
         }
 
