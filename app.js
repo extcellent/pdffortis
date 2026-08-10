@@ -34,8 +34,8 @@ async function redo(){
   updateUndoRedoButtons();
 }
 // ═══════════════════════════════════════
-// Draft-History für Inline-Text-Edits
-// → Undo wird sofort beim Tippen aktiv, nicht erst nach blur/Enter
+// Draft history for inline text edits
+// Undo becomes active immediately while typing, not just after blur/Enter
 // ═══════════════════════════════════════
 document.addEventListener('input', function(e){
   const span = e.target;
@@ -47,7 +47,7 @@ document.addEventListener('input', function(e){
 
   if(span.dataset._draftHistoryPushed !== '1'){
     // Erster Input → Draft-History-Eintrag pushen
-    if(currentText === origText) return; // wirklich noch keine Änderung
+    if(currentText === origText) return; // no real change yet
 
     const spanRef = span;
     const pageNum = parseInt(span.dataset.pageNumber || currentPage, 10);
@@ -96,9 +96,9 @@ function redrawPageCanvas(n){
     if(m.data){ ctx.putImageData(m.data,m.x,m.y); }
     else { ctx.fillStyle=m.bg; ctx.fillRect(m.x,m.y,m.w,m.h); }
   });
-  // Falls gerade ein ANDERER Span offen/in Bearbeitung ist (noch nicht committed),
-  // dessen temporäre Maske erneut auftragen — sonst blitzt dessen alter Text
-  // hier kurz wieder auf und erzeugt Doppeltext mit dem noch offenen Span
+  // If another span is currently open/being edited (not yet committed),
+  // re-apply its temporary mask — otherwise its old text briefly
+  // flashes back and creates duplicate text with the still-open span
   const activeSpan = window.activeInlineSpan;
   if(activeSpan && activeSpan._maskRect && parseInt(activeSpan.dataset.pageNumber,10)===n){
     const m = activeSpan._maskRect;
@@ -121,7 +121,7 @@ document.addEventListener('keydown', e=>{
     e.preventDefault(); redo();
   }
 });
-let pageMasks={}; // {pageNum: [{x,y,w,h,bg}, ...]} – Vorschau-Masken pro Seite
+let pageMasks={}; // {pageNum: [{x,y,w,h,bg}, ...]} – preview masks per page
 let pageImages={};
 let currentPage=1, totalPages=0, fileName='';
 let editorMode='look', currentTab='edit', compressQ='medium';
@@ -145,9 +145,7 @@ const CONFIG = {
 };
 const MAX_DL=CONFIG.DAILY_FREE_LOGGED_IN_LIMIT, LIMIT_MS=8*60*60*1000;
 const LS_DL='pf_dl', LS_GUEST_DL='pdfortis_guest_downloads_used', LS_TOKEN='pf_tok', LS_TOKDAT='pf_tokdat', LS_USER='pf_user';
-  
-let lang='en';
-// ── CAPTCHA ──
+
 let pfCaptchaVerified = false;
 let pfSignupTime = null;
 const BLOCKED_DOMAINS = [
@@ -155,17 +153,6 @@ const BLOCKED_DOMAINS = [
   'throwaway.email','sharklasers.com','trashmail.com','yopmail.com',
   'getnada.com','fakeinbox.com','dispostable.com','maildrop.cc','temp-mail.org'
 ];
-// ═══════════════════════════════════════
-// i18n
-// ═══════════════════════════════════════
-const i18n={
-  en:{nav_login:'Sign in',nav_signup:'Get started',logout:'Logout',tagline:'why would you need to pay for such a thing anyway?',hero_cta:'Start Editing',privacy_note:'Your files never leave your browser · 100% private',tools_label:'Everything you need',f1t:'Edit PDF Text',f1d:'Click any text and edit directly. Copy-paste works perfectly.',f2t:'Sign & Fill',f2d:'Draw, type or upload your signature. Save it for next time.',f3t:'Compress',f3d:'Shrink your PDF without losing quality. Great for email.',f4t:'Merge & Split',f4d:'Combine multiple PDFs or extract individual pages.',f5t:'Organize Pages',f5d:'Rotate, delete or reorder pages with one click.',f6t:'Team Dashboard',f6d:'Company accounts with shared access and activity logs.',f7t:'100% Private',f7d:'Processing happens in your browser. No uploads to servers.',privacy_banner:'PDFs are never stored or uploaded without your account.',upload_heading:'Upload your PDF',upload_sub:'Drag and drop or browse — editing starts immediately in your browser.',drop_title:'Drop your PDF here',drop_or:'or',drop_browse:'Browse files',drop_note:'PDF files only · processed locally · never uploaded',recent_title:'Recent documents',mode_look:'View',mode_edit:'Edit',tab_edit:'Edit Text',tab_add:'Add Text',tab_sign:'Sign',tab_organize:'Organize',add_text:'Add Text Box',add_img:'Image',add_date:'Date',sign_draw:'Sign Here',sign_init:'Initials',rotate:'Rotate',delete_pg:'Delete Page',merge:'Merge',nav_pages:'Pages',tools_compress:'Compress',q_high:'High',q_med:'Med',q_low:'Small',compress_save:'Compress & Save',tools_actions:'Actions',token_btn:'Token',save_btn:'Save PDF',color_lbl:'Color',firm_sig:'Company sig:',sign_modal_title:'Add Signature',sign_draw_tab:'Draw',sign_type_tab:'Type',sign_upload_tab:'Upload',clear:'Clear',insert:'Insert',upload_sig:'Upload signature image',token_title:'Company Token',token_desc:'Enter your company token for unlimited downloads and company branding.',token_activate:'Activate Token',remove_token:'Remove token',or_request:'No token yet?',token_request:'Request a free company token →',limit_title:'Daily limit reached',limit_sub:"You've used all 5 free downloads.",limit_reset:'Resets in',company_q:'Are you a company?',company_desc:'Get a free company token for unlimited downloads.',contact_us:'Contact us →',create_acc_q:'Create a free account?',create_acc_desc:'Save your signature, view document history.',nudge_msg:'💾 Save your signature for next time',nudge_cta:'Create free account',email_lbl:'Email',pw_lbl:'Password',name_lbl:'Name',no_account:'No account? Create one free →',has_account:'Already have an account? Sign in →',auth_tab_login:'Sign in',auth_tab_signup:'Create account',footer_firms:'For businesses & teams →',footer_legal:'Legal Notice',footer_privacy:'Privacy',footer_contact:'Contact'},
-};
-
-function setLang(l){
-  lang=l;
-  document.querySelectorAll('[data-i]').forEach(el=>{const k=el.dataset.i;if(i18n[l][k])el.textContent=i18n[l][k]});
-}
 
 // ═══════════════════════════════════════
 // PAGE NAVIGATION
@@ -252,20 +239,20 @@ async function loadPDF(file){
 }
 
 window.addEventListener('load', async () => {
-  // Direkt aus URL lesen, NICHT auf auth-badge.js warten (Race-Condition!)
+  // Read directly from URL, do NOT wait for auth-badge.js (race condition!)
   const params = new URLSearchParams(location.search);
   const shareToken = params.get('share');
 
-  // Variante A: bereits von auth-badge.js gesetzt
+  // Variant A: already set by auth-badge.js
   if (window.__pfSharedPDF) {
     return loadSharedFromObj(window.__pfSharedPDF);
   }
 
-  // Variante B: Share-Token in URL, aber auth-badge.js noch nicht fertig
+  // Variant B: share token in URL, but auth-badge.js not ready yet
   if (shareToken && typeof pfGetSession === 'function') {
     const sess = pfGetSession();
     if (!sess) {
-      console.warn('[PDFortis] Share-Link aber nicht eingeloggt');
+      console.warn('[PDFortis] Share link but not logged in');
       return;
     }
     try {
@@ -277,22 +264,22 @@ window.addEventListener('load', async () => {
       const row = arr?.[0];
       const valid = row && (!row.share_expires_at || new Date(row.share_expires_at) > new Date());
       if (!valid) {
-        console.warn('[PDFortis] Share-Token ungültig/abgelaufen:', shareToken);
+        console.warn('[PDFortis] Share token invalid/expired:', shareToken);
         return;
       }
       const pdfUrl = await sbGetSharedPDFUrl(shareToken, sess.user.access_token);
       if (!pdfUrl) {
-        console.warn('[PDFortis] Signed URL konnte nicht erzeugt werden');
+        console.warn('[PDFortis] Could not generate signed URL');
         return;
       }
       await loadSharedFromObj({ url: pdfUrl, name: row.document_name });
     } catch(e) {
-      console.error('[PDFortis] Share-Load Fehler', e);
+      console.error('[PDFortis] Share load error', e);
     }
   }
 });
 // ═══════════════════════════════════════
-// AUDIT LOG — direkt im PDF eingebettet, kein Server-Storage nötig
+// AUDIT LOG — embedded directly in the PDF, no server storage needed
 // ═══════════════════════════════════════
 const PF_AUDIT_KEY = 'PDFortisAudit';
 
@@ -345,19 +332,19 @@ function renderHistoryOverlay(){
   const boxWidth = 150;
   const lineLen = 34;           // kurzer Strich statt bis zum Rand
   const gap = 8;                // Mindestabstand zwischen gestapelten Boxen
-  const placed = { left: [], right: [] }; // schon platzierte Boxen pro Seite, zur Kollisionsprüfung
+  const placed = { left: [], right: [] }; // already placed boxes per side, for collision checking
 
   entries.forEach(entry => {
     const anchorX = entry.x * scaleX;
     const anchorY = canvasCssH - (entry.y * scaleY);
 
-// Immer am festen Canvas-Rand, egal wie weit die Änderung von dort weg ist
+// Always at the fixed canvas edge, regardless of how far the change is from there
     const side = anchorX < canvasCssW / 2 ? 'right' : 'left';
     const boxLeft = side === 'right'
       ? canvasCssW - boxWidth - 8
       : 8;
 
-    // Vertikale Kollision mit bereits platzierten Boxen derselben Seite vermeiden
+    // Avoid vertical collision with boxes already placed on the same side
     let boxTop = anchorY - 10;
     const stack = placed[side];
     for(const p of stack){
@@ -382,7 +369,7 @@ function renderHistoryOverlay(){
     box.innerHTML = `
       <div style="font-weight:600">${esc(entry.name)}</div>
       ${entry.email ? `<div style="color:#6b7280">${esc(entry.email)}</div>` : ''}
-      <div>${new Date(entry.ts).toLocaleString(lang==='de'?'de-DE':'en-GB')}</div>
+      <div>${new Date(entry.ts).toLocaleString('en-GB')}</div>
       <div>Action: ${esc(actionLabels[entry.action] || entry.action)}</div>
       ${entry.ip ? `<div style="color:#9ca3af">IP: ${esc(entry.ip)}</div>` : ''}
       ${entry.vpn ? `<div style="color:#f59e0b">⚠ Used VPN</div>` : ''}
@@ -408,7 +395,7 @@ function toggleHistoryOverlay(){
 }
 
 async function loadSharedFromObj({ url, name }) {
-  showPdfLoader('Geteiltes Dokument wird geladen...');
+  showPdfLoader('Loading shared document...');
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error('Download fehlgeschlagen');
@@ -417,13 +404,13 @@ async function loadSharedFromObj({ url, name }) {
     await loadPDF(file);
   } catch(e) {
     console.error(e);
-    alert('PDF konnte nicht geladen werden');
+    alert('PDF could not be loaded');
   } finally {
     hidePdfLoader();
   }
 }
 
-function showPdfLoader(msg = 'Lädt…') {
+function showPdfLoader(msg = 'Loading…') {
   let el = document.getElementById('pdf-loader');
   if (!el) {
     el = document.createElement('div');
@@ -457,9 +444,9 @@ async function renderPage(n){
   const vw=document.getElementById('canvas-area').clientWidth-48;
   const scale=Math.min(1,vw/img.width);
 
-  // Backing-Store bleibt IMMER nativ (fix) — nur die CSS-Anzeigegröße
-  // passt sich Viewport/Zoom an. So bleiben Pixel-Masken immer korrekt,
-  // egal bei welchem Browser-Zoom.
+  // Backing store always stays native (fixed) — only the CSS display size
+  // adapts to viewport/zoom. This keeps pixel masks always correct,
+  // regardless of browser zoom.
   canvas.width=img.width;
   canvas.height=img.height;
   canvas.style.width=(img.width*scale)+'px';
@@ -471,7 +458,7 @@ async function renderPage(n){
   userEls.forEach(el=>ol.appendChild(el));
   const _ctx=canvas.getContext('2d',{willReadFrequently:true});
   _ctx.drawImage(img,0,0,canvas.width,canvas.height);
-  // Editier-Masken (übermalte Originaltext-Bereiche) erneut auftragen
+  // Re-apply edit masks (painted-over original text areas)
   (pageMasks[n]||[]).forEach(m=>{
     if(m.data){
       _ctx.putImageData(m.data, m.x, m.y);
@@ -500,8 +487,8 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
   // scale: wie viel Canvas-Pixel pro PDF-Punkt
   const scale=canvasWidth/pdfNativeWidth;
 
-  // pageHeight vom Backend = echte PDF-Höhe in Punkten
-  // canvasHeight berechnen damit top-Koordinaten stimmen
+  // pageHeight from backend = actual PDF height in points
+  // compute canvasHeight so top coordinates are correct
   const canvas=document.getElementById('pdf-canvas');
   const canvasHeight=canvas.height;
 
@@ -512,7 +499,7 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
   layer.style.cssText='position:absolute;inset:0;overflow:hidden;pointer-events:none;';
 
   items.forEach((item, itemIdx) => {
-    // Prüfen, ob für diese Textposition schon eine gespeicherte (noch nicht heruntergeladene) Änderung existiert
+    // Check if a saved (not yet downloaded) edit already exists for this text position
     const existingEdit = pendingEdits.find(e =>
       e.page===pageNum && Math.abs(e.x-item.x)<1 && Math.abs(e.y-item.y)<1
     );
@@ -574,8 +561,7 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
       overflow:visible;
       pointer-events:${editActive?'all':'none'};
     `;
-    // Original-Farbe für später speichern
-  // Original-Farbe für später speichern
+    // Save original color for later
     span.dataset.cssColor=rgb;
     span.dataset.cssFamily=family;
     span.dataset.cssWeight=weight;
@@ -648,7 +634,7 @@ function switchRTab(tab){
   document.querySelectorAll('.rtab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
   document.querySelectorAll('.ribbon-panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+tab));
   if(tab==='sign'&&!currentUser&&!currentToken){showSignLock();return}
-  // Text-layer und Spans sofort auf korrekten State setzen
+  // Immediately set text layer and spans to the correct state
   const editActive=(tab==='edit'&&editorMode==='edit');
   const layer=document.querySelector('.pdf-text-layer');
   if(layer){
@@ -659,7 +645,7 @@ function switchRTab(tab){
       }
     });
   }
-  // Edit-Mode automatisch aktivieren wenn Edit-Tab gewählt
+  // Automatically activate edit mode when the Edit tab is selected
   if(tab==='edit'&&editorMode!=='edit'){setMode('edit')}
 }
 
@@ -667,7 +653,7 @@ function switchRTab(tab){
 // TEXT BOX (Add)
 // ═══════════════════════════════════════
 function addTextBox(x,y){
-  if(!pdfLibDoc){toast('Lade zuerst ein PDF','err');return}
+  if(!pdfLibDoc){toast('Load a PDF first','err');return}
   const ol=document.getElementById('overlay-layer');
   const canvas=document.getElementById('pdf-canvas');
 
@@ -698,7 +684,7 @@ function addTextBox(x,y){
   const colorPick=document.createElement('input');
   colorPick.type='color';colorPick.value='#000000';colorPick.className='pf-tb-color';
   const dragH=document.createElement('div');
-  dragH.className='pf-tbox-drag';dragH.innerHTML='⠿';dragH.title='Verschieben';
+  dragH.className='pf-tbox-drag';dragH.innerHTML='⠿';dragH.title='Move';
   const delBtn=document.createElement('button');
   delBtn.className='pf-tb-btn';delBtn.innerHTML='✕';delBtn.style.color='#f87171';
 
@@ -723,7 +709,7 @@ function addTextBox(x,y){
   ol.appendChild(wrap);
   pushHistory({undo:()=>wrap.remove(),redo:()=>ol.appendChild(wrap)});
 
-  // ── DRAG (nur über ⠿ Handle) ──
+  // ── DRAG (only via ⠿ handle) ──
   let dSx,dSy,dLx,dLy,dragging=false;
   dragH.addEventListener('mousedown',e=>{
     e.stopPropagation();e.preventDefault();
@@ -791,7 +777,7 @@ function addTextBox(x,y){
     pushHistory({undo:()=>ol.appendChild(wrap),redo:()=>wrap.remove()});
   });
 
-  // ── Klick innerhalb wrap → nicht nach außen bubblen (verhindert sofortiges neues addTextBox) ──
+  // ── Click inside wrap → don't bubble outward (prevents an immediate new addTextBox) ──
   wrap.addEventListener('click',e=>e.stopPropagation());
 
   setTimeout(()=>body.focus(),30);
@@ -824,7 +810,7 @@ function addDateBox(){
   el.contentEditable='true';
   el.className='pdf-overlay pdf-text-box';
   el.style.left='60px';el.style.top='140px';
-  el.textContent=new Date().toLocaleDateString(lang==='de'?'de-DE':'en-GB');
+  el.textContent=new Date().toLocaleDateString('en-GB');
   addDelBtn(el);
   makeDraggable(el);
   ol.appendChild(el);
@@ -929,7 +915,7 @@ function addDelBtn(el){
     el.remove();
     pushHistory({undo:()=>parent.appendChild(el),redo:()=>el.remove()});
   };
-  // Position nur setzen wenn noch nicht gesetzt
+  // Only set position if not already set
   if(!el.style.position||el.style.position==='static'){
     el.style.position='absolute';
   }
@@ -1016,7 +1002,7 @@ function placeSig(src){
   ol.appendChild(wrap);
   pushHistory({undo:()=>wrap.remove(),redo:()=>ol.appendChild(wrap)});
   setMode('edit');
-  toast(lang==='de'?'Unterschrift eingefügt':'Signature inserted — drag to position');
+  toast('Signature inserted — drag to position');
 }
 
 function updateTypedSig(){
@@ -1048,7 +1034,7 @@ async function rotatePage(){
   const p=pages[currentPage-1];
   p.setRotation(PDFLib.degrees((p.getRotation().angle+90)%360));
   await refreshDoc();
-  toast(lang==='de'?'Seite gedreht':'Page rotated 90°');
+  toast('Page rotated 90°');
 
   pushHistory({
     undo: async ()=>{
@@ -1067,11 +1053,11 @@ async function rotatePage(){
 }
 
 async function deletePage(){
-  if(!pdfLibDoc||totalPages<=1){toast(lang==='de'?'Mindestens eine Seite':'At least one page required','err');return}
-  if(!confirm(lang==='de'?`Seite ${currentPage} löschen?`:`Delete page ${currentPage}?`))return;
+  if(!pdfLibDoc||totalPages<=1){toast('At least one page required','err');return}
+  if(!confirm(`Delete page ${currentPage}?`))return;
 
   const deletedIndex = currentPage - 1;
-  // Seite für Undo separat sichern, bevor sie entfernt wird
+  // Save the page separately for undo, before it's removed
   const holder = await PDFLib.PDFDocument.create();
   const [copiedPage] = await holder.copyPages(pdfLibDoc, [deletedIndex]);
   holder.addPage(copiedPage);
@@ -1084,7 +1070,7 @@ async function deletePage(){
   currentPage=Math.min(currentPage,totalPages);
   await buildThumbs();
   await renderPage(currentPage);
-  toast(lang==='de'?'Seite gelöscht':'Page deleted');
+  toast('Page deleted');
 
   pushHistory({
     undo: async ()=>{
@@ -1106,7 +1092,7 @@ function mergePDFs(){
   const inp=document.createElement('input');inp.type='file';inp.accept='.pdf';inp.multiple=true;
   inp.onchange=async e=>{
     const files=Array.from(e.target.files);if(!files.length)return;
-    toast(lang==='de'?'PDFs werden zusammengeführt...':'Merging PDFs...');
+    toast('Merging PDFs...');
     const merged=await PDFLib.PDFDocument.create();
     if(pdfLibDoc){const pgs=await merged.copyPages(pdfLibDoc,pdfLibDoc.getPageIndices());pgs.forEach(p=>merged.addPage(p))}
     for(const f of files){const b=new Uint8Array(await f.arrayBuffer());const doc=await PDFLib.PDFDocument.load(b);const pgs=await merged.copyPages(doc,doc.getPageIndices());pgs.forEach(p=>merged.addPage(p))}
@@ -1114,7 +1100,7 @@ function mergePDFs(){
     pdfDoc=await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
     totalPages=pdfDoc.numPages;currentPage=1;
     await buildThumbs();await renderPage(1);
-    toast(`${lang==='de'?'Zusammengeführt':'Merged'}: ${totalPages} ${lang==='de'?'Seiten':'pages'}`);
+    toast(`${'Merged'}: ${totalPages} ${'pages'}`);
   };inp.click();
 }
 
@@ -1144,7 +1130,7 @@ async function compressAndSave(){
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download='compressed_'+fileName;a.click();
   URL.revokeObjectURL(url);
-  toast(`${lang==='de'?'Gespeichert':'Saved'}${saved>0?` (${saved}% ${lang==='de'?'kleiner':'smaller'})`:''}`)
+  toast(`${'Saved'}${saved>0?` (${saved}% ${'smaller'})`:''}`)
 }
 
 // ═══════════════════════════════════════
@@ -1179,10 +1165,10 @@ async function triggerDownload(){
 }
 
 async function performDownload(){
-  toast(lang==='de'?'PDF wird gespeichert...':'Saving PDF...','info');
+  toast('Saving PDF...','info');
 
   try{
-    // ── Schritt 1: Edit-Text Änderungen via Backend einbetten ──
+    // ── Step 1: embed edit-text changes via backend ──
     let workBytes = pdfBytes;
     if(pendingEdits.length > 0){
       workBytes = await editBatchLocal(workBytes, pendingEdits);
@@ -1190,15 +1176,15 @@ async function performDownload(){
       pageImages = {};
       pageMasks = {};
 
-      // Bearbeitete Version wird die neue Arbeitsgrundlage — unsichtbar für den Nutzer,
-      // aber jetzt sind PDF-Bytes/Textlayer/Masken wieder konsistent zueinander
+      // The edited version becomes the new working base — invisible to the user,
+      // but now PDF bytes/text layer/masks are consistent with each other again
       pdfBytes = workBytes;
       pdfDoc = await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
       pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
       await renderPage(currentPage);
     }
 
-// ── Schritt 2: Add-Text & Bild-Overlays via pdf-lib einbetten ──
+// ── Step 2: embed add-text & image overlays via pdf-lib ──
     const overlays = document.querySelectorAll('#overlay-layer .pdf-overlay, #overlay-layer .pf-tbox-wrap');
     if(overlays.length > 0){
       const doc = await PDFLib.PDFDocument.load(workBytes);
@@ -1224,7 +1210,7 @@ async function performDownload(){
         const scaleX = pdfW / canvasW;
         const scaleY = pdfH / canvasH;
 
-        // ── Bild-Overlay (Signatur oder hochgeladenes Bild) ──
+        // ── Image overlay (signature or uploaded image) ──
         const imgEl = wrap.tagName === 'IMG' ? wrap : wrap.querySelector('img');
         if(imgEl){
           try{
@@ -1299,7 +1285,7 @@ async function performDownload(){
       workBytes = await doc.save();
     }
 
-    // ── Schritt 2b: Translation Overlays via pdf-lib einbetten (alle übersetzten Seiten) ──
+    // ── Step 2b: embed translation overlays via pdf-lib (all translated pages) ──
     const pft = window.PFTranslate;
     const overlayPages = pft ? await pft.buildDownloadOverlayData() : [];
     if (overlayPages.length){
@@ -1317,15 +1303,15 @@ async function performDownload(){
             x: pdfX2, y: pdfY2, width: it.w * scaleX2, height: it.h * scaleY2,
             color: PDFLib.rgb(it.bg[0]/255, it.bg[1]/255, it.bg[2]/255),
           });
-          // it.lines: Array bereits umgebrochener Zeilen (buildDownloadOverlayData()
-          // liefert seit der Absatz-Gruppierung mehrzeiligen Text). PDFLib bricht
-          // \n nicht selbst um -> zeilenweise zeichnen, von oben nach unten.
+          // it.lines: array of already-wrapped lines (buildDownloadOverlayData()
+          // returns multi-line text since paragraph grouping). PDFLib doesn't
+          // wrap \n itself -> draw line by line, top to bottom.
           const lines = it.lines && it.lines.length ? it.lines : [it.text];
           const lineHeightPdf = (it.lineHeight || it.fontSize * 1.18) * scaleY2;
           const fontSizePdf = Math.max(6, it.fontSize * scaleY2);
           let lineY = pdfY2 + it.h * scaleY2 - lineHeightPdf * 0.85;
           lines.forEach(lineText => {
-            if (lineY < pdfY2) return; // Absatz überläuft nach unten -> abschneiden statt Nachbartext zu überschreiben
+            if (lineY < pdfY2) return; // paragraph overflows downward -> cut off instead of overwriting neighboring text
             page2.drawText(lineText, {
               x: pdfX2, y: lineY,
               size: fontSizePdf,
@@ -1346,16 +1332,16 @@ async function performDownload(){
     a.href=url; a.download=fileName||'pdffortis.pdf'; a.click();
     URL.revokeObjectURL(url);
 
-    // Aktivität loggen → im Dashboard sichtbar
+    // Log activity → visible in the dashboard
     if(typeof pfLogActivity === 'function'){
       pfLogActivity(fileName || 'document.pdf', 'edited');
     }
     
-    toast(lang==='de'?'PDF gespeichert!':'PDF saved!','ok');
+    toast('PDF saved!','ok');
 
   }catch(e){
     console.error('Download fehlgeschlagen:',e);
-    toast(lang==='de'?'Fehler beim Speichern':'Save failed','err');
+    toast('Save failed','err');
   }
 }
   
@@ -1365,7 +1351,7 @@ function _doDownload(bytes){
   const a=document.createElement('a');
   a.href=url;a.download=fileName||'pdffortis.pdf';a.click();
   URL.revokeObjectURL(url);
-  toast(lang==='de'?'PDF gespeichert!':'PDF saved!','ok');
+  toast('PDF saved!','ok');
 }
   
 function isLoggedIn(){ return !!currentUser; }
@@ -1431,23 +1417,23 @@ function loadStoredToken(){
 async function validateToken(){
   const val=document.getElementById('token-val').value.trim();
   if(!val){toast('Enter a token','err');return}
-  toast(lang==='de'?'Token wird geprüft...':'Checking token...');
+  toast('Checking token...');
   try{
     const data=await sbValidateToken(val);
-    if(!data){toast(lang==='de'?'Ungültiger Token':'Invalid token','err');return}
+    if(!data){toast('Invalid token','err');return}
     localStorage.setItem(LS_TOKDAT,JSON.stringify(data));
     currentToken=data;applyTokenUI(data);
 
-    // ► Token am Profil persistieren → User wird im Dashboard-Team sichtbar
+    // ► Persist token on the profile → user becomes visible in the dashboard team
     if(currentUser?.id && currentUser?.token){
       await sbUpsertProfile(currentUser.id, { company_token: data.token }, currentUser.token);
       currentUser.company_token = data.token;
     }
 
     closeModal('token-modal');
-    toast(`${lang==='de'?'Token aktiviert':'Token activated'}: ${data.company_name}`,'ok');
+    toast(`${'Token activated'}: ${data.company_name}`,'ok');
     updateDLDisplay();
-  }catch(e){toast(lang==='de'?'Verbindungsfehler':'Connection error','err')}
+  }catch(e){toast('Connection error','err')}
 }
   
 function applyTokenUI(d){
@@ -1465,7 +1451,7 @@ function removeToken(){
   sbUpsertProfile(currentUser.id, { company_token: null }, currentUser.token).catch(()=>{});
   currentUser.company_token = null;
 }
-  document.getElementById('token-label-bar').textContent=i18n[lang].token_btn;
+  document.getElementById('token-label-bar').textContent='Token';
   document.getElementById('token-input-area').classList.remove('hidden');
   document.getElementById('token-active-display').classList.add('hidden');
   document.getElementById('sign-lock-icon').style.display='';
@@ -1492,7 +1478,7 @@ async function doLogin(){
   const pw=document.getElementById('login-pw').value;
   const err=document.getElementById('login-error');
   err.classList.add('hidden');
-  if(!email||!pw){err.textContent=lang==='de'?'Bitte alle Felder ausfüllen':'Please fill all fields';err.classList.remove('hidden');return}
+  if(!email||!pw){err.textContent='Please fill all fields';err.classList.remove('hidden');return}
   try{
     const d = await sbLogin(email, pw);
     if(d.error||d.error_description){
@@ -1523,7 +1509,7 @@ async function doLogin(){
       company_token: profile?.company_token || null
     };
 
-    // Session-Mirror mit echtem Namen (damit Anti-Flicker beim Reload den Namen kennt)
+    // Session mirror with real name (so anti-flicker knows the name on reload)
     try{
       const userObj = {...d.user, access_token: d.access_token};
       userObj.user_metadata = {...(d.user.user_metadata||{}), name: currentUser.name};
@@ -1533,7 +1519,7 @@ async function doLogin(){
       }));
     }catch(e){}
 
-    // Falls Profil bereits company_token hat → Token-UI sofort anwenden
+    // If profile already has a company_token → apply token UI immediately
     if(currentUser.company_token){
       const tok = await sbValidateToken(currentUser.company_token);
       if(tok){
@@ -1545,7 +1531,7 @@ async function doLogin(){
 
     applyUserUI();
     closeModal('auth-modal');
-    toast(lang==='de'?'Willkommen zurück!':'Welcome back!','ok');
+    toast('Welcome back!','ok');
   }catch(e){
     err.textContent='Connection error';
     err.classList.remove('hidden');
@@ -1558,8 +1544,8 @@ async function doSignup(){
   const pw=document.getElementById('signup-pw').value;
   const err=document.getElementById('signup-error');
   err.classList.add('hidden');
-  if(!name||!email||!pw){err.textContent=lang==='de'?'Bitte alle Felder ausfüllen':'Please fill all fields';err.classList.remove('hidden');return}
-  if(pw.length<8){err.textContent=lang==='de'?'Passwort min. 8 Zeichen':'Password min. 8 characters';err.classList.remove('hidden');return}
+  if(!name||!email||!pw){err.textContent='Please fill all fields';err.classList.remove('hidden');return}
+  if(pw.length<8){err.textContent='Password min. 8 characters';err.classList.remove('hidden');return}
   // Honeypot Check
   if(document.getElementById('hp-field')?.value){ return; }
   // Disposable Email
@@ -1568,17 +1554,17 @@ async function doSignup(){
     'throwaway.email','sharklasers.com','trashmail.com','yopmail.com',
     'getnada.com','fakeinbox.com','dispostable.com','maildrop.cc','temp-mail.org'];
   if(blocked.includes(domain)){
-    err.textContent=lang==='de'?'Bitte eine echte E-Mail verwenden':'Please use a real email address';
+    err.textContent='Please use a real email address';
     err.classList.remove('hidden');return;
   }
   // Captcha
   if(!pfCaptchaVerified){
-    err.textContent=lang==='de'?'Bitte bestätige dass du kein Roboter bist':'Please verify you are not a robot';
+    err.textContent='Please verify you are not a robot';
     err.classList.remove('hidden');return;
   }
   
   try{
-    // Optional: schon eingegebener Firmen-Token wird mit übergeben
+    // Optional: an already-entered company token is passed along
     const preToken = (currentToken && currentToken.token) || null;
 
     const d = await sbSignup(email, pw, name, preToken);
@@ -1587,18 +1573,16 @@ async function doSignup(){
       err.classList.remove('hidden');return;
     }
 
-    // Email-Confirm AN → kein access_token zurück
+    // Email confirm ON → no access_token returned
     if(!d.access_token){
-      err.textContent = lang==='de'
-        ? '✅ Konto erstellt. Bitte E-Mail bestätigen und einloggen.'
-        : '✅ Account created. Please confirm email and sign in.';
+      err.textContent = '✅ Account created. Please confirm email and sign in.';
       err.classList.remove('hidden');
       return;
     }
 
     pfSaveSession(d);
 
-    // ► user_profiles-Row anlegen (DAS war der fehlende Teil im Index!)
+    // ► Create user_profiles row (this was the missing part in the index!)
     const profile = await sbUpsertProfile(d.user.id, {
       email,
       display_name: name,
@@ -1611,7 +1595,7 @@ async function doSignup(){
       company_token: profile?.company_token || preToken || null
     };
 
-    // Session-Mirror mit Namen
+    // Session mirror with name
     try{
       const userObj = {...d.user, access_token: d.access_token};
       userObj.user_metadata = {...(d.user.user_metadata||{}), name};
@@ -1623,7 +1607,7 @@ async function doSignup(){
 
     applyUserUI();
     closeModal('auth-modal');
-    toast(lang==='de'?'Konto erstellt! Willkommen.':'Account created! Welcome.','ok');
+    toast('Account created! Welcome.','ok');
   }catch(e){
     err.textContent='Connection error';
     err.classList.remove('hidden');
@@ -1634,7 +1618,7 @@ function applyUserUI(){
   if(!currentUser) return;
   const initials=(currentUser.name||'?').slice(0,2).toUpperCase();
 
-  // ► Anti-Flicker-Klasse jetzt auf authed umschalten (war 'pf-anon' beim Laden)
+  // ► Switch anti-flicker class to authed now (was 'pf-anon' on load)
   document.documentElement.classList.remove('pf-anon');
   document.documentElement.classList.add('pf-authed');
 
@@ -1657,15 +1641,15 @@ async function logout(){
   try{ await sbLogout(); }catch(e){}
   currentUser=null;
 
-  // ► Lokale Session- und Token-Daten entfernen (Token war an den Account gekoppelt)
+  // ► Remove local session and token data (token was tied to the account)
   localStorage.removeItem('pf_session');
   localStorage.removeItem(LS_TOKDAT);
   currentToken=null;
-  document.getElementById('token-label-bar').textContent=i18n[lang].token_btn;
+  document.getElementById('token-label-bar').textContent='Token';
   document.getElementById('token-input-area')?.classList.remove('hidden');
   document.getElementById('token-active-display')?.classList.add('hidden');
   
-  // ► Anti-Flicker-Klasse zurück auf anon
+  // ► Anti-flicker class back to anon
   document.documentElement.classList.remove('pf-authed');
   document.documentElement.classList.add('pf-anon');
 
@@ -1676,7 +1660,7 @@ async function logout(){
   });
   const lock=document.getElementById('sign-lock-icon'); if(lock) lock.style.display='';
   document.getElementById('recent-section')?.classList.add('hidden');
-  toast(lang==='de'?'Abgemeldet':'Logged out');
+  toast('Logged out');
 }
   
 async function restoreSessionFromStorage(){
@@ -1713,10 +1697,10 @@ function pfVerifyCaptcha(){
   const el = document.getElementById('pf-captcha');
   if(el.classList.contains('verified')) return;
   if(pfSignupTime && Date.now() - pfSignupTime < 2000){
-    toast('Bitte warte einen Moment','err'); return;
+    toast('Please wait a moment','err'); return;
   }
   el.classList.add('verified');
-  document.getElementById('pf-captcha-text').textContent = 'Verifiziert ✓';
+  document.getElementById('pf-captcha-text').textContent = 'Verified ✓';
   pfCaptchaVerified = true;
   setTimeout(()=>{
     const sh=document.getElementById('pf-captcha-shimmer');
@@ -1734,7 +1718,7 @@ function pfResetCaptcha(){
   pfSignupTime = Date.now();
   const el = document.getElementById('pf-captcha');
   if(el){ el.classList.remove('verified');
-    document.getElementById('pf-captcha-text').textContent = 'Ich bin kein Roboter';
+    document.getElementById('pf-captcha-text').textContent = "I'm not a robot";
   }
 }
 // ═══════════════════════════════════════
@@ -1788,14 +1772,14 @@ function showNudge(){
 function closeNudge(){document.getElementById('nudge-bar').classList.add('hidden')}
 
 function showSignLock(){
-  toast(lang==='de'?'Bitte zuerst einloggen':'Please sign in first','warn');
+  toast('Please sign in first','warn');
   openAuth('signup');
 }  
 // ═══════════════════════════════════════
 // MODALS
 // ═══════════════════════════════════════
 function openSignModal(){
-  if(!currentUser&&!currentToken){toast(lang==='de'?'Bitte zuerst einloggen':'Please sign in first','warn');openAuth('signup');return}
+  if(!currentUser&&!currentToken){toast('Please sign in first','warn');openAuth('signup');return}
   document.getElementById('sign-modal').classList.remove('hidden');
 }
 function openTokenModal(){document.getElementById('token-modal').classList.remove('hidden')}
@@ -1821,7 +1805,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(!ol)return;
 
 
-// ── ADD TEXT: Klick auf leere Fläche ──
+// ── ADD TEXT: click on empty area ──
   let _wasDragging=false;
   document.addEventListener('mousedown',()=>{_wasDragging=false});
   document.addEventListener('mousemove',()=>{_wasDragging=true},{passive:true});
@@ -1836,7 +1820,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     addTextBox(e.clientX-rect.left,e.clientY-rect.top);
   });
 
-  // ── EDIT TEXT: Klick auf PDF-Text-Span → Floating Editor ──
+  // ── EDIT TEXT: click on PDF text span → floating editor ──
 document.addEventListener('click',function(e){
   if(editorMode!=='edit')return;
   if(currentTab!=='edit')return;
@@ -1845,7 +1829,7 @@ document.addEventListener('click',function(e){
   openInlineEditor(e.target);
 });
 
-  // Klick auf leere Fläche im Edit-Tab → Editor schließen
+  // Click on empty area in the Edit tab → close editor
   ol.addEventListener('click',function(e){
     if(e.target.classList.contains('pdf-text-item'))return;
     if(e.target.id==='pdf-inline-editor')return;
@@ -1858,7 +1842,7 @@ window.activeInlineSpan = window.activeInlineSpan || null;
 window.activeInlineInput = window.activeInlineInput || null;
 
 // ═══════════════════════════════════════════════════════════════════
-// 2. TEXT-EDITOR ÖFFNEN
+// 2. OPEN TEXT EDITOR
 // ═══════════════════════════════════════════════════════════════════
 async function openInlineEditor(span){
   if(window.activeInlineSpan){
@@ -1876,7 +1860,7 @@ async function openInlineEditor(span){
   const ctx=canvas.getContext('2d',{willReadFrequently:true});
   const img=pageImages[pageNum];
 
-  // === Originaltext WIRKLICH vom Canvas entfernen ===
+  // === Actually remove the original text from the canvas ===
   if(img){
     const pdfNativeWidth =img.width/2;
     const pdfNativeHeight=img.height/2;
@@ -1892,8 +1876,8 @@ async function openInlineEditor(span){
     const cw=(x1-x)*scaleX, ch=(y1-y)*scaleY;
    
     // === BG-Farbe per CLUSTER-MODE — eng am Text sampeln (1-4px) ===
-    // Zu weites Sampling trifft Nachbar-Zeilen (dunkel) oder verlässt
-    // farbige Balken (Seite=weiß). Direkt um die Bbox ist immer Balken-BG.
+    // Sampling too wide hits neighboring lines (dark) or leaves
+    // colored bars (page=white). Right around the bbox is always the bar's BG.
     const samples=[];
     const pick=(sx,sy,weight)=>{
       if(sx<0||sy<0||sx>=canvas.width||sy>=canvas.height) return;
@@ -1904,7 +1888,7 @@ async function openInlineEditor(span){
       }catch(e){}
     };
     const midY=cy+ch/2;
-    // SEITLICH: 1-4 px neben Bbox, jede Höhe samplen (gewichtet 2x weil sicherer)
+    // SIDES: 1-4 px next to bbox, sample every height (weighted 2x for reliability)
     for(let i=1;i<=4;i++){
       for(let f=0.15;f<=0.85;f+=0.20){
         pick(cx-i,        cy+ch*f, 2);
@@ -1918,7 +1902,7 @@ async function openInlineEditor(span){
         pick(cx+cw*f, cy+ch-1+i,1);
       }
     }
-    // ECKEN: 1-2 px diagonal (sehr verlässlich)
+    // CORNERS: 1-2 px diagonal (very reliable)
     for(let i=1;i<=2;i++){
       pick(cx-i,      cy-i,      2);
       pick(cx+cw-1+i, cy-i,      2);
@@ -1926,8 +1910,8 @@ async function openInlineEditor(span){
       pick(cx+cw-1+i, cy+ch-1+i, 2);
     }
 
-    // Dominanten Cluster finden – gröberes Raster (>>5 = 8 Stufen/Kanal)
-    // → leichte BG-Variationen (Antialiasing/Kompression) landen im gleichen Bucket
+    // Find the dominant cluster – coarser grid (>>5 = 8 steps/channel)
+    // → slight BG variations (antialiasing/compression) land in the same bucket
     let bgR=255,bgG=255,bgB=255;
     if(samples.length){
       const buckets={};
@@ -1948,7 +1932,7 @@ async function openInlineEditor(span){
     }
     const bg=`rgb(${bgR},${bgG},${bgB})`;
 
-    // Bereich: 0 horizontal, 1 vertikal — Pass1/2 croppt eh auf echte Text-Pixel
+    // Range: 0 horizontal, 1 vertical — pass 1/2 crops to actual text pixels anyway
     const padX=0;
     const padY=1;
     const mx0=Math.max(0, Math.floor(cx-padX));
@@ -1957,7 +1941,7 @@ async function openInlineEditor(span){
     const mh =Math.min(canvas.height-my0, Math.ceil(ch+padY*2));
 
     // === Schritt 1: Text-Pixel finden (Scan, ohne zu schreiben) ===
-    // → echte Ober-/Unterkante der Glyphen ermitteln, damit Maske exakt sitzt
+    // → determine the actual top/bottom edge of the glyphs so the mask sits exactly
     let savedData=null;
     try{
       const imgData=ctx.getImageData(mx0,my0,mw,mh);
@@ -1978,14 +1962,14 @@ async function openInlineEditor(span){
           }
         }
       }
-      // Tightes Bounding der Text-Pixel
+      // Tight bounding of the text pixels
       let yMin=0; while(yMin<mh && !rowHasText[yMin]) yMin++;
       let yMax=mh-1; while(yMax>=0 && !rowHasText[yMax]) yMax--;
       let xMin=0; while(xMin<mw && !colHasText[xMin]) xMin++;
       let xMax=mw-1; while(xMax>=0 && !colHasText[xMax]) xMax--;
       if(yMin>yMax || xMin>xMax){ yMin=0; yMax=mh-1; xMin=0; xMax=mw-1; }
 
-      // Pass 2: NUR innerhalb der gefundenen Text-Box ersetzen (+1px AA-Slack)
+      // Pass 2: replace ONLY within the found text box (+1px AA slack)
       const yA=Math.max(0,yMin-1), yB=Math.min(mh-1,yMax+1);
       const xA=Math.max(0,xMin-1), xB=Math.min(mw-1,xMax+1);
       for(let y=yA;y<=yB;y++){
@@ -2004,7 +1988,7 @@ async function openInlineEditor(span){
         }
       }
 
-      // Maske auf tatsächlichen Text-Bereich zuschneiden
+      // Crop the mask to the actual text area
       const tightX=mx0+xA, tightY=my0+yA;
       const tightW=xB-xA+1, tightH=yB-yA+1;
       const tightData=ctx.createImageData(tightW,tightH);
@@ -2022,7 +2006,7 @@ async function openInlineEditor(span){
       ctx.putImageData(tightData,tightX,tightY);
       savedData=tightData;
 
-      // maskRect tight machen, damit pageMasks später dasselbe wiederherstellt
+      // Make maskRect tight, so pageMasks later restores the same thing
       var _maskFinal={ x:tightX, y:tightY, w:tightW, h:tightH, bg, data:tightData };
     }catch(e){
       ctx.fillStyle=bg;
@@ -2036,7 +2020,7 @@ async function openInlineEditor(span){
     span.dataset.maskPage=pageNum;
   }
 
-  // Span editierbar machen – Original-Farbe & Font verwenden, KEIN weißer Hintergrund
+  // Make span editable – use original color & font, NO white background
   span.classList.remove('is-edited');
   span.classList.add('editing');
   span.style.color       = span.dataset.cssColor  || 'black';
@@ -2089,7 +2073,7 @@ async function closeInlineEditor(save=true){
 
   span.contentEditable = 'false';
   span.classList.remove('editing');
-  // Sicherheit: alle inline-Styles vom Editing-Modus killen
+  // Safety: kill all inline styles from editing mode
   span.style.boxShadow = 'none';
   span.style.border    = 'none';
   span.style.outline   = 'none';
@@ -2110,7 +2094,7 @@ async function closeInlineEditor(save=true){
     });
   };
 
-  // Abbruch ODER keine Änderung → Originaltext wiederherstellen
+  // Cancel OR no change → restore original text
   if(!save || newText === origText){
     span.textContent     = origText;
     span.style.color     = 'transparent';
@@ -2122,15 +2106,15 @@ async function closeInlineEditor(save=true){
     return;
   }
 
-  // === Text wurde geändert ===
+  // === Text was changed ===
   if (typeof window.pftNotifyPageEdited === 'function') {
     window.pftNotifyPageEdited(pageNum);
   }
 
-  // === Text wurde geändert ===
+  // === Text was changed ===
   const _prevMaskRect = span._maskRect;
 
-  // 1) Maske dauerhaft in pageMasks übernehmen → bleibt nach Re-Render erhalten
+  // 1) Permanently move mask into pageMasks → persists after re-render
   if(span._maskRect){
     if(!pageMasks[pageNum]) pageMasks[pageNum]=[];
     pageMasks[pageNum].push(span._maskRect);
@@ -2153,7 +2137,7 @@ async function closeInlineEditor(save=true){
   span.style.padding      = '0';
   span.classList.add('is-edited');
 
-  // 3) Für Download an Backend merken
+  // 3) Remember for download to backend
   const x  = parseFloat(span.dataset.pdfX);
   const y  = parseFloat(span.dataset.pdfY);
   const x1 = parseFloat(span.dataset.pdfX1);
@@ -2165,7 +2149,7 @@ async function closeInlineEditor(save=true){
   const flags = parseInt(span.dataset.pdfFlags||0,10);
   const idx = pendingEdits.findIndex(e => e.page===pageNum && e.x===x && e.y===y);
   const prevEdit = idx > -1 ? {...pendingEdits[idx]} : null;
-  const bgColor = _prevMaskRect ? _prevMaskRect.bg : null; // exakte Hintergrundfarbe aus der Vorschau
+  const bgColor = _prevMaskRect ? _prevMaskRect.bg : null; // exact background color from the preview
   const itemIndex = parseInt(span.dataset.pdfItemIndex, 10);
   const edit = {
       page:pageNum,
@@ -2184,9 +2168,9 @@ async function closeInlineEditor(save=true){
   if(idx > -1) pendingEdits[idx] = edit;
   else pendingEdits.push(edit);
 
-  // 4) Undo/Redo registrieren — Draft aus Input-Listener übernehmen falls vorhanden
+  // 4) Register undo/redo — take over draft from input listener if present
   if(span.dataset._draftHistoryPushed === '1' && historyStack[historyIndex]){
-    // Draft-Entry existiert bereits — nur den Redo-Text auf finalen Wert setzen
+    // Draft entry already exists — just set the redo text to the final value
     span.dataset._draftFinalText = newText;
     delete span.dataset._draftHistoryPushed;
     // Redo-Closure aktualisieren, damit Redo den finalen edit-Zustand wiederherstellt
@@ -2194,7 +2178,7 @@ async function closeInlineEditor(save=true){
     const _origUndo = _draftEntry.undo;
     _draftEntry.undo = async () => {
       await _origUndo();
-      // zusätzlich: pendingEdits sauber entfernen wie im vollen closeInlineEditor
+      // additionally: cleanly remove pendingEdits like in the full closeInlineEditor
       const idx2 = pendingEdits.findIndex(ed => ed===edit);
       if(idx2 > -1) pendingEdits.splice(idx2, 1);
     };
@@ -2246,7 +2230,6 @@ async function closeInlineEditor(save=true){
 // INIT
 // ═══════════════════════════════════════
 window.addEventListener('load',()=>{
-  setLang('en');
   loadStoredToken();
   updateDLDisplay();
   loadRecent();
@@ -2256,5 +2239,3 @@ Object.defineProperty(window, 'currentPDF',     { get: () => pdfBytes });
 Object.defineProperty(window, 'currentPageNum', { get: () => currentPage });
 Object.defineProperty(window, 'currentPdfDocLocal', { get: () => pdfDoc });   // NEU
 window.openAuthModal = () => document.getElementById('auth-modal')?.classList.remove('hidden');
-
-
