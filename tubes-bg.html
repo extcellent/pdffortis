@@ -1,1339 +1,1652 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
 <meta charset="UTF-8">
-
-<meta
-  name="viewport"
-  content="width=device-width, initial-scale=1.0"
->
-
-<title>NEXUS</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 
 <style>
-
 html,
 body {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-
-  overflow: hidden;
-
-  background: transparent;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
 }
 
 canvas {
-  position: absolute;
-
-  inset: 0;
-
-  width: 100%;
-  height: 100%;
-
-  display: block;
-
-  background: transparent;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
 }
-
 </style>
-
 </head>
 
 <body>
 
-<canvas id="canvas"></canvas>
+<canvas id="blackhole"></canvas>
 
+<script>
 
-<script type="module">
+(() => {
 
-/*
-══════════════════════════════════════════════════════════════════════
- N E X U S
- Interactive dimensional fluid field
- Designed specifically for iframe embedding
-══════════════════════════════════════════════════════════════════════
-*/
+"use strict";
 
-
-import(
-  "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
-)
-.then(({ default: THREE }) => {
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                          SETUP
-══════════════════════════════════════════════════════════════════════
-*/
-
+/* ================================================================
+   NEXUS BLACK HOLE
+   Self-contained WebGL2/WEBGL iframe background
+   ================================================================ */
 
 const canvas =
-  document.getElementById("canvas");
+    document.getElementById("blackhole");
+
+const gl =
+    canvas.getContext("webgl2", {
+        alpha: true,
+        antialias: false,
+        depth: false,
+        stencil: false,
+        powerPreference: "high-performance"
+    }) ||
+    canvas.getContext("webgl", {
+        alpha: true,
+        antialias: false,
+        depth: false,
+        stencil: false,
+        powerPreference: "high-performance"
+    });
+
+if (!gl) {
+    console.error("WebGL unavailable");
+    return;
+}
 
 
-const renderer =
-  new THREE.WebGLRenderer({
+/* ================================================================
+   STATE
+   ================================================================ */
 
-    canvas,
+let W = 1;
+let H = 1;
+let DPR = Math.min(window.devicePixelRatio || 1, 2);
 
-    alpha: true,
+const mouse = {
+    x: .5,
+    y: .5,
 
-    antialias: true,
+    tx: .5,
+    ty: .5,
 
-    powerPreference:
-      "high-performance"
-  });
+    vx: 0,
+    vy: 0,
 
+    speed: 0
+};
 
-renderer.setPixelRatio(
-  Math.min(
-    window.devicePixelRatio || 1,
-    2
-  )
-);
+let lastMouseX = .5;
+let lastMouseY = .5;
 
+let startTime = performance.now();
 
-renderer.setClearColor(
-  0x000000,
-  0
-);
-
-
-const scene =
-  new THREE.Scene();
+let pulse = 0;
+let explosion = 0;
 
 
-const camera =
-  new THREE.PerspectiveCamera(
-    55,
-    1,
-    .1,
-    100
-  );
-
-
-camera.position.z =
-  8;
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                           SIZE
-══════════════════════════════════════════════════════════════════════
-*/
-
-
-let width =
-  window.innerWidth;
-
-let height =
-  window.innerHeight;
-
+/* ================================================================
+   RESIZE
+   ================================================================ */
 
 function resize() {
 
-  width =
-    window.innerWidth;
+    W = Math.max(1, window.innerWidth);
+    H = Math.max(1, window.innerHeight);
 
-  height =
-    window.innerHeight;
+    DPR =
+        Math.min(
+            window.devicePixelRatio || 1,
+            2
+        );
 
+    canvas.width =
+        Math.floor(W * DPR);
 
-  renderer.setSize(
-    width,
-    height,
-    false
-  );
+    canvas.height =
+        Math.floor(H * DPR);
 
+    canvas.style.width =
+        W + "px";
 
-  camera.aspect =
-    width / height;
+    canvas.style.height =
+        H + "px";
 
-
-  camera.updateProjectionMatrix();
-
+    gl.viewport(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
 }
 
+window.addEventListener(
+    "resize",
+    resize
+);
 
 resize();
 
 
+/* ================================================================
+   POINTER
+   ================================================================ */
+
 window.addEventListener(
-  "resize",
-  resize
+    "pointermove",
+    e => {
+
+        const nx =
+            e.clientX / W;
+
+        const ny =
+            e.clientY / H;
+
+        mouse.vx =
+            nx - lastMouseX;
+
+        mouse.vy =
+            ny - lastMouseY;
+
+        mouse.speed =
+            Math.min(
+                1,
+                Math.sqrt(
+                    mouse.vx * mouse.vx +
+                    mouse.vy * mouse.vy
+                ) * 12
+            );
+
+        mouse.tx = nx;
+        mouse.ty = ny;
+
+        lastMouseX = nx;
+        lastMouseY = ny;
+    },
+    { passive: true }
 );
 
 
-/*
-══════════════════════════════════════════════════════════════════════
-                         POINTER
-══════════════════════════════════════════════════════════════════════
-*/
-
-
-const pointer = {
-
-  x: 0,
-
-  y: 0,
-
-  targetX: 0,
-
-  targetY: 0,
-
-  vx: 0,
-
-  vy: 0,
-
-  speed: 0
-};
-
+/* ================================================================
+   INTERACTION
+   ================================================================ */
 
 window.addEventListener(
-  "pointermove",
-  event => {
+    "pointerdown",
+    () => {
 
-    const nx =
-      event.clientX /
-      width;
+        pulse = 1;
+        explosion = 1;
 
-    const ny =
-      event.clientY /
-      height;
+    },
+    { passive: true }
+);
 
+window.addEventListener(
+    "dblclick",
+    () => {
 
-    pointer.vx =
-      nx -
-      pointer.targetX;
+        pulse = 1.5;
+        explosion = 1.5;
 
+    }
+);
 
-    pointer.vy =
-      ny -
-      pointer.targetY;
+window.addEventListener(
+    "keydown",
+    e => {
 
+        if (e.code === "Space") {
 
-    pointer.targetX =
-      nx;
+            pulse = 1.4;
+            explosion = 1.4;
 
-    pointer.targetY =
-      ny;
+        }
 
-
-    pointer.speed =
-      Math.min(
-        1,
-        Math.sqrt(
-          pointer.vx *
-          pointer.vx +
-          pointer.vy *
-          pointer.vy
-        ) * 8
-      );
-
-  }
+    }
 );
 
 
-/*
-══════════════════════════════════════════════════════════════════════
-                    PROCEDURAL SHADER
-══════════════════════════════════════════════════════════════════════
-*/
+/* ================================================================
+   FULL SCREEN SHADER
+   ================================================================ */
 
+const vertexSource = `
 
-const vertexShader = `
-
-varying vec2 vUv;
+attribute vec2 a_position;
 
 void main() {
 
-  vUv = uv;
-
-  gl_Position =
-    projectionMatrix *
-    modelViewMatrix *
-    vec4(
-      position,
-      1.0
-    );
+    gl_Position =
+        vec4(
+            a_position,
+            0.0,
+            1.0
+        );
 
 }
-
 `;
 
 
-const fragmentShader = `
+/*
+================================================================
+FRAGMENT SHADER
+
+This is the actual black hole.
+
+The important difference from a normal "glowing circle":
+
+We're calculating a distorted coordinate field around
+an event horizon and then sampling procedural volumetric
+noise through that warped field.
+================================================================
+*/
+
+const fragmentSource = `
 
 precision highp float;
 
-
-/*
-──────────────────────────────────────────────────────────────────────
-UNIFORMS
-──────────────────────────────────────────────────────────────────────
-*/
-
-
-uniform float uTime;
-
-uniform vec2 uMouse;
-
-uniform float uSpeed;
+uniform vec2 u_resolution;
+uniform vec2 u_mouse;
+uniform float u_time;
+uniform float u_speed;
+uniform float u_pulse;
+uniform float u_explosion;
 
 
-/*
-──────────────────────────────────────────────────────────────────────
-UV
-──────────────────────────────────────────────────────────────────────
-*/
+/* ================================================================
+   HASH
+   ================================================================ */
 
+float hash21(vec2 p) {
 
-varying vec2 vUv;
+    p =
+        fract(
+            p *
+            vec2(
+                123.34,
+                456.21
+            )
+        );
 
+    p +=
+        dot(
+            p,
+            p + 45.32
+        );
 
-/*
-──────────────────────────────────────────────────────────────────────
-HASH
-──────────────────────────────────────────────────────────────────────
-*/
-
-
-float hash(
-  vec2 p
-) {
-
-  return fract(
-    sin(
-      dot(
-        p,
-        vec2(
-          127.1,
-          311.7
-        )
-      )
-    )
-    *
-    43758.5453123
-  );
-
-}
-
-
-/*
-──────────────────────────────────────────────────────────────────────
-NOISE
-──────────────────────────────────────────────────────────────────────
-*/
-
-
-float noise(
-  vec2 p
-) {
-
-  vec2 i =
-    floor(p);
-
-  vec2 f =
-    fract(p);
-
-
-  f =
-    f *
-    f *
-    (
-      3.0 -
-      2.0 *
-      f
+    return fract(
+        p.x * p.y
     );
-
-
-  return mix(
-
-    mix(
-      hash(i),
-      hash(
-        i +
-        vec2(
-          1.0,
-          0.0
-        )
-      ),
-      f.x
-    ),
-
-    mix(
-      hash(
-        i +
-        vec2(
-          0.0,
-          1.0
-        )
-      ),
-
-      hash(
-        i +
-        vec2(
-          1.0,
-          1.0
-        )
-      ),
-
-      f.x
-    ),
-
-    f.y
-  );
-
 }
 
 
-/*
-──────────────────────────────────────────────────────────────────────
-FBM
-──────────────────────────────────────────────────────────────────────
-*/
+/* ================================================================
+   NOISE
+   ================================================================ */
 
+float noise(vec2 p) {
 
-float fbm(
-  vec2 p
-) {
+    vec2 i =
+        floor(p);
 
-  float value =
-    0.0;
+    vec2 f =
+        fract(p);
 
-  float amplitude =
-    .5;
+    f =
+        f *
+        f *
+        (3.0 - 2.0 * f);
 
+    return mix(
 
-  for(
-    int i = 0;
-    i < 6;
-    i++
-  ) {
+        mix(
+            hash21(i),
+            hash21(
+                i +
+                vec2(
+                    1.0,
+                    0.0
+                )
+            ),
+            f.x
+        ),
 
-    value +=
-      noise(p) *
-      amplitude;
+        mix(
+            hash21(
+                i +
+                vec2(
+                    0.0,
+                    1.0
+                )
+            ),
 
+            hash21(
+                i +
+                vec2(
+                    1.0,
+                    1.0
+                )
+            ),
 
-    p *=
-      2.0;
+            f.x
+        ),
 
-
-    amplitude *=
-      .5;
-  }
-
-
-  return value;
+        f.y
+    );
 }
 
 
-/*
-══════════════════════════════════════════════════════════════════════
-                          MAIN
-══════════════════════════════════════════════════════════════════════
-*/
+/* ================================================================
+   FRACTAL BROWNIAN MOTION
+   ================================================================ */
 
+float fbm(vec2 p) {
+
+    float value = 0.0;
+    float amp = .5;
+
+    for(int i = 0; i < 6; i++) {
+
+        value +=
+            noise(p) *
+            amp;
+
+        p *= 2.02;
+        amp *= .5;
+    }
+
+    return value;
+}
+
+
+/* ================================================================
+   ROTATION
+   ================================================================ */
+
+mat2 rot(float a) {
+
+    float c = cos(a);
+    float s = sin(a);
+
+    return mat2(
+        c, -s,
+        s,  c
+    );
+}
+
+
+/* ================================================================
+   MAIN
+   ================================================================ */
 
 void main() {
 
+    /*
+    --------------------------------------------------------------
+    SCREEN COORDINATES
+    --------------------------------------------------------------
+    */
 
-  /*
-  Center coordinates.
-  */
+    vec2 uv =
+        gl_FragCoord.xy /
+        u_resolution.xy;
 
-  vec2 uv =
-    vUv -
-    .5;
+    vec2 p =
+        uv -
+        .5;
 
-
-  uv.x *=
-    1.65;
-
-
-  /*
-  Mouse.
-
-  */
-
-  vec2 mouse =
-    uMouse -
-    .5;
+    p.x *=
+        u_resolution.x /
+        u_resolution.y;
 
 
-  mouse.x *=
-    1.65;
+    /*
+    --------------------------------------------------------------
+    MOUSE POSITION
+
+    The black hole follows the cursor.
+    --------------------------------------------------------------
+    */
+
+    vec2 m =
+        u_mouse -
+        .5;
+
+    m.x *=
+        u_resolution.x /
+        u_resolution.y;
 
 
-  /*
-  Distance from cursor.
-  */
+    /*
+    --------------------------------------------------------------
+    LOCAL SPACE AROUND BLACK HOLE
+    --------------------------------------------------------------
+    */
 
-  vec2 delta =
-    uv -
-    mouse;
-
-
-  float distance =
-    length(delta);
+    vec2 q =
+        p -
+        m;
 
 
-  /*
-  ═══════════════════════════════════════════════════════════════
-                       GRAVITY FIELD
-  ═══════════════════════════════════════════════════════════════
-  */
+    float r =
+        length(q);
+
+    float angle =
+        atan(
+            q.y,
+            q.x
+        );
 
 
-  float gravity =
-    exp(
-      -distance *
-      3.5
-    );
+    /*
+    ==============================================================
+                    GRAVITATIONAL LENSING
+    ==============================================================
+
+    The coordinate itself is bent.
+
+    This is what makes the region around the event horizon
+    visually "pull" the surrounding field around it.
+    */
+
+    float gravity =
+        .115 /
+        max(
+            r,
+            .025
+        );
 
 
-  /*
-  Bend space.
-  */
-
-  uv +=
-    normalize(
-      delta +
-      .00001
-    )
-    *
-    gravity
-    *
-    .15;
+    gravity =
+        min(
+            gravity,
+            2.4
+        );
 
 
-  /*
-  Spiral distortion.
-  */
-
-  float angle =
-    atan(
-      uv.y,
-      uv.x
-    );
+    vec2 lens =
+        normalize(
+            q +
+            vec2(.00001)
+        );
 
 
-  float radius =
-    length(uv);
+    q +=
+        lens *
+        gravity *
+        .065;
 
 
-  angle +=
-    gravity *
-    2.5;
+    /*
+    Additional angular deflection.
+    */
+
+    float lensAngle =
+        gravity *
+        .9;
 
 
-  uv =
-    vec2(
-      cos(angle),
-      sin(angle)
-    )
-    *
-    radius;
+    q =
+        rot(
+            lensAngle
+        ) *
+        q;
 
 
-  /*
-  ═══════════════════════════════════════════════════════════════
-                        LIVING CLOUD
-  ═══════════════════════════════════════════════════════════════
-  */
+    /*
+    Recalculate.
+    */
+
+    r =
+        length(q);
+
+    angle =
+        atan(
+            q.y,
+            q.x
+        );
 
 
-  vec2 flow =
-    uv *
-    3.0;
+    /*
+    ==============================================================
+                         SPACETIME SWIRL
+    ==============================================================
+
+    Close to the horizon the entire coordinate system rotates.
+    */
+
+    float swirl =
+        1.8 *
+        exp(
+            -r *
+            3.8
+        );
 
 
-  flow.x +=
-    uTime *
-    .00012;
+    angle +=
+        swirl;
 
 
-  flow.y -=
-    uTime *
-    .00008;
+    /*
+    ==============================================================
+                         VOLUMETRIC SPACE
+    ==============================================================
+
+    Multiple layers moving at different rates.
+    */
+
+    vec2 flow =
+        vec2(
+            cos(angle),
+            sin(angle)
+        ) *
+        r;
 
 
-  float cloud =
-    fbm(flow);
+    flow *=
+        3.4;
 
 
-  /*
-  Secondary distortion.
-  */
+    flow.x +=
+        u_time *
+        .00006;
 
-  float cloud2 =
-    fbm(
-      flow *
-      2.4
-      +
-      cloud
-    );
+    flow.y -=
+        u_time *
+        .000035;
 
 
-  /*
-  ═══════════════════════════════════════════════════════════════
+    float n1 =
+        fbm(flow);
+
+
+    float n2 =
+        fbm(
+            flow *
+            2.1 +
+            vec2(
+                -u_time * .00008,
+                u_time * .00005
+            )
+        );
+
+
+    float n3 =
+        fbm(
+            flow *
+            .42 -
+            vec2(
+                u_time * .000025,
+                0.0
+            )
+        );
+
+
+    /*
+    ==============================================================
+                      ACCRETION DISK
+    ==============================================================
+
+    A luminous rotating disk around the horizon.
+    */
+
+    float diskDistance =
+        abs(
+            r -
+            .245
+        );
+
+
+    float disk =
+        exp(
+            -diskDistance *
+            38.0
+        );
+
+
+    /*
+    Turbulence inside disk.
+    */
+
+    float diskNoise =
+        fbm(
+            vec2(
+                angle * 4.0,
+                r * 35.0
+            )
+            +
+            u_time *
+            vec2(
+                -.0007,
+                .00012
+            )
+        );
+
+
+    disk *=
+        .55 +
+        diskNoise *
+        1.3;
+
+
+    /*
+    Rotating bright sections.
+    */
+
+    float rotating =
+        .5 +
+        .5 *
+        sin(
+            angle *
+            8.0
+            -
+            u_time *
+            .0022
+        );
+
+
+    disk *=
+        .55 +
+        rotating *
+        .75;
+
+
+    /*
+    ==============================================================
+                         INNER RING
+    ============================================================== */
+
+    float innerRing =
+        exp(
+            -abs(
+                r -
+                .105
+            )
+            *
+            85.0
+        );
+
+
+    innerRing *=
+        .4 +
+        .6 *
+        sin(
+            angle *
+            18.0
+            -
+            u_time *
+            .003
+        );
+
+
+    /*
+    ==============================================================
+                        OUTER RINGS
+    ============================================================== */
+
+    float ring1 =
+        pow(
+            max(
+                0.0,
+                sin(
+                    r *
+                    42.0
+                    -
+                    u_time *
+                    .001
+                )
+            ),
+            20.0
+        );
+
+
+    ring1 *=
+        smoothstep(
+            .7,
+            .08,
+            r
+        );
+
+
+    float ring2 =
+        pow(
+            max(
+                0.0,
+                sin(
+                    r *
+                    73.0
+                    +
+                    angle *
+                    3.0
+                    -
+                    u_time *
+                    .0015
+                )
+            ),
+            35.0
+        );
+
+
+    ring2 *=
+        smoothstep(
+            .55,
+            .12,
+            r
+        );
+
+
+    /*
+    ==============================================================
                        ENERGY FILAMENTS
-  ═══════════════════════════════════════════════════════════════
-  */
+    ============================================================== */
+
+    float filament =
+        abs(
+            sin(
+                angle *
+                17.0
+                +
+                r *
+                32.0
+                -
+                u_time *
+                .001
+            )
+        );
 
 
-  float filament =
-    abs(
-      sin(
-        angle *
-        14.0
-        +
-        radius *
-        25.0
-        -
-        uTime *
-        .001
-      )
-    );
+    filament =
+        pow(
+            filament,
+            19.0
+        );
 
 
-  filament =
-    pow(
-      filament,
-      14.0
-    );
+    filament *=
+        smoothstep(
+            .65,
+            .05,
+            r
+        );
 
 
-  /*
-  ═══════════════════════════════════════════════════════════════
-                         ACCRETION RING
-  ═══════════════════════════════════════════════════════════════
-  */
-
-
-  float ring =
-    exp(
-      -abs(
-        radius -
-        .22
-      )
-      *
-      38.0
-    );
-
-
-  ring *=
-    .5 +
-    .5 *
-    sin(
-      angle *
-      9.0
-      -
-      uTime *
-      .002
-    );
-
-
-  /*
-  ═══════════════════════════════════════════════════════════════
+    /*
+    ==============================================================
                          EVENT HORIZON
-  ═══════════════════════════════════════════════════════════════
-  */
+    ============================================================== */
+
+    float horizon =
+        smoothstep(
+            .115,
+            .065,
+            r
+        );
 
 
-  float horizon =
-    smoothstep(
-      .18,
-      .06,
-      radius
-    );
-
-
-  /*
-  ═══════════════════════════════════════════════════════════════
+    /*
+    ==============================================================
                              CORE
-  ═══════════════════════════════════════════════════════════════
-  */
+    ============================================================== */
+
+    float core =
+        exp(
+            -r *
+            75.0
+        );
 
 
-  float core =
-    exp(
-      -radius *
-      55.0
-    );
+    /*
+    ==============================================================
+                       PHOTON RING
+    ============================================================== */
+
+    float photon =
+        exp(
+            -abs(
+                r -
+                .073
+            )
+            *
+            160.0
+        );
 
 
-  /*
-  ═══════════════════════════════════════════════════════════════
-                           COLORS
-  ═══════════════════════════════════════════════════════════════
-  */
+    photon *=
+        .5 +
+        .5 *
+        sin(
+            angle *
+            12.0
+            -
+            u_time *
+            .004
+        );
 
 
-  vec3 cyan =
-    vec3(
-      .0,
-      .8,
-      1.0
-    );
+    /*
+    ==============================================================
+                     MOUSE VELOCITY ENERGY
+    ============================================================== */
+
+    float velocityEnergy =
+        u_speed *
+        (
+            .5 +
+            .5 *
+            sin(
+                angle -
+                u_time *
+                .002
+            )
+        );
 
 
-  vec3 blue =
-    vec3(
-      .05,
-      .25,
-      1.0
-    );
+    /*
+    ==============================================================
+                       SHOCKWAVE
+    ============================================================== */
+
+    float waveRadius =
+        .08 +
+        u_pulse *
+        .8;
 
 
-  vec3 violet =
-    vec3(
-      .55,
-      .05,
-      1.0
-    );
+    float wave =
+        exp(
+            -abs(
+                r -
+                waveRadius
+            )
+            *
+            80.0
+        );
 
 
-  vec3 pink =
-    vec3(
-      1.0,
-      .02,
-      .45
-    );
+    wave *=
+        u_pulse;
 
 
-  /*
-  Base remains mostly transparent/dark.
-  */
+    /*
+    ==============================================================
+                       EXPLOSION SHELL
+    ============================================================== */
 
-  vec3 color =
-    vec3(
-      0.0
-    );
-
-
-  /*
-  Nebula.
-  */
-
-  color +=
-    cyan *
-    cloud *
-    .14;
-
-
-  color +=
-    blue *
-    cloud2 *
-    .18;
+    float blast =
+        exp(
+            -abs(
+                r -
+                (
+                    .12 +
+                    u_explosion *
+                    .9
+                )
+            )
+            *
+            20.0
+        );
 
 
-  /*
-  Filaments.
-  */
-
-  color +=
-    violet *
-    filament *
-    .4;
+    blast *=
+        u_explosion;
 
 
-  /*
-  Accretion disk.
-  */
+    /*
+    ==============================================================
+                            COLORS
+    ============================================================== */
 
-  color +=
-    cyan *
-    ring *
-    .8;
-
-
-  color +=
-    pink *
-    ring *
-    .25;
+    vec3 black =
+        vec3(
+            0.0,
+            0.0,
+            0.002
+        );
 
 
-  /*
-  Core.
-  */
-
-  color +=
-    vec3(
-      .7,
-      .95,
-      1.0
-    )
-    *
-    core *
-    3.0;
+    vec3 cyan =
+        vec3(
+            .01,
+            .75,
+            1.0
+        );
 
 
-  /*
-  Cursor speed increases energy.
-  */
-
-  color +=
-    pink *
-    uSpeed *
-    filament *
-    .5;
+    vec3 electricBlue =
+        vec3(
+            .02,
+            .18,
+            1.0
+        );
 
 
-  /*
-  Dark event horizon.
-  */
-
-  color *=
-    1.0 -
-    horizon *
-    .97;
+    vec3 violet =
+        vec3(
+            .45,
+            .02,
+            1.0
+        );
 
 
-  /*
-  Fade toward edges.
-
-  This is IMPORTANT for iframe usage.
-
-  */
-
-  float edge =
-    smoothstep(
-      .95,
-      .25,
-      length(
-        vUv -
-        .5
-      )
-      *
-      1.25
-    );
+    vec3 magenta =
+        vec3(
+            1.0,
+            .015,
+            .35
+        );
 
 
-  color *=
-    edge;
+    vec3 white =
+        vec3(
+            1.0,
+            .98,
+            .92
+        );
 
 
-  /*
-  Soft HDR response.
-  */
+    /*
+    --------------------------------------------------------------
+    BASE SPACE
+    --------------------------------------------------------------
+    */
 
-  color =
-    color /
-    (
-      1.0 +
-      color
-    );
+    vec3 color =
+        black;
 
 
-  color =
-    pow(
-      color,
-      vec3(
-        .82
-      )
-    );
+    /*
+    Nebula volume.
+    */
+
+    color +=
+        cyan *
+        n1 *
+        .075;
 
 
-  /*
-  Alpha is based on brightness.
-
-  Therefore the iframe itself
-  remains transparent.
-  */
-
-  float alpha =
-    max(
-      max(
-        color.r,
-        color.g
-      ),
-      color.b
-    );
+    color +=
+        electricBlue *
+        n2 *
+        .10;
 
 
-  alpha =
-    smoothstep(
-      .005,
-      .22,
-      alpha
-    );
+    color +=
+        violet *
+        n3 *
+        .055;
 
 
-  alpha *=
-    .9;
+    /*
+    Accretion disk.
+    */
+
+    color +=
+        cyan *
+        disk *
+        .72;
 
 
-  gl_FragColor =
-    vec4(
-      color,
-      alpha
-    );
+    color +=
+        violet *
+        disk *
+        .24;
+
+
+    color +=
+        magenta *
+        disk *
+        .12;
+
+
+    /*
+    Inner ring.
+    */
+
+    color +=
+        electricBlue *
+        innerRing *
+        .75;
+
+
+    color +=
+        magenta *
+        innerRing *
+        .32;
+
+
+    /*
+    Photon ring.
+    */
+
+    color +=
+        white *
+        photon *
+        1.25;
+
+
+    /*
+    Procedural outer rings.
+    */
+
+    color +=
+        cyan *
+        ring1 *
+        .22;
+
+
+    color +=
+        violet *
+        ring2 *
+        .18;
+
+
+    /*
+    Filaments.
+    */
+
+    color +=
+        magenta *
+        filament *
+        .28;
+
+
+    color +=
+        cyan *
+        filament *
+        .20;
+
+
+    /*
+    Velocity energy.
+    */
+
+    color +=
+        magenta *
+        velocityEnergy *
+        filament *
+        .45;
+
+
+    /*
+    Shockwave.
+    */
+
+    color +=
+        cyan *
+        wave *
+        1.25;
+
+
+    color +=
+        violet *
+        wave *
+        .5;
+
+
+    /*
+    Explosion.
+    */
+
+    color +=
+        white *
+        blast *
+        .55;
+
+
+    color +=
+        magenta *
+        blast *
+        .8;
+
+
+    /*
+    Event horizon.
+
+    Almost all light disappears here.
+    */
+
+    color *=
+        1.0 -
+        horizon *
+        .98;
+
+
+    /*
+    Black-hole core.
+    */
+
+    color +=
+        white *
+        core *
+        2.0;
+
+
+    /*
+    ==============================================================
+                    CHROMATIC ABERRATION
+    ==============================================================
+
+    Artificial RGB separation around the gravitational edge.
+    */
+
+    float aberration =
+        smoothstep(
+            .34,
+            .05,
+            r
+        )
+        *
+        (
+            1.0 -
+            smoothstep(
+                .04,
+                .09,
+                r
+            )
+        );
+
+
+    color.r +=
+        aberration *
+        .22;
+
+
+    color.b +=
+        aberration *
+        .38;
+
+
+    /*
+    ==============================================================
+                       DISTANT ENERGY FIELD
+    ============================================================== */
+
+    float field =
+        exp(
+            -r *
+            .9
+        );
+
+
+    color +=
+        cyan *
+        field *
+        n1 *
+        .035;
+
+
+    /*
+    ==============================================================
+                          VIGNETTE
+    ============================================================== */
+
+    float screenDistance =
+        length(
+            (
+                gl_FragCoord.xy /
+                u_resolution.xy
+            )
+            *
+            2.0
+            -
+            1.0
+        );
+
+
+    float vignette =
+        smoothstep(
+            1.5,
+            .35,
+            screenDistance
+        );
+
+
+    color *=
+        vignette;
+
+
+    /*
+    ==============================================================
+                        HDR TONEMAPPING
+    ============================================================== */
+
+    color =
+        color /
+        (
+            1.0 +
+            color
+        );
+
+
+    color =
+        pow(
+            color,
+            vec3(
+                .82
+            )
+        );
+
+
+    /*
+    ==============================================================
+                           ALPHA
+    ==============================================================
+
+    Critical for iframe transparency.
+    */
+
+    float brightness =
+        max(
+            color.r,
+            max(
+                color.g,
+                color.b
+            )
+        );
+
+
+    float alpha =
+        smoothstep(
+            .004,
+            .12,
+            brightness
+        );
+
+
+    /*
+    Keep the effect atmospheric rather
+    than creating an opaque rectangle.
+    */
+
+    alpha *=
+        .82;
+
+
+    gl_FragColor =
+        vec4(
+            color,
+            alpha
+        );
 
 }
 
 `;
 
 
-/*
-══════════════════════════════════════════════════════════════════════
-                          MATERIAL
-══════════════════════════════════════════════════════════════════════
-*/
+/* ================================================================
+   COMPILE
+   ================================================================ */
 
-
-const material =
-  new THREE.ShaderMaterial({
-
-    vertexShader,
-
-    fragmentShader,
-
-    transparent: true,
-
-    depthWrite: false,
-
-    blending:
-      THREE.AdditiveBlending,
-
-    uniforms: {
-
-      uTime: {
-
-        value: 0
-
-      },
-
-      uMouse: {
-
-        value: new THREE.Vector2(
-          .5,
-          .5
-        )
-
-      },
-
-      uSpeed: {
-
-        value: 0
-
-      }
-
-    }
-
-  });
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                            PLANE
-══════════════════════════════════════════════════════════════════════
-*/
-
-
-const geometry =
-  new THREE.PlaneGeometry(
-    2,
-    2
-  );
-
-
-const plane =
-  new THREE.Mesh(
-    geometry,
-    material
-  );
-
-
-scene.add(
-  plane
-);
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                      ORBITAL PARTICLE FIELD
-══════════════════════════════════════════════════════════════════════
-*/
-
-
-const particleCount =
-  width < 700
-    ? 700
-    : 1800;
-
-
-const positions =
-  new Float32Array(
-    particleCount *
-    3
-  );
-
-
-const colors =
-  new Float32Array(
-    particleCount *
-    3
-  );
-
-
-const sizes =
-  new Float32Array(
-    particleCount
-  );
-
-
-for(
-  let i = 0;
-  i < particleCount;
-  i++
+function compile(
+    type,
+    source
 ) {
 
+    const shader =
+        gl.createShader(type);
 
-  const angle =
-    Math.random() *
-    Math.PI *
-    2;
+    gl.shaderSource(
+        shader,
+        source
+    );
 
+    gl.compileShader(
+        shader
+    );
 
-  const radius =
-    Math.pow(
-      Math.random(),
-      .55
-    )
-    *
-    7;
+    if (
+        !gl.getShaderParameter(
+            shader,
+            gl.COMPILE_STATUS
+        )
+    ) {
 
+        console.error(
+            gl.getShaderInfoLog(shader)
+        );
 
-  const z =
-    (
-      Math.random() -
-      .5
-    )
-    *
-    2;
+        return null;
+    }
 
-
-  positions[
-    i * 3
-  ] =
-    Math.cos(angle) *
-    radius;
-
-
-  positions[
-    i * 3 + 1
-  ] =
-    Math.sin(angle) *
-    radius *
-    .32;
-
-
-  positions[
-    i * 3 + 2
-  ] =
-    z;
-
-
-  /*
-  Color spectrum.
-  */
-
-  const color =
-    new THREE.Color();
-
-
-  const hue =
-    .5 +
-    Math.random() *
-    .5;
-
-
-  color.setHSL(
-    hue,
-    1,
-    .65
-  );
-
-
-  colors[
-    i * 3
-  ] =
-    color.r;
-
-
-  colors[
-    i * 3 + 1
-  ] =
-    color.g;
-
-
-  colors[
-    i * 3 + 2
-  ] =
-    color.b;
-
-
-  sizes[i] =
-    Math.random() *
-    3 +
-    1;
+    return shader;
 }
 
 
-const particleGeometry =
-  new THREE.BufferGeometry();
-
-
-particleGeometry.setAttribute(
-  "position",
-  new THREE.BufferAttribute(
-    positions,
-    3
-  )
-);
-
-
-particleGeometry.setAttribute(
-  "color",
-  new THREE.BufferAttribute(
-    colors,
-    3
-  )
-);
-
-
-particleGeometry.setAttribute(
-  "size",
-  new THREE.BufferAttribute(
-    sizes,
-    1
-  )
-);
-
-
-const particleMaterial =
-  new THREE.PointsMaterial({
-
-    size:
-      .025,
-
-    vertexColors:
-      true,
-
-    transparent:
-      true,
-
-    opacity:
-      .65,
-
-    depthWrite:
-      false,
-
-    blending:
-      THREE.AdditiveBlending
-  });
-
-
-const particles =
-  new THREE.Points(
-    particleGeometry,
-    particleMaterial
-  );
-
-
-scene.add(
-  particles
-);
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                       PARTICLE ANIMATION
-══════════════════════════════════════════════════════════════════════
-*/
-
-
-function animateParticles() {
-
-  /*
-  Slow orbital rotation.
-  */
-
-  particles.rotation.z +=
-    .0008;
-
-
-  /*
-  Cursor causes dimensional tilt.
-  */
-
-  particles.rotation.x +=
-    (
-      pointer.targetY -
-      .5 -
-      particles.rotation.x
-    )
-    *
-    .002;
-
-
-  particles.rotation.y +=
-    (
-      pointer.targetX -
-      .5 -
-      particles.rotation.y
-    )
-    *
-    .002;
-
-}
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                           ANIMATION
-══════════════════════════════════════════════════════════════════════
-*/
-
-
-const clock =
-  new THREE.Clock();
-
-
-function animate() {
-
-  requestAnimationFrame(
-    animate
-  );
-
-
-  const elapsed =
-    clock.getElapsedTime();
-
-
-  /*
-  Smooth pointer.
-  */
-
-  pointer.x +=
-    (
-      pointer.targetX -
-      pointer.x
-    )
-    *
-    .065;
-
-
-  pointer.y +=
-    (
-      pointer.targetY -
-      pointer.y
-    )
-    *
-    .065;
-
-
-  pointer.vx *=
-    .92;
-
-
-  pointer.vy *=
-    .92;
-
-
-  pointer.speed *=
-    .94;
-
-
-  /*
-  Shader state.
-  */
-
-  material.uniforms
-    .uTime.value =
-      elapsed *
-      1000;
-
-
-  material.uniforms
-    .uMouse.value
-    .set(
-      pointer.x,
-      1.0 -
-      pointer.y
+const vertex =
+    compile(
+        gl.VERTEX_SHADER,
+        vertexSource
     );
 
 
-  material.uniforms
-    .uSpeed.value =
-      pointer.speed;
+const fragment =
+    compile(
+        gl.FRAGMENT_SHADER,
+        fragmentSource
+    );
 
 
-  /*
-  3D particle world.
-  */
-
-  animateParticles();
-
-
-  /*
-  Tiny camera breathing.
-
-  */
-
-  camera.position.x +=
-    (
-      pointer.x -
-      .5
-    )
-    *
-    .003;
-
-
-  camera.position.y +=
-    (
-      .5 -
-      pointer.y
-    )
-    *
-    .003;
-
-
-  camera.lookAt(
-    0,
-    0,
-    0
-  );
-
-
-  renderer.render(
-    scene,
-    camera
-  );
-
+if (!vertex || !fragment) {
+    return;
 }
 
 
-animate();
+const program =
+    gl.createProgram();
 
 
-})
-.catch(
-  error => {
+gl.attachShader(
+    program,
+    vertex
+);
+
+gl.attachShader(
+    program,
+    fragment
+);
+
+gl.linkProgram(
+    program
+);
+
+
+if (
+    !gl.getProgramParameter(
+        program,
+        gl.LINK_STATUS
+    )
+) {
 
     console.error(
-      "NEXUS failed:",
-      error
+        gl.getProgramInfoLog(program)
     );
 
-  }
+    return;
+}
+
+
+gl.useProgram(
+    program
 );
+
+
+/* ================================================================
+   FULL SCREEN TRIANGLE
+   ================================================================ */
+
+const buffer =
+    gl.createBuffer();
+
+
+gl.bindBuffer(
+    gl.ARRAY_BUFFER,
+    buffer
+);
+
+
+gl.bufferData(
+    gl.ARRAY_BUFFER,
+
+    new Float32Array([
+
+        -1, -1,
+
+         3, -1,
+
+        -1,  3
+
+    ]),
+
+    gl.STATIC_DRAW
+);
+
+
+const position =
+    gl.getAttribLocation(
+        program,
+        "a_position"
+    );
+
+
+gl.enableVertexAttribArray(
+    position
+);
+
+
+gl.vertexAttribPointer(
+    position,
+    2,
+    gl.FLOAT,
+    false,
+    0,
+    0
+);
+
+
+/* ================================================================
+   UNIFORMS
+   ================================================================ */
+
+const uniforms = {
+
+    resolution:
+        gl.getUniformLocation(
+            program,
+            "u_resolution"
+        ),
+
+    mouse:
+        gl.getUniformLocation(
+            program,
+            "u_mouse"
+        ),
+
+    time:
+        gl.getUniformLocation(
+            program,
+            "u_time"
+        ),
+
+    speed:
+        gl.getUniformLocation(
+            program,
+            "u_speed"
+        ),
+
+    pulse:
+        gl.getUniformLocation(
+            program,
+            "u_pulse"
+        ),
+
+    explosion:
+        gl.getUniformLocation(
+            program,
+            "u_explosion"
+        )
+};
+
+
+/* ================================================================
+   BLENDING
+   ================================================================ */
+
+gl.enable(
+    gl.BLEND
+);
+
+gl.blendFunc(
+    gl.SRC_ALPHA,
+    gl.ONE
+);
+
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+
+function render(now) {
+
+    /*
+    Smooth pointer.
+    */
+
+    mouse.x +=
+        (
+            mouse.tx -
+            mouse.x
+        )
+        *
+        .075;
+
+
+    mouse.y +=
+        (
+            mouse.ty -
+            mouse.y
+        )
+        *
+        .075;
+
+
+    /*
+    Velocity decay.
+    */
+
+    mouse.vx *= .91;
+    mouse.vy *= .91;
+
+    mouse.speed *= .93;
+
+
+    /*
+    Event decay.
+    */
+
+    pulse *= .965;
+
+    explosion *= .95;
+
+
+    gl.viewport(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+
+    gl.clearColor(
+        0,
+        0,
+        0,
+        0
+    );
+
+
+    gl.clear(
+        gl.COLOR_BUFFER_BIT
+    );
+
+
+    gl.useProgram(
+        program
+    );
+
+
+    gl.uniform2f(
+        uniforms.resolution,
+        canvas.width,
+        canvas.height
+    );
+
+
+    gl.uniform2f(
+        uniforms.mouse,
+        mouse.x,
+        1.0 - mouse.y
+    );
+
+
+    gl.uniform1f(
+        uniforms.time,
+        now -
+        startTime
+    );
+
+
+    gl.uniform1f(
+        uniforms.speed,
+        mouse.speed
+    );
+
+
+    gl.uniform1f(
+        uniforms.pulse,
+        pulse
+    );
+
+
+    gl.uniform1f(
+        uniforms.explosion,
+        explosion
+    );
+
+
+    gl.drawArrays(
+        gl.TRIANGLES,
+        0,
+        3
+    );
+
+
+    requestAnimationFrame(
+        render
+    );
+}
+
+
+requestAnimationFrame(
+    render
+);
+
+
+/* ================================================================
+   CLEANUP WHEN IFRAME IS UNLOADED
+   ================================================================ */
+
+window.addEventListener(
+    "beforeunload",
+    () => {
+
+        try {
+
+            const loseContext =
+                gl.getExtension(
+                    "WEBGL_lose_context"
+                );
+
+            if (loseContext) {
+                loseContext.loseContext();
+            }
+
+        } catch (_) {}
+
+    }
+);
+
+})();
 
 </script>
 
