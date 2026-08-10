@@ -644,7 +644,47 @@ input,select,textarea{font-family:var(--font)}
 .site-footer a:hover{color:var(--gray-700)}
 .footer-links{display:flex;gap:18px;flex-wrap:wrap}
 .footer-left{font-weight:500}
-  
+
+/* ═══════════════════════════════════════
+   LANDING PAGE — INTERACTIVE TUBES THEME
+═══════════════════════════════════════ */
+#page-landing{background:#050507}
+#tubes-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;z-index:0}
+
+#page-landing .nav{background:rgba(5,5,7,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.08);position:relative;z-index:2}
+#page-landing .nav-logo-text{color:#fff}
+#page-landing .lang-toggle{background:rgba(255,255,255,.08)}
+#page-landing .lang-btn{color:rgba(255,255,255,.55)}
+#page-landing .lang-btn.active{background:rgba(255,255,255,.16);color:#fff;box-shadow:none}
+#page-landing .nav-login{color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.25)}
+#page-landing .nav-login:hover{background:rgba(255,255,255,.1);color:#fff}
+#page-landing .nav-signup{background:#fff;color:#0a0a0a}
+#page-landing .nav-signup:hover{background:rgba(255,255,255,.85)}
+#page-landing .nav-user{color:rgba(255,255,255,.85)}
+#page-landing .nav-dropdown{background:#111114;border-color:rgba(255,255,255,.12)}
+#page-landing .nav-dropdown a{color:rgba(255,255,255,.8)}
+#page-landing .nav-dropdown a:hover{background:rgba(255,255,255,.08)}
+
+#page-landing .landing-hero{position:relative;z-index:2}
+#page-landing .hero-cycle-item{text-shadow:0 4px 30px rgba(0,0,0,.85)}
+#page-landing .hero-tagline{color:rgba(255,255,255,.65);text-shadow:0 2px 14px rgba(0,0,0,.7)}
+#page-landing .hero-tagline em{color:rgba(255,255,255,.8)}
+#page-landing .hero-cta{background:#fff;color:#0a0a0a;box-shadow:0 4px 30px rgba(0,0,0,.45)}
+#page-landing .hero-cta:hover{background:rgba(255,255,255,.85)}
+#page-landing .hero-privacy{color:rgba(255,255,255,.5)}
+
+#page-landing .features-scroll-area{position:relative;z-index:2}
+#page-landing .features-label{color:rgba(255,255,255,.4)}
+#page-landing .feat-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:none}
+#page-landing .feat-card:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22)}
+#page-landing .feat-icon{background:rgba(255,255,255,.08)}
+#page-landing .feat-title{color:#fff}
+#page-landing .feat-desc{color:rgba(255,255,255,.55)}
+
+#page-landing .site-footer{position:relative;z-index:2;color:rgba(255,255,255,.4);border-top:1px solid rgba(255,255,255,.1)}
+#page-landing .site-footer a{color:rgba(255,255,255,.4)}
+#page-landing .site-footer a:hover{color:#fff}
+
 </style>
 </head>
 <body>
@@ -653,6 +693,7 @@ input,select,textarea{font-family:var(--font)}
      PAGE 1: LANDING
 ═══════════════════════ -->
 <div class="page" id="page-landing">
+  <canvas id="tubes-canvas"></canvas>
   <nav class="nav">
     <a class="nav-logo" href="#">
       <svg class="nav-logo-icon" viewBox="0 0 28 28" fill="none"><rect x="3" y="2" width="16" height="21" rx="2.5" fill="#e0e7ff"/><rect x="7" y="2" width="16" height="21" rx="2.5" fill="#a5b4fc"/><rect x="9" y="2" width="16" height="21" rx="2.5" fill="#6366f1"/><path d="M14 9h6M14 13h6M14 17h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -736,7 +777,45 @@ input,select,textarea{font-family:var(--font)}
     </div>
   </footer>  
 </div>              
-  
+
+<script type="module">
+(function(){
+  var canvas = document.getElementById('tubes-canvas');
+  if(!canvas) return;
+
+  var app = null;
+  var loaded = false;
+
+  function randomColors(count){
+    return Array.from({length:count},function(){
+      return "#"+Math.floor(Math.random()*16777215).toString(16).padStart(6,'0');
+    });
+  }
+
+  import('https://cdn.jsdelivr.net/npm/threejs-components@0.0.19/build/cursors/tubes1.min.js')
+    .then(function(mod){
+      var TubesCursor = mod.default;
+      app = TubesCursor(canvas, {
+        tubes:{
+          colors:["#f967fb","#53bc28","#6958d5"],
+          lights:{ intensity:200, colors:["#83f36e","#fe8a2e","#ff008a","#60aed5"] }
+        }
+      });
+      loaded = true;
+    })
+    .catch(function(err){
+      console.error('Failed to load TubesCursor:', err);
+      // Graceful fallback: keep the dark background, no interactive tubes.
+    });
+
+  canvas.addEventListener('click', function(){
+    if(!loaded || !app) return;
+    app.tubes.setColors(randomColors(3));
+    app.tubes.setLightsColors(randomColors(4));
+  });
+})();
+</script>
+
 <!-- ═══════════════════════
      PAGE 2: UPLOAD
 ═══════════════════════ -->
