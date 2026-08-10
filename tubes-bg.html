@@ -1,408 +1,167 @@
-<!--
-╔══════════════════════════════════════════════════════════════════════╗
-║                                                                      ║
-║                  N E X U S   //   A P E X                           ║
-║                                                                      ║
-║        AN INTERACTIVE PROCEDURAL DIMENSIONAL ANOMALY                ║
-║                                                                      ║
-║  • Raymarched volumetric singularity                                ║
-║  • Gravitational lensing                                            ║
-║  • Chromatic aberration                                             ║
-║  • 3D orbital particle field                                        ║
-║  • Mouse velocity distortion                                        ║
-║  • Energy shockwaves                                                 ║
-║  • Event horizon                                                     ║
-║  • Procedural rings                                                  ║
-║  • Adaptive performance                                              ║
-║  • No external visual assets                                         ║
-║                                                                      ║
-╚══════════════════════════════════════════════════════════════════════╝
--->
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0"
+>
+
+<title>NEXUS</title>
 
 <style>
 
 html,
 body {
+  width: 100%;
+  height: 100%;
   margin: 0;
   padding: 0;
-  width: 100%;
-  height: 100%;
+
   overflow: hidden;
-  background: #010205;
+
+  background: transparent;
 }
 
-#apex {
-  position: fixed;
-  inset: 0;
-  z-index: -9999;
-  overflow: hidden;
-  background:
-    radial-gradient(
-      circle at center,
-      #07111d 0%,
-      #02050b 42%,
-      #000103 100%
-    );
-}
-
-#apex-gl {
+canvas {
   position: absolute;
+
   inset: 0;
+
   width: 100%;
   height: 100%;
+
   display: block;
+
+  background: transparent;
 }
-
-#apex-particles {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-#apex-grain {
-  position: absolute;
-  inset: -50%;
-  pointer-events: none;
-
-  opacity: .045;
-
-  background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-
-  mix-blend-mode: screen;
-
-  animation:
-    grainMove .18s steps(2) infinite;
-}
-
-@keyframes grainMove {
-  0%   { transform: translate(0,0); }
-  25%  { transform: translate(2%,-1%); }
-  50%  { transform: translate(-1%,2%); }
-  75%  { transform: translate(-2%,-2%); }
-  100% { transform: translate(1%,1%); }
-}
-
-
-#apex-vignette {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-
-  background:
-    radial-gradient(
-      ellipse at center,
-      transparent 35%,
-      rgba(0,0,0,.14) 62%,
-      rgba(0,0,0,.7) 100%
-    );
-}
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                         CURSOR HUD
-══════════════════════════════════════════════════════════════════════
-*/
-
-#apex-hud {
-  position: fixed;
-  left: 0;
-  top: 0;
-
-  width: 100px;
-  height: 100px;
-
-  pointer-events: none;
-
-  transform:
-    translate3d(-50%,-50%,0);
-
-  opacity: .8;
-}
-
-.apex-cross {
-  position: absolute;
-  inset: 44px;
-
-  border:
-    1px solid rgba(145,235,255,.6);
-
-  border-radius: 50%;
-
-  box-shadow:
-    0 0 10px rgba(67,219,255,.7),
-    0 0 35px rgba(70,120,255,.25);
-
-  animation:
-    crossPulse 2s ease-in-out infinite;
-}
-
-@keyframes crossPulse {
-
-  0%,
-  100% {
-    transform: scale(.75);
-    opacity: .4;
-  }
-
-  50% {
-    transform: scale(1.25);
-    opacity: 1;
-  }
-}
-
-
-.apex-line {
-  position: absolute;
-
-  background:
-    linear-gradient(
-      90deg,
-      transparent,
-      rgba(128,231,255,.7),
-      transparent
-    );
-}
-
-.apex-line.horizontal {
-  width: 100%;
-  height: 1px;
-
-  top: 50%;
-  left: 0;
-}
-
-.apex-line.vertical {
-  width: 1px;
-  height: 100%;
-
-  left: 50%;
-  top: 0;
-
-  background:
-    linear-gradient(
-      180deg,
-      transparent,
-      rgba(128,231,255,.7),
-      transparent
-    );
-}
-
-
-.apex-ring {
-  position: absolute;
-
-  border-radius: 50%;
-
-  border:
-    1px solid rgba(109,225,255,.18);
-}
-
-.apex-ring.one {
-  inset: 20px;
-
-  animation:
-    rotateA 8s linear infinite;
-}
-
-.apex-ring.two {
-  inset: 9px;
-
-  border-style: dashed;
-
-  animation:
-    rotateB 13s linear infinite;
-}
-
-@keyframes rotateA {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes rotateB {
-  to {
-    transform: rotate(-360deg);
-  }
-}
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                          WEBGL SHADERS
-══════════════════════════════════════════════════════════════════════
-*/
 
 </style>
 
+</head>
 
-<div id="apex">
+<body>
 
-  <canvas id="apex-gl"></canvas>
-
-  <canvas id="apex-particles"></canvas>
-
-  <div id="apex-grain"></div>
-
-  <div id="apex-vignette"></div>
-
-</div>
+<canvas id="canvas"></canvas>
 
 
-<div id="apex-hud">
+<script type="module">
 
-  <div class="apex-ring one"></div>
-  <div class="apex-ring two"></div>
-
-  <div class="apex-line horizontal"></div>
-  <div class="apex-line vertical"></div>
-
-  <div class="apex-cross"></div>
-
-</div>
+/*
+══════════════════════════════════════════════════════════════════════
+ N E X U S
+ Interactive dimensional fluid field
+ Designed specifically for iframe embedding
+══════════════════════════════════════════════════════════════════════
+*/
 
 
-<script>
+import(
+  "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+)
+.then(({ default: THREE }) => {
 
 
 /*
 ══════════════════════════════════════════════════════════════════════
-                           APEX ENGINE
+                          SETUP
 ══════════════════════════════════════════════════════════════════════
 */
 
-(() => {
 
-"use strict";
-
-
-const glCanvas =
-  document.getElementById("apex-gl");
-
-const particleCanvas =
-  document.getElementById("apex-particles");
-
-const hud =
-  document.getElementById("apex-hud");
+const canvas =
+  document.getElementById("canvas");
 
 
-const gl =
-  glCanvas.getContext("webgl2", {
+const renderer =
+  new THREE.WebGLRenderer({
+
+    canvas,
+
     alpha: true,
-    antialias: false,
-    powerPreference: "high-performance"
-  })
-  ||
-  glCanvas.getContext("webgl", {
-    alpha: true,
-    antialias: false,
-    powerPreference: "high-performance"
+
+    antialias: true,
+
+    powerPreference:
+      "high-performance"
   });
 
 
-/*
-If WebGL isn't available,
-the particle layer still works.
-*/
-
-const hasGL = !!gl;
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                           POINTER STATE
-══════════════════════════════════════════════════════════════════════
-*/
-
-const pointer = {
-
-  x: innerWidth * .5,
-  y: innerHeight * .5,
-
-  targetX: innerWidth * .5,
-  targetY: innerHeight * .5,
-
-  vx: 0,
-  vy: 0,
-
-  speed: 0,
-
-  down: false,
-
-  pulse: 0,
-
-  energy: 0
-};
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                           RESOLUTION
-══════════════════════════════════════════════════════════════════════
-*/
-
-let width = innerWidth;
-let height = innerHeight;
-
-let dpr =
+renderer.setPixelRatio(
   Math.min(
     window.devicePixelRatio || 1,
     2
+  )
+);
+
+
+renderer.setClearColor(
+  0x000000,
+  0
+);
+
+
+const scene =
+  new THREE.Scene();
+
+
+const camera =
+  new THREE.PerspectiveCamera(
+    55,
+    1,
+    .1,
+    100
   );
+
+
+camera.position.z =
+  8;
+
+
+/*
+══════════════════════════════════════════════════════════════════════
+                           SIZE
+══════════════════════════════════════════════════════════════════════
+*/
+
+
+let width =
+  window.innerWidth;
+
+let height =
+  window.innerHeight;
 
 
 function resize() {
 
-  width = innerWidth;
-  height = innerHeight;
+  width =
+    window.innerWidth;
 
-  dpr =
-    Math.min(
-      window.devicePixelRatio || 1,
-      2
-    );
+  height =
+    window.innerHeight;
 
 
-  if (hasGL) {
-
-    glCanvas.width =
-      width * dpr;
-
-    glCanvas.height =
-      height * dpr;
-
-    glCanvas.style.width =
-      width + "px";
-
-    glCanvas.style.height =
-      height + "px";
-
-    gl.viewport(
-      0,
-      0,
-      glCanvas.width,
-      glCanvas.height
-    );
-  }
+  renderer.setSize(
+    width,
+    height,
+    false
+  );
 
 
-  particleCanvas.width =
-    width * dpr;
+  camera.aspect =
+    width / height;
 
-  particleCanvas.height =
-    height * dpr;
 
-  particleCanvas.style.width =
-    width + "px";
+  camera.updateProjectionMatrix();
 
-  particleCanvas.style.height =
-    height + "px";
 }
 
+
 resize();
+
 
 window.addEventListener(
   "resize",
@@ -412,77 +171,69 @@ window.addEventListener(
 
 /*
 ══════════════════════════════════════════════════════════════════════
-                         POINTER EVENTS
+                         POINTER
 ══════════════════════════════════════════════════════════════════════
 */
 
+
+const pointer = {
+
+  x: 0,
+
+  y: 0,
+
+  targetX: 0,
+
+  targetY: 0,
+
+  vx: 0,
+
+  vy: 0,
+
+  speed: 0
+};
+
+
 window.addEventListener(
   "pointermove",
-  e => {
+  event => {
 
-    const oldX =
+    const nx =
+      event.clientX /
+      width;
+
+    const ny =
+      event.clientY /
+      height;
+
+
+    pointer.vx =
+      nx -
       pointer.targetX;
 
-    const oldY =
+
+    pointer.vy =
+      ny -
       pointer.targetY;
 
 
     pointer.targetX =
-      e.clientX;
+      nx;
 
     pointer.targetY =
-      e.clientY;
+      ny;
 
-
-    pointer.vx =
-      e.clientX - oldX;
-
-    pointer.vy =
-      e.clientY - oldY;
 
     pointer.speed =
       Math.min(
-        35,
+        1,
         Math.sqrt(
           pointer.vx *
           pointer.vx +
           pointer.vy *
           pointer.vy
-        )
+        ) * 8
       );
-
-
-    hud.style.transform =
-      `translate3d(
-        ${e.clientX}px,
-        ${e.clientY}px,
-        0
-      ) translate3d(-50%,-50%,0)`;
-  }
-);
-
-
-window.addEventListener(
-  "pointerdown",
-  () => {
-
-    pointer.down = true;
-
-    pointer.pulse = 1;
-
-    pointer.energy = 1;
-
-    createShockwave();
-
-  }
-);
-
-
-window.addEventListener(
-  "pointerup",
-  () => {
-
-    pointer.down = false;
 
   }
 );
@@ -490,29 +241,33 @@ window.addEventListener(
 
 /*
 ══════════════════════════════════════════════════════════════════════
-                          WEBGL PROGRAM
+                    PROCEDURAL SHADER
 ══════════════════════════════════════════════════════════════════════
 */
 
-let program = null;
 
-let uniforms = {};
+const vertexShader = `
 
-
-const vertexShaderSource = `
-
-attribute vec2 position;
+varying vec2 vUv;
 
 void main() {
 
+  vUv = uv;
+
   gl_Position =
-    vec4(position, 0.0, 1.0);
+    projectionMatrix *
+    modelViewMatrix *
+    vec4(
+      position,
+      1.0
+    );
 
 }
+
 `;
 
 
-const fragmentShaderSource = `
+const fragmentShader = `
 
 precision highp float;
 
@@ -523,17 +278,22 @@ UNIFORMS
 ──────────────────────────────────────────────────────────────────────
 */
 
-uniform vec2 u_resolution;
 
-uniform vec2 u_mouse;
+uniform float uTime;
 
-uniform vec2 u_velocity;
+uniform vec2 uMouse;
 
-uniform float u_time;
+uniform float uSpeed;
 
-uniform float u_pulse;
 
-uniform float u_energy;
+/*
+──────────────────────────────────────────────────────────────────────
+UV
+──────────────────────────────────────────────────────────────────────
+*/
+
+
+varying vec2 vUv;
 
 
 /*
@@ -542,21 +302,25 @@ HASH
 ──────────────────────────────────────────────────────────────────────
 */
 
-float hash21(vec2 p) {
 
-    p =
-      fract(p *
-      vec2(123.34,456.21));
+float hash(
+  vec2 p
+) {
 
-    p +=
+  return fract(
+    sin(
       dot(
         p,
-        p + 45.32
-      );
+        vec2(
+          127.1,
+          311.7
+        )
+      )
+    )
+    *
+    43758.5453123
+  );
 
-    return fract(
-      p.x * p.y
-    );
 }
 
 
@@ -566,542 +330,551 @@ NOISE
 ──────────────────────────────────────────────────────────────────────
 */
 
-float noise(vec2 p) {
 
-    vec2 i =
-      floor(p);
+float noise(
+  vec2 p
+) {
 
-    vec2 f =
-      fract(p);
+  vec2 i =
+    floor(p);
 
-    f =
-      f * f *
-      (3.0 - 2.0 * f);
+  vec2 f =
+    fract(p);
 
-    return mix(
 
-      mix(
-        hash21(i),
-        hash21(i + vec2(1.0,0.0)),
-        f.x
-      ),
-
-      mix(
-        hash21(i + vec2(0.0,1.0)),
-        hash21(i + vec2(1.0,1.0)),
-        f.x
-      ),
-
-      f.y
+  f =
+    f *
+    f *
+    (
+      3.0 -
+      2.0 *
+      f
     );
+
+
+  return mix(
+
+    mix(
+      hash(i),
+      hash(
+        i +
+        vec2(
+          1.0,
+          0.0
+        )
+      ),
+      f.x
+    ),
+
+    mix(
+      hash(
+        i +
+        vec2(
+          0.0,
+          1.0
+        )
+      ),
+
+      hash(
+        i +
+        vec2(
+          1.0,
+          1.0
+        )
+      ),
+
+      f.x
+    ),
+
+    f.y
+  );
+
 }
 
 
 /*
 ──────────────────────────────────────────────────────────────────────
-FRACTAL NOISE
+FBM
 ──────────────────────────────────────────────────────────────────────
 */
 
-float fbm(vec2 p) {
 
-    float value = 0.0;
+float fbm(
+  vec2 p
+) {
 
-    float amp = .5;
+  float value =
+    0.0;
 
-    for(int i = 0; i < 6; i++) {
+  float amplitude =
+    .5;
 
-        value +=
-          noise(p) * amp;
 
-        p *= 2.02;
+  for(
+    int i = 0;
+    i < 6;
+    i++
+  ) {
 
-        amp *= .5;
-    }
+    value +=
+      noise(p) *
+      amplitude;
 
-    return value;
+
+    p *=
+      2.0;
+
+
+    amplitude *=
+      .5;
+  }
+
+
+  return value;
 }
 
 
 /*
-──────────────────────────────────────────────────────────────────────
-MAIN
-──────────────────────────────────────────────────────────────────────
+══════════════════════════════════════════════════════════════════════
+                          MAIN
+══════════════════════════════════════════════════════════════════════
 */
+
 
 void main() {
 
 
-    /*
-    Normalize coordinates.
-    */
+  /*
+  Center coordinates.
+  */
 
-    vec2 uv =
-      gl_FragCoord.xy /
-      u_resolution.xy;
+  vec2 uv =
+    vUv -
+    .5;
 
-    uv =
-      uv * 2.0 - 1.0;
 
-    uv.x *=
-      u_resolution.x /
-      u_resolution.y;
+  uv.x *=
+    1.65;
 
 
-    /*
-    Mouse coordinates.
-    */
+  /*
+  Mouse.
 
-    vec2 mouse =
-      u_mouse /
-      u_resolution;
+  */
 
-    mouse =
-      mouse * 2.0 - 1.0;
+  vec2 mouse =
+    uMouse -
+    .5;
 
-    mouse.x *=
-      u_resolution.x /
-      u_resolution.y;
 
+  mouse.x *=
+    1.65;
 
-    /*
-    Distance from singularity.
-    */
 
-    vec2 delta =
-      uv - mouse;
+  /*
+  Distance from cursor.
+  */
 
-    float dist =
-      length(delta);
+  vec2 delta =
+    uv -
+    mouse;
 
 
-    /*
-    Angle around singularity.
-    */
+  float distance =
+    length(delta);
 
-    float angle =
-      atan(
-        delta.y,
-        delta.x
-      );
 
+  /*
+  ═══════════════════════════════════════════════════════════════
+                       GRAVITY FIELD
+  ═══════════════════════════════════════════════════════════════
+  */
 
-    /*
-    GRAVITATIONAL LENSING
 
-    The closer the pixel is to the core,
-    the more aggressively it bends.
-    */
+  float gravity =
+    exp(
+      -distance *
+      3.5
+    );
 
-    float gravity =
-      0.12 /
-      max(
-        dist,
-        .035
-      );
 
+  /*
+  Bend space.
+  */
 
-    gravity =
-      min(
-        gravity,
-        1.8
-      );
+  uv +=
+    normalize(
+      delta +
+      .00001
+    )
+    *
+    gravity
+    *
+    .15;
 
 
-    uv +=
-      normalize(
-        delta + .0001
-      )
-      *
-      gravity
-      *
-      .055;
+  /*
+  Spiral distortion.
+  */
 
+  float angle =
+    atan(
+      uv.y,
+      uv.x
+    );
 
-    /*
-    Rotating spacetime.
-    */
 
-    float swirl =
-      1.8 *
-      exp(
-        -dist * 2.4
-      );
+  float radius =
+    length(uv);
 
 
-    float a =
-      angle +
-      swirl +
-      u_time * .00025;
+  angle +=
+    gravity *
+    2.5;
 
 
-    vec2 warped =
-      vec2(
-        cos(a),
-        sin(a)
-      );
+  uv =
+    vec2(
+      cos(angle),
+      sin(angle)
+    )
+    *
+    radius;
 
 
-    /*
-    Volumetric nebula.
-    */
+  /*
+  ═══════════════════════════════════════════════════════════════
+                        LIVING CLOUD
+  ═══════════════════════════════════════════════════════════════
+  */
 
-    vec2 nebulaUV =
-      warped *
-      (3.0 + dist * 2.0);
 
+  vec2 flow =
+    uv *
+    3.0;
 
-    nebulaUV +=
-      vec2(
-        u_time * .00008,
-        -u_time * .00005
-      );
 
+  flow.x +=
+    uTime *
+    .00012;
 
-    float cloud =
-      fbm(
-        nebulaUV +
-        fbm(nebulaUV * .7)
-      );
 
+  flow.y -=
+    uTime *
+    .00008;
 
-    /*
-    Energy filaments.
-    */
 
-    float filament =
-      abs(
-        sin(
-          a * 13.0
-          +
-          dist * 18.0
-          -
-          u_time * .001
-        )
-      );
+  float cloud =
+    fbm(flow);
 
 
-    filament =
-      pow(
-        filament,
-        16.0
-      );
+  /*
+  Secondary distortion.
+  */
 
+  float cloud2 =
+    fbm(
+      flow *
+      2.4
+      +
+      cloud
+    );
 
-    /*
-    Ring system.
-    */
 
-    float ring =
-      abs(
-        sin(
-          dist * 31.0
-          -
-          u_time * .002
-          +
-          cloud * 3.0
-        )
-      );
-
-
-    ring =
-      pow(
-        ring,
-        28.0
-      );
-
-
-    /*
-    EVENT HORIZON
-    */
-
-    float horizon =
-      smoothstep(
-        .17,
-        .055,
-        dist
-      );
-
-
-    /*
-    CORE
-    */
-
-    float core =
-      exp(
-        -dist * 42.0
-      );
-
-
-    /*
-    ENERGY BURST
-    */
-
-    float pulseRing =
-      abs(
-        dist -
-        (.05 +
-         u_pulse * .55)
-      );
-
-
-    pulseRing =
-      smoothstep(
-        .045,
-        .0,
-        pulseRing
-      )
-      *
-      u_pulse;
-
-
-    /*
-    Cursor velocity creates directional
-    spacetime distortion.
-    */
-
-    vec2 velocity =
-      u_velocity * .002;
-
-    float velocityField =
-      dot(
-        normalize(delta + .001),
-        normalize(
-          velocity +
-          vec2(.001)
-        )
-      );
-
-
-    velocityField *=
-      length(velocity) *
-      3.0;
-
-
-    /*
-    COLORS
-    */
-
-    vec3 cyan =
-      vec3(
-        .03,
-        .75,
-        1.0
-      );
-
-    vec3 blue =
-      vec3(
-        .08,
-        .20,
-        1.0
-      );
-
-    vec3 violet =
-      vec3(
-        .48,
-        .06,
-        1.0
-      );
-
-    vec3 magenta =
-      vec3(
-        1.0,
-        .02,
-        .52
-      );
-
-
-    /*
-    Deep-space base.
-    */
-
-    vec3 color =
-      vec3(
-        .001,
-        .003,
-        .008
-      );
-
-
-    /*
-    Nebula coloring.
-    */
-
-    color +=
-      cyan *
-      cloud *
-      .18;
-
-    color +=
-      blue *
-      cloud *
-      cloud *
-      .22;
-
-    color +=
-      violet *
-      filament *
-      .32;
-
-    color +=
-      magenta *
-      ring *
-      .20;
-
-
-    /*
-    Accretion disk.
-    */
-
-    float disk =
-      exp(
-        -abs(dist - .24) * 28.0
-      );
-
-    disk *=
-      .55 +
-      .45 *
+  /*
+  ═══════════════════════════════════════════════════════════════
+                       ENERGY FILAMENTS
+  ═══════════════════════════════════════════════════════════════
+  */
+
+
+  float filament =
+    abs(
       sin(
-        a * 8.0
+        angle *
+        14.0
+        +
+        radius *
+        25.0
         -
-        u_time * .002
-      );
+        uTime *
+        .001
+      )
+    );
 
 
-    color +=
-      cyan *
-      disk *
-      .35;
-
-    color +=
-      violet *
-      disk *
-      .22;
+  filament =
+    pow(
+      filament,
+      14.0
+    );
 
 
-    /*
-    Event horizon becomes almost black.
-    */
-
-    color *=
-      1.0 -
-      horizon *
-      .95;
+  /*
+  ═══════════════════════════════════════════════════════════════
+                         ACCRETION RING
+  ═══════════════════════════════════════════════════════════════
+  */
 
 
-    /*
-    Core.
-    */
+  float ring =
+    exp(
+      -abs(
+        radius -
+        .22
+      )
+      *
+      38.0
+    );
 
-    color +=
+
+  ring *=
+    .5 +
+    .5 *
+    sin(
+      angle *
+      9.0
+      -
+      uTime *
+      .002
+    );
+
+
+  /*
+  ═══════════════════════════════════════════════════════════════
+                         EVENT HORIZON
+  ═══════════════════════════════════════════════════════════════
+  */
+
+
+  float horizon =
+    smoothstep(
+      .18,
+      .06,
+      radius
+    );
+
+
+  /*
+  ═══════════════════════════════════════════════════════════════
+                             CORE
+  ═══════════════════════════════════════════════════════════════
+  */
+
+
+  float core =
+    exp(
+      -radius *
+      55.0
+    );
+
+
+  /*
+  ═══════════════════════════════════════════════════════════════
+                           COLORS
+  ═══════════════════════════════════════════════════════════════
+  */
+
+
+  vec3 cyan =
+    vec3(
+      .0,
+      .8,
+      1.0
+    );
+
+
+  vec3 blue =
+    vec3(
+      .05,
+      .25,
+      1.0
+    );
+
+
+  vec3 violet =
+    vec3(
+      .55,
+      .05,
+      1.0
+    );
+
+
+  vec3 pink =
+    vec3(
+      1.0,
+      .02,
+      .45
+    );
+
+
+  /*
+  Base remains mostly transparent/dark.
+  */
+
+  vec3 color =
+    vec3(
+      0.0
+    );
+
+
+  /*
+  Nebula.
+  */
+
+  color +=
+    cyan *
+    cloud *
+    .14;
+
+
+  color +=
+    blue *
+    cloud2 *
+    .18;
+
+
+  /*
+  Filaments.
+  */
+
+  color +=
+    violet *
+    filament *
+    .4;
+
+
+  /*
+  Accretion disk.
+  */
+
+  color +=
+    cyan *
+    ring *
+    .8;
+
+
+  color +=
+    pink *
+    ring *
+    .25;
+
+
+  /*
+  Core.
+  */
+
+  color +=
+    vec3(
+      .7,
+      .95,
+      1.0
+    )
+    *
+    core *
+    3.0;
+
+
+  /*
+  Cursor speed increases energy.
+  */
+
+  color +=
+    pink *
+    uSpeed *
+    filament *
+    .5;
+
+
+  /*
+  Dark event horizon.
+  */
+
+  color *=
+    1.0 -
+    horizon *
+    .97;
+
+
+  /*
+  Fade toward edges.
+
+  This is IMPORTANT for iframe usage.
+
+  */
+
+  float edge =
+    smoothstep(
+      .95,
+      .25,
+      length(
+        vUv -
+        .5
+      )
+      *
+      1.25
+    );
+
+
+  color *=
+    edge;
+
+
+  /*
+  Soft HDR response.
+  */
+
+  color =
+    color /
+    (
+      1.0 +
+      color
+    );
+
+
+  color =
+    pow(
+      color,
       vec3(
-        .65,
-        .92,
-        1.0
+        .82
       )
-      *
-      core *
-      2.8;
+    );
 
 
-    /*
-    Pulse.
-    */
+  /*
+  Alpha is based on brightness.
 
-    color +=
-      cyan *
-      pulseRing *
-      1.5;
+  Therefore the iframe itself
+  remains transparent.
+  */
 
-
-    /*
-    Motion energy.
-    */
-
-    color +=
-      magenta *
-      abs(
-        velocityField
-      ) *
-      .25;
+  float alpha =
+    max(
+      max(
+        color.r,
+        color.g
+      ),
+      color.b
+    );
 
 
-    /*
-    Chromatic fringe.
-
-    Red/blue separation around the
-    gravitational edge.
-    */
-
-    float fringe =
-      smoothstep(
-        .33,
-        .08,
-        dist
-      )
-      *
-      (1.0 -
-       smoothstep(
-         .0,
-         .08,
-         dist
-       ));
+  alpha =
+    smoothstep(
+      .005,
+      .22,
+      alpha
+    );
 
 
-    color.r +=
-      fringe *
-      .18;
-
-    color.b +=
-      fringe *
-      .28;
+  alpha *=
+    .9;
 
 
-    /*
-    Vignette.
-    */
-
-    float vignette =
-      smoothstep(
-        1.65,
-        .25,
-        length(
-          gl_FragCoord.xy /
-          u_resolution.xy *
-          2.0 -
-          1.0
-        )
-      );
-
-
-    color *=
-      vignette;
-
-
-    /*
-    HDR-ish response.
-    */
-
-    color =
-      color /
-      (
-        1.0 +
-        color
-      );
-
-
-    color =
-      pow(
-        color,
-        vec3(.82)
-      );
-
-
-    gl_FragColor =
-      vec4(
-        color,
-        1.0
-      );
+  gl_FragColor =
+    vec4(
+      color,
+      alpha
+    );
 
 }
 
@@ -1110,876 +883,339 @@ void main() {
 
 /*
 ══════════════════════════════════════════════════════════════════════
-                          SHADER COMPILATION
+                          MATERIAL
 ══════════════════════════════════════════════════════════════════════
 */
 
-function compileShader(
-  type,
-  source
-) {
 
-  const shader =
-    gl.createShader(type);
+const material =
+  new THREE.ShaderMaterial({
 
-  gl.shaderSource(
-    shader,
-    source
-  );
+    vertexShader,
 
-  gl.compileShader(
-    shader
-  );
+    fragmentShader,
 
+    transparent: true,
 
-  if (
-    !gl.getShaderParameter(
-      shader,
-      gl.COMPILE_STATUS
-    )
-  ) {
+    depthWrite: false,
 
-    console.error(
-      gl.getShaderInfoLog(shader)
-    );
+    blending:
+      THREE.AdditiveBlending,
 
-    return null;
-  }
+    uniforms: {
 
+      uTime: {
 
-  return shader;
-}
+        value: 0
 
+      },
 
-function createProgram() {
+      uMouse: {
 
-  const vs =
-    compileShader(
-      gl.VERTEX_SHADER,
-      vertexShaderSource
-    );
-
-  const fs =
-    compileShader(
-      gl.FRAGMENT_SHADER,
-      fragmentShaderSource
-    );
-
-
-  if (!vs || !fs)
-    return null;
-
-
-  const p =
-    gl.createProgram();
-
-
-  gl.attachShader(
-    p,
-    vs
-  );
-
-  gl.attachShader(
-    p,
-    fs
-  );
-
-  gl.linkProgram(
-    p
-  );
-
-
-  if (
-    !gl.getProgramParameter(
-      p,
-      gl.LINK_STATUS
-    )
-  ) {
-
-    console.error(
-      gl.getProgramInfoLog(p)
-    );
-
-    return null;
-  }
-
-
-  return p;
-}
-
-
-if (hasGL) {
-
-  program =
-    createProgram();
-
-
-  if (program) {
-
-    gl.useProgram(
-      program
-    );
-
-
-    uniforms.resolution =
-      gl.getUniformLocation(
-        program,
-        "u_resolution"
-      );
-
-    uniforms.mouse =
-      gl.getUniformLocation(
-        program,
-        "u_mouse"
-      );
-
-    uniforms.velocity =
-      gl.getUniformLocation(
-        program,
-        "u_velocity"
-      );
-
-    uniforms.time =
-      gl.getUniformLocation(
-        program,
-        "u_time"
-      );
-
-    uniforms.pulse =
-      gl.getUniformLocation(
-        program,
-        "u_pulse"
-      );
-
-    uniforms.energy =
-      gl.getUniformLocation(
-        program,
-        "u_energy"
-      );
-
-
-    /*
-    Full-screen triangle.
-    */
-
-    const buffer =
-      gl.createBuffer();
-
-    gl.bindBuffer(
-      gl.ARRAY_BUFFER,
-      buffer
-    );
-
-
-    gl.bufferData(
-      gl.ARRAY_BUFFER,
-      new Float32Array([
-        -1,-1,
-         3,-1,
-        -1, 3
-      ]),
-      gl.STATIC_DRAW
-    );
-
-
-    const position =
-      gl.getAttribLocation(
-        program,
-        "position"
-      );
-
-
-    gl.enableVertexAttribArray(
-      position
-    );
-
-
-    gl.vertexAttribPointer(
-      position,
-      2,
-      gl.FLOAT,
-      false,
-      0,
-      0
-    );
-  }
-}
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                         PARTICLE SYSTEM
-══════════════════════════════════════════════════════════════════════
-*/
-
-const pctx =
-  particleCanvas.getContext(
-    "2d"
-  );
-
-
-const mobile =
-  width < 700;
-
-
-const PARTICLE_COUNT =
-  mobile
-    ? 380
-    : Math.min(
-        1200,
-        Math.floor(
-          width * height / 1500
+        value: new THREE.Vector2(
+          .5,
+          .5
         )
-      );
 
+      },
 
-const particles = [];
+      uSpeed: {
 
+        value: 0
 
-class Particle {
-
-  constructor() {
-
-    this.reset();
-  }
-
-
-  reset() {
-
-    const angle =
-      Math.random() *
-      Math.PI *
-      2;
-
-
-    /*
-    Most particles start around
-    an orbital disk.
-    */
-
-    const radius =
-      Math.pow(
-        Math.random(),
-        .55
-      ) *
-      Math.max(
-        width,
-        height
-      )
-      *
-      .75;
-
-
-    this.x =
-      width * .5 +
-      Math.cos(angle) *
-      radius;
-
-
-    this.y =
-      height * .5 +
-      Math.sin(angle) *
-      radius *
-      .35;
-
-
-    this.z =
-      Math.random() * 2 - 1;
-
-
-    this.size =
-      Math.random() <
-      .92
-        ? Math.random() * 1.4
-        : 2 + Math.random() * 2.5;
-
-
-    this.alpha =
-      .15 +
-      Math.random() * .75;
-
-
-    this.speed =
-      .15 +
-      Math.random() * .75;
-
-
-    this.angle =
-      angle;
-
-
-    this.radius =
-      radius;
-
-
-    this.phase =
-      Math.random() *
-      Math.PI *
-      2;
-
-
-    this.hue =
-      175 +
-      Math.random() *
-      170;
-  }
-
-
-  update(t) {
-
-    /*
-    Orbit the center.
-    */
-
-    const centerX =
-      width * .5;
-
-    const centerY =
-      height * .5;
-
-
-    const dx =
-      this.x -
-      centerX;
-
-    const dy =
-      this.y -
-      centerY;
-
-
-    const r =
-      Math.sqrt(
-        dx * dx +
-        dy * dy
-      );
-
-
-    /*
-    Orbital velocity.
-
-    Close particles move much faster.
-    */
-
-    const orbital =
-      .0007 *
-      (
-        1 +
-        900 / Math.max(r,90)
-      );
-
-
-    this.angle +=
-      orbital *
-      this.speed;
-
-
-    /*
-    The cursor bends the orbit.
-    */
-
-    const mdx =
-      pointer.x -
-      this.x;
-
-    const mdy =
-      pointer.y -
-      this.y;
-
-
-    const md =
-      Math.sqrt(
-        mdx * mdx +
-        mdy * mdy
-      );
-
-
-    const influence =
-      Math.max(
-        0,
-        1 -
-        md / 550
-      );
-
-
-    const gravitational =
-      influence *
-      influence;
-
-
-    this.angle +=
-      gravitational *
-      .035;
-
-
-    /*
-    Recalculate position.
-    */
-
-    this.x =
-      centerX +
-      Math.cos(
-        this.angle
-      ) *
-      this.radius;
-
-
-    this.y =
-      centerY +
-      Math.sin(
-        this.angle
-      ) *
-      this.radius *
-      (.25 + this.z * .15);
-
-
-    /*
-    Cursor displacement.
-    */
-
-    this.x +=
-      pointer.vx *
-      gravitational *
-      .65;
-
-    this.y +=
-      pointer.vy *
-      gravitational *
-      .65;
-
-
-    /*
-    Wave interaction.
-    */
-
-    for (
-      const wave of shockwaves
-    ) {
-
-      const wx =
-        this.x -
-        wave.x;
-
-      const wy =
-        this.y -
-        wave.y;
-
-
-      const distance =
-        Math.sqrt(
-          wx * wx +
-          wy * wy
-        );
-
-
-      const ringDistance =
-        Math.abs(
-          distance -
-          wave.radius
-        );
-
-
-      if (
-        ringDistance <
-        35
-      ) {
-
-        const force =
-          (
-            1 -
-            ringDistance / 35
-          ) *
-          wave.life;
-
-
-        this.x +=
-          (
-            wx /
-            Math.max(distance,1)
-          )
-          *
-          force *
-          10;
-
-
-        this.y +=
-          (
-            wy /
-            Math.max(distance,1)
-          )
-          *
-          force *
-          10;
       }
+
     }
-  }
 
-
-  draw() {
-
-    const perspective =
-      1 /
-      (
-        1 +
-        this.z * .45
-      );
-
-
-    const size =
-      this.size *
-      perspective;
-
-
-    const a =
-      this.alpha *
-      perspective;
-
-
-    pctx.beginPath();
-
-
-    pctx.fillStyle =
-      `hsla(
-        ${this.hue},
-        100%,
-        72%,
-        ${a}
-      )`;
-
-
-    pctx.arc(
-      this.x,
-      this.y,
-      size,
-      0,
-      Math.PI * 2
-    );
-
-
-    pctx.fill();
-
-
-    /*
-    High-energy particles get a glow.
-    */
-
-    if (size > 2.1) {
-
-      pctx.beginPath();
-
-      pctx.fillStyle =
-        `hsla(
-          ${this.hue},
-          100%,
-          70%,
-          ${a * .12}
-        )`;
-
-      pctx.arc(
-        this.x,
-        this.y,
-        size * 6,
-        0,
-        Math.PI * 2
-      );
-
-      pctx.fill();
-    }
-  }
-}
-
-
-for (
-  let i = 0;
-  i < PARTICLE_COUNT;
-  i++
-) {
-
-  particles.push(
-    new Particle()
-  );
-}
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                          SHOCKWAVES
-══════════════════════════════════════════════════════════════════════
-*/
-
-const shockwaves = [];
-
-
-function createShockwave() {
-
-  shockwaves.push({
-
-    x: pointer.x,
-
-    y: pointer.y,
-
-    radius: 0,
-
-    life: 1,
-
-    hue:
-      180 +
-      Math.random() *
-      150
   });
 
 
-  if (
-    shockwaves.length >
-    8
-  ) {
+/*
+══════════════════════════════════════════════════════════════════════
+                            PLANE
+══════════════════════════════════════════════════════════════════════
+*/
 
-    shockwaves.shift();
-  }
-}
+
+const geometry =
+  new THREE.PlaneGeometry(
+    2,
+    2
+  );
+
+
+const plane =
+  new THREE.Mesh(
+    geometry,
+    material
+  );
+
+
+scene.add(
+  plane
+);
 
 
 /*
 ══════════════════════════════════════════════════════════════════════
-                          PARTICLE RENDER
+                      ORBITAL PARTICLE FIELD
 ══════════════════════════════════════════════════════════════════════
 */
 
-function renderParticles(t) {
 
-  pctx.setTransform(
-    dpr,
-    0,
-    0,
-    dpr,
-    0,
-    0
-  );
+const particleCount =
+  width < 700
+    ? 700
+    : 1800;
 
 
-  /*
-  Slight persistence.
-
-  This is what makes particles
-  leave beautiful energy trails.
-  */
-
-  pctx.fillStyle =
-    "rgba(0,1,5,.16)";
-
-
-  pctx.fillRect(
-    0,
-    0,
-    width,
-    height
-  );
-
-
-  pctx.globalCompositeOperation =
-    "lighter";
-
-
-  for (
-    const particle
-    of particles
-  ) {
-
-    particle.update(t);
-
-    particle.draw();
-  }
-
-
-  /*
-  Shockwave rings.
-  */
-
-  for (
-    let i =
-      shockwaves.length - 1;
-
-    i >= 0;
-
-    i--
-  ) {
-
-    const wave =
-      shockwaves[i];
-
-
-    wave.radius +=
-      9 +
-      pointer.speed *
-      .35;
-
-
-    wave.life -=
-      .012;
-
-
-    if (
-      wave.life <= 0
-    ) {
-
-      shockwaves.splice(
-        i,
-        1
-      );
-
-      continue;
-    }
-
-
-    /*
-    Outer glow.
-    */
-
-    pctx.beginPath();
-
-    pctx.arc(
-      wave.x,
-      wave.y,
-      wave.radius,
-      0,
-      Math.PI * 2
-    );
-
-
-    pctx.strokeStyle =
-      `hsla(
-        ${wave.hue},
-        100%,
-        70%,
-        ${wave.life * .08}
-      )`;
-
-
-    pctx.lineWidth =
-      24 *
-      wave.life;
-
-
-    pctx.stroke();
-
-
-    /*
-    Sharp energy edge.
-    */
-
-    pctx.beginPath();
-
-    pctx.arc(
-      wave.x,
-      wave.y,
-      wave.radius,
-      0,
-      Math.PI * 2
-    );
-
-
-    pctx.strokeStyle =
-      `hsla(
-        ${wave.hue},
-        100%,
-        80%,
-        ${wave.life * .65}
-      )`;
-
-
-    pctx.lineWidth =
-      1;
-
-
-    pctx.stroke();
-  }
-
-
-  pctx.globalCompositeOperation =
-    "source-over";
-}
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                            GL RENDER
-══════════════════════════════════════════════════════════════════════
-*/
-
-let start =
-  performance.now();
-
-
-function renderGL(now) {
-
-  if (
-    !hasGL ||
-    !program
-  )
-    return;
-
-
-  gl.useProgram(
-    program
-  );
-
-
-  gl.uniform2f(
-    uniforms.resolution,
-    glCanvas.width,
-    glCanvas.height
-  );
-
-
-  gl.uniform2f(
-    uniforms.mouse,
-    pointer.x * dpr,
-    (
-      height -
-      pointer.y
-    ) * dpr
-  );
-
-
-  gl.uniform2f(
-    uniforms.velocity,
-    pointer.vx,
-    pointer.vy
-  );
-
-
-  gl.uniform1f(
-    uniforms.time,
-    now - start
-  );
-
-
-  gl.uniform1f(
-    uniforms.pulse,
-    pointer.pulse
-  );
-
-
-  gl.uniform1f(
-    uniforms.energy,
-    pointer.energy
-  );
-
-
-  gl.drawArrays(
-    gl.TRIANGLES,
-    0,
+const positions =
+  new Float32Array(
+    particleCount *
     3
   );
+
+
+const colors =
+  new Float32Array(
+    particleCount *
+    3
+  );
+
+
+const sizes =
+  new Float32Array(
+    particleCount
+  );
+
+
+for(
+  let i = 0;
+  i < particleCount;
+  i++
+) {
+
+
+  const angle =
+    Math.random() *
+    Math.PI *
+    2;
+
+
+  const radius =
+    Math.pow(
+      Math.random(),
+      .55
+    )
+    *
+    7;
+
+
+  const z =
+    (
+      Math.random() -
+      .5
+    )
+    *
+    2;
+
+
+  positions[
+    i * 3
+  ] =
+    Math.cos(angle) *
+    radius;
+
+
+  positions[
+    i * 3 + 1
+  ] =
+    Math.sin(angle) *
+    radius *
+    .32;
+
+
+  positions[
+    i * 3 + 2
+  ] =
+    z;
+
+
+  /*
+  Color spectrum.
+  */
+
+  const color =
+    new THREE.Color();
+
+
+  const hue =
+    .5 +
+    Math.random() *
+    .5;
+
+
+  color.setHSL(
+    hue,
+    1,
+    .65
+  );
+
+
+  colors[
+    i * 3
+  ] =
+    color.r;
+
+
+  colors[
+    i * 3 + 1
+  ] =
+    color.g;
+
+
+  colors[
+    i * 3 + 2
+  ] =
+    color.b;
+
+
+  sizes[i] =
+    Math.random() *
+    3 +
+    1;
+}
+
+
+const particleGeometry =
+  new THREE.BufferGeometry();
+
+
+particleGeometry.setAttribute(
+  "position",
+  new THREE.BufferAttribute(
+    positions,
+    3
+  )
+);
+
+
+particleGeometry.setAttribute(
+  "color",
+  new THREE.BufferAttribute(
+    colors,
+    3
+  )
+);
+
+
+particleGeometry.setAttribute(
+  "size",
+  new THREE.BufferAttribute(
+    sizes,
+    1
+  )
+);
+
+
+const particleMaterial =
+  new THREE.PointsMaterial({
+
+    size:
+      .025,
+
+    vertexColors:
+      true,
+
+    transparent:
+      true,
+
+    opacity:
+      .65,
+
+    depthWrite:
+      false,
+
+    blending:
+      THREE.AdditiveBlending
+  });
+
+
+const particles =
+  new THREE.Points(
+    particleGeometry,
+    particleMaterial
+  );
+
+
+scene.add(
+  particles
+);
+
+
+/*
+══════════════════════════════════════════════════════════════════════
+                       PARTICLE ANIMATION
+══════════════════════════════════════════════════════════════════════
+*/
+
+
+function animateParticles() {
+
+  /*
+  Slow orbital rotation.
+  */
+
+  particles.rotation.z +=
+    .0008;
+
+
+  /*
+  Cursor causes dimensional tilt.
+  */
+
+  particles.rotation.x +=
+    (
+      pointer.targetY -
+      .5 -
+      particles.rotation.x
+    )
+    *
+    .002;
+
+
+  particles.rotation.y +=
+    (
+      pointer.targetX -
+      .5 -
+      particles.rotation.y
+    )
+    *
+    .002;
+
 }
 
 
 /*
 ══════════════════════════════════════════════════════════════════════
-                            MAIN LOOP
+                           ANIMATION
 ══════════════════════════════════════════════════════════════════════
 */
 
-function frame(now) {
+
+const clock =
+  new THREE.Clock();
+
+
+function animate() {
+
+  requestAnimationFrame(
+    animate
+  );
+
+
+  const elapsed =
+    clock.getElapsedTime();
 
 
   /*
@@ -1990,195 +1226,118 @@ function frame(now) {
     (
       pointer.targetX -
       pointer.x
-    ) * .075;
+    )
+    *
+    .065;
 
 
   pointer.y +=
     (
       pointer.targetY -
       pointer.y
-    ) * .075;
+    )
+    *
+    .065;
 
 
-  pointer.vx *= .92;
-  pointer.vy *= .92;
+  pointer.vx *=
+    .92;
+
+
+  pointer.vy *=
+    .92;
+
+
+  pointer.speed *=
+    .94;
 
 
   /*
-  Energy decay.
+  Shader state.
   */
 
-  pointer.pulse *= .965;
-  pointer.energy *= .94;
+  material.uniforms
+    .uTime.value =
+      elapsed *
+      1000;
 
 
-  renderGL(now);
+  material.uniforms
+    .uMouse.value
+    .set(
+      pointer.x,
+      1.0 -
+      pointer.y
+    );
 
-  renderParticles(now);
+
+  material.uniforms
+    .uSpeed.value =
+      pointer.speed;
 
 
-  requestAnimationFrame(
-    frame
+  /*
+  3D particle world.
+  */
+
+  animateParticles();
+
+
+  /*
+  Tiny camera breathing.
+
+  */
+
+  camera.position.x +=
+    (
+      pointer.x -
+      .5
+    )
+    *
+    .003;
+
+
+  camera.position.y +=
+    (
+      .5 -
+      pointer.y
+    )
+    *
+    .003;
+
+
+  camera.lookAt(
+    0,
+    0,
+    0
   );
+
+
+  renderer.render(
+    scene,
+    camera
+  );
+
 }
 
 
-requestAnimationFrame(
-  frame
-);
+animate();
 
 
-/*
-══════════════════════════════════════════════════════════════════════
-                           IDLE MODE
-══════════════════════════════════════════════════════════════════════
+})
+.catch(
+  error => {
 
-When the mouse doesn't move, the system doesn't stop.
-
-It slowly breathes.
-*/
-
-let idleTime = 0;
-
-
-setInterval(
-  () => {
-
-    if (
-      Math.abs(pointer.vx) <
-        .05 &&
-      Math.abs(pointer.vy) <
-        .05
-    ) {
-
-      idleTime += 1;
-
-
-      if (
-        idleTime >
-        10
-      ) {
-
-        pointer.targetX =
-          width * .5 +
-          Math.sin(
-            performance.now() *
-            .00015
-          ) *
-          width *
-          .08;
-
-
-        pointer.targetY =
-          height * .5 +
-          Math.cos(
-            performance.now() *
-            .00019
-          ) *
-          height *
-          .06;
-      }
-
-    } else {
-
-      idleTime = 0;
-    }
-
-  },
-  100
-);
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                         SPACEBAR EVENT
-══════════════════════════════════════════════════════════════════════
-
-Space = artificial singularity collapse.
-*/
-
-window.addEventListener(
-  "keydown",
-  e => {
-
-    if (
-      e.code ===
-      "Space"
-    ) {
-
-      e.preventDefault();
-
-      pointer.pulse = 1;
-
-      pointer.energy = 1.5;
-
-      createShockwave();
-
-      createShockwave();
-
-    }
+    console.error(
+      "NEXUS failed:",
+      error
+    );
 
   }
 );
 
-
-/*
-══════════════════════════════════════════════════════════════════════
-                          DOUBLE CLICK
-══════════════════════════════════════════════════════════════════════
-
-Double click creates a much larger event.
-*/
-
-window.addEventListener(
-  "dblclick",
-  () => {
-
-    pointer.pulse = 1.5;
-
-    pointer.energy = 2;
-
-
-    for (
-      let i = 0;
-      i < 4;
-      i++
-    ) {
-
-      setTimeout(
-        createShockwave,
-        i * 120
-      );
-    }
-
-  }
-);
-
-
-/*
-══════════════════════════════════════════════════════════════════════
-                         TAB VISIBILITY
-══════════════════════════════════════════════════════════════════════
-
-Don't burn GPU when the page isn't visible.
-*/
-
-document.addEventListener(
-  "visibilitychange",
-  () => {
-
-    if (
-      document.hidden
-    ) {
-
-      pointer.vx = 0;
-      pointer.vy = 0;
-    }
-
-  }
-);
-
-
-})();
 </script>
+
+</body>
+</html>
 ```
