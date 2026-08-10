@@ -1,40 +1,1040 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8"/>
-<style>
-  html,body{margin:0;height:100%;background:#050507;overflow:hidden}
-  canvas{display:block;width:100%;height:100%;touch-action:none}
-</style>
-</head>
-<body>
-<canvas id="tubes-canvas"></canvas>
-<script type="module">
-  var canvas = document.getElementById('tubes-canvas');
+```html
+<!-- ═══════════════════════════════════════════════════════════════════
+     NEXUS // LIQUID SINGULARITY
+     Premium interactive WebGL background
+     Replace your existing cursor/tubes code with this entire block.
+═══════════════════════════════════════════════════════════════════ -->
 
-  function randomColors(count){
-    return Array.from({length:count},function(){
-      return "#"+Math.floor(Math.random()*16777215).toString(16).padStart(6,'0');
-    });
+<style>
+  /* ───────────────────────────────────────────────────────────────
+     NEXUS CORE
+  ─────────────────────────────────────────────────────────────── */
+
+  #nexus-stage {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 50% 50%, #090d18 0%, #03050a 42%, #010204 100%);
   }
 
-  import('https://cdn.jsdelivr.net/npm/threejs-components@0.0.19/build/cursors/tubes1.min.js')
-    .then(function(mod){
-      var TubesCursor = mod.default;
-      var app = TubesCursor(canvas, {
-        tubes:{
-          colors:["#f967fb","#53bc28","#6958d5"],
-          lights:{ intensity:200, colors:["#83f36e","#fe8a2e","#ff008a","#60aed5"] }
-        }
-      });
-      canvas.addEventListener('click', function(){
-        app.tubes.setColors(randomColors(3));
-        app.tubes.setLightsColors(randomColors(4));
-      });
-    })
-    .catch(function(err){
-      console.error('Failed to load TubesCursor:', err);
-    });
+  #nexus-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Atmospheric layers */
+
+  .nexus-atmosphere {
+    position: absolute;
+    inset: -20%;
+    pointer-events: none;
+    opacity: .75;
+    filter: blur(70px);
+    background:
+      radial-gradient(
+        ellipse at 25% 30%,
+        rgba(93, 74, 255, .15),
+        transparent 35%
+      ),
+      radial-gradient(
+        ellipse at 75% 65%,
+        rgba(0, 224, 255, .10),
+        transparent 32%
+      ),
+      radial-gradient(
+        ellipse at 50% 90%,
+        rgba(255, 0, 153, .07),
+        transparent 28%
+      );
+    animation: nexusAtmosphere 16s ease-in-out infinite alternate;
+  }
+
+  @keyframes nexusAtmosphere {
+    from {
+      transform: translate3d(-2%, -1%, 0) scale(1);
+    }
+
+    to {
+      transform: translate3d(2%, 2%, 0) scale(1.08);
+    }
+  }
+
+  /* Fine cinematic grain */
+
+  .nexus-grain {
+    position: absolute;
+    inset: 0;
+    opacity: .035;
+    mix-blend-mode: screen;
+    background-image:
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E");
+    animation: nexusGrain .18s steps(2) infinite;
+  }
+
+  @keyframes nexusGrain {
+    0% { transform: translate(0,0); }
+    25% { transform: translate(-2%,1%); }
+    50% { transform: translate(1%,-2%); }
+    75% { transform: translate(2%,2%); }
+    100% { transform: translate(-1%,-1%); }
+  }
+
+  /* Scanline architecture */
+
+  .nexus-scanlines {
+    position: absolute;
+    inset: 0;
+    opacity: .025;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        transparent 0px,
+        transparent 3px,
+        rgba(255,255,255,.8) 4px
+      );
+    mix-blend-mode: overlay;
+  }
+
+  /* Vignette */
+
+  .nexus-vignette {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(
+        ellipse at center,
+        transparent 35%,
+        rgba(0,0,0,.25) 70%,
+        rgba(0,0,0,.72) 100%
+      );
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     OPTIONAL CENTER INTERFACE
+     Looks beautiful behind normal page content.
+  ─────────────────────────────────────────────────────────────── */
+
+  .nexus-core {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: min(42vw, 620px);
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    opacity: .45;
+    filter: blur(.2px);
+  }
+
+  .nexus-core::before,
+  .nexus-core::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  .nexus-core::before {
+    border: 1px solid rgba(116, 151, 255, .09);
+    box-shadow:
+      0 0 60px rgba(82, 112, 255, .06),
+      inset 0 0 80px rgba(40, 110, 255, .04);
+    animation: nexusSpin 30s linear infinite;
+  }
+
+  .nexus-core::after {
+    inset: 8%;
+    border: 1px dashed rgba(122, 210, 255, .055);
+    animation: nexusSpinReverse 22s linear infinite;
+  }
+
+  @keyframes nexusSpin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes nexusSpinReverse {
+    to { transform: rotate(-360deg); }
+  }
+
+  /* Small orbital points */
+
+  .nexus-orbit {
+    position: absolute;
+    inset: 18%;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.035);
+    transform: rotate(-20deg);
+  }
+
+  .nexus-orbit span {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #8eeaff;
+    box-shadow:
+      0 0 8px #8eeaff,
+      0 0 24px rgba(83, 224, 255, .8);
+    left: 50%;
+    top: -2px;
+    transform: translateX(-50%);
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     PERFORMANCE / MOBILE
+  ─────────────────────────────────────────────────────────────── */
+
+  @media (max-width: 700px) {
+
+    .nexus-atmosphere {
+      opacity: .45;
+    }
+
+    .nexus-core {
+      width: 85vw;
+      opacity: .3;
+    }
+
+    .nexus-grain {
+      opacity: .02;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+
+    .nexus-atmosphere,
+    .nexus-grain,
+    .nexus-core::before,
+    .nexus-core::after {
+      animation: none !important;
+    }
+  }
+</style>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     VISUAL LAYER
+═══════════════════════════════════════════════════════════════════ -->
+
+<div id="nexus-stage">
+
+  <canvas id="nexus-canvas"></canvas>
+
+  <div class="nexus-atmosphere"></div>
+
+  <div class="nexus-core">
+    <div class="nexus-orbit">
+      <span></span>
+    </div>
+  </div>
+
+  <div class="nexus-scanlines"></div>
+  <div class="nexus-grain"></div>
+  <div class="nexus-vignette"></div>
+
+</div>
+
+
+<script type="module">
+
+/* ═══════════════════════════════════════════════════════════════════
+   NEXUS // LIQUID SINGULARITY ENGINE
+═══════════════════════════════════════════════════════════════════ */
+
+const canvas = document.getElementById("nexus-canvas");
+const ctx = canvas.getContext("2d", {
+  alpha: true,
+  desynchronized: true
+});
+
+let W = 0;
+let H = 0;
+let DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+let mouse = {
+  x: innerWidth / 2,
+  y: innerHeight / 2,
+  tx: innerWidth / 2,
+  ty: innerHeight / 2,
+  vx: 0,
+  vy: 0
+};
+
+let time = 0;
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   COLOR SYSTEM
+═══════════════════════════════════════════════════════════════════ */
+
+const palette = [
+  { h: 188, s: 100, l: 65 },
+  { h: 214, s: 100, l: 68 },
+  { h: 254, s: 100, l: 72 },
+  { h: 306, s: 100, l: 70 },
+  { h: 166, s: 100, l: 63 }
+];
+
+function hsla(h, s, l, a = 1) {
+  return `hsla(${h},${s}%,${l}%,${a})`;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESIZE
+═══════════════════════════════════════════════════════════════════ */
+
+function resize() {
+
+  W = innerWidth;
+  H = innerHeight;
+
+  DPR = Math.min(devicePixelRatio || 1, 2);
+
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+
+  canvas.style.width = W + "px";
+  canvas.style.height = H + "px";
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+
+window.addEventListener("resize", resize);
+resize();
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   POINTER PHYSICS
+═══════════════════════════════════════════════════════════════════ */
+
+window.addEventListener("pointermove", e => {
+
+  const oldX = mouse.tx;
+  const oldY = mouse.ty;
+
+  mouse.tx = e.clientX;
+  mouse.ty = e.clientY;
+
+  mouse.vx = e.clientX - oldX;
+  mouse.vy = e.clientY - oldY;
+});
+
+
+function updateMouse() {
+
+  mouse.x += (mouse.tx - mouse.x) * .085;
+  mouse.y += (mouse.ty - mouse.y) * .085;
+
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   PARTICLE FIELD
+═══════════════════════════════════════════════════════════════════ */
+
+class Particle {
+
+  constructor() {
+    this.reset(true);
+  }
+
+  reset(initial = false) {
+
+    this.x = Math.random() * W;
+    this.y = Math.random() * H;
+
+    if (!initial) {
+
+      const side = Math.floor(Math.random() * 4);
+
+      if (side === 0) {
+        this.x = -20;
+      }
+
+      if (side === 1) {
+        this.x = W + 20;
+      }
+
+      if (side === 2) {
+        this.y = -20;
+      }
+
+      if (side === 3) {
+        this.y = H + 20;
+      }
+    }
+
+    this.px = this.x;
+    this.py = this.y;
+
+    this.speed = .15 + Math.random() * .55;
+
+    this.size =
+      Math.random() < .94
+        ? Math.random() * 1.3
+        : 1.5 + Math.random() * 2;
+
+    this.alpha = .15 + Math.random() * .75;
+
+    this.phase = Math.random() * Math.PI * 2;
+
+    this.color =
+      palette[Math.floor(Math.random() * palette.length)];
+  }
+
+  update() {
+
+    this.px = this.x;
+    this.py = this.y;
+
+    const dx = mouse.x - this.x;
+    const dy = mouse.y - this.y;
+
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    const influence = Math.max(
+      0,
+      1 - distance / 520
+    );
+
+    /*
+      The particles don't simply follow the cursor.
+
+      They orbit its gravitational field.
+    */
+
+    const angle = Math.atan2(dy, dx);
+
+    const force =
+      influence *
+      influence *
+      .85;
+
+    const swirl = Math.sin(
+      time * .0005 +
+      this.phase
+    ) * .35;
+
+    this.x +=
+      Math.cos(angle + Math.PI / 2) *
+      force *
+      (1.2 + swirl);
+
+    this.y +=
+      Math.sin(angle + Math.PI / 2) *
+      force *
+      (1.2 + swirl);
+
+    this.x +=
+      Math.sin(this.y * .002 + time * .00025) *
+      this.speed;
+
+    this.y +=
+      Math.cos(this.x * .002 + time * .0002) *
+      this.speed;
+
+    /*
+      Cursor repulsion at very close range.
+    */
+
+    if (distance < 90) {
+
+      const repel =
+        (90 - distance) / 90;
+
+      this.x -=
+        Math.cos(angle) *
+        repel *
+        1.8;
+
+      this.y -=
+        Math.sin(angle) *
+        repel *
+        1.8;
+    }
+
+    /*
+      Wrap around screen.
+    */
+
+    if (this.x < -30) this.x = W + 30;
+    if (this.x > W + 30) this.x = -30;
+
+    if (this.y < -30) this.y = H + 30;
+    if (this.y > H + 30) this.y = -30;
+  }
+
+  draw() {
+
+    const c = this.color;
+
+    ctx.beginPath();
+
+    ctx.fillStyle = hsla(
+      c.h,
+      c.s,
+      c.l,
+      this.alpha
+    );
+
+    ctx.arc(
+      this.x,
+      this.y,
+      this.size,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.fill();
+
+    /*
+      Tiny velocity trails.
+    */
+
+    const dx = this.x - this.px;
+    const dy = this.y - this.py;
+
+    if (Math.abs(dx) + Math.abs(dy) > .4) {
+
+      ctx.beginPath();
+
+      ctx.strokeStyle = hsla(
+        c.h,
+        c.s,
+        c.l,
+        this.alpha * .18
+      );
+
+      ctx.lineWidth = .5;
+
+      ctx.moveTo(this.px, this.py);
+      ctx.lineTo(this.x, this.y);
+
+      ctx.stroke();
+    }
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   PARTICLE COUNT
+═══════════════════════════════════════════════════════════════════ */
+
+const particleCount =
+  Math.min(
+    900,
+    Math.max(
+      350,
+      Math.floor((W * H) / 2200)
+    )
+  );
+
+const particles =
+  Array.from(
+    { length: particleCount },
+    () => new Particle()
+  );
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   ENERGY WAVES
+═══════════════════════════════════════════════════════════════════ */
+
+const waves = [];
+
+function createWave(x, y) {
+
+  waves.push({
+    x,
+    y,
+    radius: 0,
+    life: 1,
+    hue: 185 + Math.random() * 150,
+    speed: 5 + Math.random() * 4
+  });
+
+  /*
+    Limit memory.
+  */
+
+  if (waves.length > 12) {
+    waves.shift();
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   CLICK / TAP
+═══════════════════════════════════════════════════════════════════ */
+
+window.addEventListener("pointerdown", e => {
+
+  createWave(e.clientX, e.clientY);
+
+  /*
+    Shock particles outward.
+  */
+
+  for (const p of particles) {
+
+    const dx = p.x - e.clientX;
+    const dy = p.y - e.clientY;
+
+    const d = Math.sqrt(dx * dx + dy * dy);
+
+    if (d < 260 && d > 1) {
+
+      const power =
+        (260 - d) / 260;
+
+      p.x +=
+        (dx / d) *
+        power *
+        35;
+
+      p.y +=
+        (dy / d) *
+        power *
+        35;
+    }
+  }
+
+});
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   DRAW WAVES
+═══════════════════════════════════════════════════════════════════ */
+
+function drawWaves() {
+
+  for (let i = waves.length - 1; i >= 0; i--) {
+
+    const w = waves[i];
+
+    w.radius += w.speed;
+    w.life -= .012;
+
+    if (w.life <= 0) {
+
+      waves.splice(i, 1);
+      continue;
+    }
+
+    /*
+      Outer glow
+    */
+
+    ctx.beginPath();
+
+    ctx.arc(
+      w.x,
+      w.y,
+      w.radius,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.strokeStyle =
+      hsla(
+        w.hue,
+        100,
+        70,
+        w.life * .15
+      );
+
+    ctx.lineWidth =
+      20 * w.life;
+
+    ctx.stroke();
+
+
+    /*
+      Core ring
+    */
+
+    ctx.beginPath();
+
+    ctx.arc(
+      w.x,
+      w.y,
+      w.radius,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.strokeStyle =
+      hsla(
+        w.hue,
+        100,
+        75,
+        w.life * .65
+      );
+
+    ctx.lineWidth = 1;
+
+    ctx.stroke();
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONNECT NEARBY PARTICLES
+═══════════════════════════════════════════════════════════════════ */
+
+function drawConnections() {
+
+  /*
+    Don't calculate every possible pair.
+    Spatial approximation through sampling.
+  */
+
+  const step =
+    W < 700 ? 5 : 3;
+
+  for (
+    let i = 0;
+    i < particles.length;
+    i += step
+  ) {
+
+    const a = particles[i];
+
+    for (
+      let j = i + step;
+      j < particles.length;
+      j += step
+    ) {
+
+      const b = particles[j];
+
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+
+      const d2 =
+        dx * dx +
+        dy * dy;
+
+      const max =
+        W < 700
+          ? 90 * 90
+          : 125 * 125;
+
+      if (d2 < max) {
+
+        const distance =
+          Math.sqrt(d2);
+
+        const opacity =
+          (1 - distance / Math.sqrt(max))
+          * .13;
+
+        const hue =
+          (a.color.h + b.color.h) / 2;
+
+        ctx.beginPath();
+
+        ctx.strokeStyle =
+          hsla(
+            hue,
+            100,
+            72,
+            opacity
+          );
+
+        ctx.lineWidth = .45;
+
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   CENTRAL SINGULARITY
+═══════════════════════════════════════════════════════════════════ */
+
+function drawSingularity() {
+
+  const x = mouse.x;
+  const y = mouse.y;
+
+  /*
+    Invisible gravitational glow.
+  */
+
+  const gradient =
+    ctx.createRadialGradient(
+      x,
+      y,
+      0,
+      x,
+      y,
+      250
+    );
+
+  gradient.addColorStop(
+    0,
+    "rgba(110,230,255,.12)"
+  );
+
+  gradient.addColorStop(
+    .18,
+    "rgba(93,117,255,.055)"
+  );
+
+  gradient.addColorStop(
+    .5,
+    "rgba(190,60,255,.025)"
+  );
+
+  gradient.addColorStop(
+    1,
+    "rgba(0,0,0,0)"
+  );
+
+  ctx.fillStyle = gradient;
+
+  ctx.beginPath();
+
+  ctx.arc(
+    x,
+    y,
+    250,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.fill();
+
+
+  /*
+    Tiny central star.
+  */
+
+  const core =
+    ctx.createRadialGradient(
+      x,
+      y,
+      0,
+      x,
+      y,
+      18
+    );
+
+  core.addColorStop(
+    0,
+    "rgba(255,255,255,.9)"
+  );
+
+  core.addColorStop(
+    .12,
+    "rgba(120,240,255,.75)"
+  );
+
+  core.addColorStop(
+    .35,
+    "rgba(90,120,255,.18)"
+  );
+
+  core.addColorStop(
+    1,
+    "rgba(0,0,0,0)"
+  );
+
+  ctx.fillStyle = core;
+
+  ctx.beginPath();
+
+  ctx.arc(
+    x,
+    y,
+    18,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.fill();
+
+
+  /*
+    Cursor halo.
+  */
+
+  ctx.beginPath();
+
+  ctx.arc(
+    x,
+    y,
+    26 + Math.sin(time * .003) * 3,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.strokeStyle =
+    "rgba(132,231,255,.14)";
+
+  ctx.lineWidth = .6;
+
+  ctx.stroke();
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   AMBIENT COLOR BLOOMS
+═══════════════════════════════════════════════════════════════════ */
+
+function drawAmbientBlooms() {
+
+  const points = [
+    {
+      x: W * .15,
+      y: H * .20,
+      r: 260,
+      color: "rgba(77,88,255,.035)"
+    },
+    {
+      x: W * .82,
+      y: H * .30,
+      r: 300,
+      color: "rgba(0,213,255,.028)"
+    },
+    {
+      x: W * .72,
+      y: H * .86,
+      r: 350,
+      color: "rgba(255,0,170,.025)"
+    }
+  ];
+
+  for (const p of points) {
+
+    const g =
+      ctx.createRadialGradient(
+        p.x,
+        p.y,
+        0,
+        p.x,
+        p.y,
+        p.r
+      );
+
+    g.addColorStop(0, p.color);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+
+    ctx.fillStyle = g;
+
+    ctx.beginPath();
+
+    ctx.arc(
+      p.x,
+      p.y,
+      p.r,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.fill();
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAIN RENDER LOOP
+═══════════════════════════════════════════════════════════════════ */
+
+function render(now) {
+
+  time = now;
+
+  updateMouse();
+
+  /*
+    Cinematic fade instead of clearing completely.
+    This creates microscopic persistence.
+  */
+
+  ctx.globalCompositeOperation = "source-over";
+
+  ctx.fillStyle =
+    "rgba(1,3,7,.20)";
+
+  ctx.fillRect(
+    0,
+    0,
+    W,
+    H
+  );
+
+  /*
+    Additive light.
+  */
+
+  ctx.globalCompositeOperation = "lighter";
+
+  drawAmbientBlooms();
+
+  drawConnections();
+
+  for (const p of particles) {
+
+    p.update();
+    p.draw();
+  }
+
+  drawWaves();
+
+  drawSingularity();
+
+  ctx.globalCompositeOperation = "source-over";
+
+  requestAnimationFrame(render);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   START
+═══════════════════════════════════════════════════════════════════ */
+
+ctx.fillStyle = "#010307";
+
+ctx.fillRect(
+  0,
+  0,
+  W,
+  H
+);
+
+requestAnimationFrame(render);
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   OPTIONAL KEYBOARD EASTER EGG
+═══════════════════════════════════════════════════════════════════ */
+
+window.addEventListener("keydown", e => {
+
+  if (e.code === "Space") {
+
+    createWave(
+      mouse.x,
+      mouse.y
+    );
+
+  }
+
+});
+
 </script>
-</body>
-</html>
+```
