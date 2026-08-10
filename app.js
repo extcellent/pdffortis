@@ -76,7 +76,6 @@ document.addEventListener('input', function(e){
     span.dataset._draftHistoryPushed = '1';
     span.dataset._draftFinalText = currentText;
   } else {
-    // Folgeinputs → nur den Redo-Ziel-Text aktualisieren
     span.dataset._draftFinalText = currentText;
   }
 });
@@ -114,7 +113,7 @@ document.addEventListener('keydown', e=>{
   if(!mod) return;
   const key = e.key.toLowerCase();
   if(key==='z' && !e.shiftKey){
-    if(inTextField) return; // native Undo im Textfeld hat Vorrang
+    if(inTextField) return; 
     e.preventDefault(); undo();
   }else if(key==='y' || (key==='z' && e.shiftKey)){
     if(inTextField) return;
@@ -330,15 +329,15 @@ function renderHistoryOverlay(){
 
   const actionLabels = {signed:'Signed', add_text:'Add Text', add_image:'Add Image', add_date:'Add Date', add_initials:'Add Initials'};
   const boxWidth = 150;
-  const lineLen = 34;           // kurzer Strich statt bis zum Rand
-  const gap = 8;                // Mindestabstand zwischen gestapelten Boxen
-  const placed = { left: [], right: [] }; // already placed boxes per side, for collision checking
+  const lineLen = 34;   
+  const gap = 8;
+  const placed = { left: [], right: [] }; 
 
   entries.forEach(entry => {
     const anchorX = entry.x * scaleX;
     const anchorY = canvasCssH - (entry.y * scaleY);
 
-// Always at the fixed canvas edge, regardless of how far the change is from there
+  // Always at the fixed canvas edge, regardless of how far the change is from there
     const side = anchorX < canvasCssW / 2 ? 'right' : 'left';
     const boxLeft = side === 'right'
       ? canvasCssW - boxWidth - 8
@@ -379,7 +378,6 @@ function renderHistoryOverlay(){
     placed[side].push({ top: boxTop, bottom: boxTop + box.offsetHeight });
   });
 }
-// NEU — History-Toggle-Button-Logik, direkt dahinter:
 let historyOverlayOn = false;
 
 function updateHistoryButtonVisibility(){
@@ -482,9 +480,8 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
   window._pfItemCounts = window._pfItemCounts || {};
   window._pfItemCounts[pageNum] = items.length;
 
-  // imgWidth ist 2x (Matrix 2,2) → native PDF Breite
   const pdfNativeWidth=imgWidth/2;
-  // scale: wie viel Canvas-Pixel pro PDF-Punkt
+
   const scale=canvasWidth/pdfNativeWidth;
 
   // pageHeight from backend = actual PDF height in points
@@ -510,7 +507,6 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
     span.dataset.originalText = existingEdit ? existingEdit.spanOrigText : item.text;
     span.dataset.editedText   = existingEdit ? existingEdit.newText : item.text;
 
-    //neu
     span.dataset.pdfItemIndex = itemIdx;
     
     span.dataset.pageNumber=pageNum;
@@ -524,12 +520,12 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
     span.dataset.pdfFont=item.font||'';
     span.dataset.pdfFlags=item.flags||0;
 
-    // Farbe (PyMuPDF gibt int sRGB)
+    // Color (PyMuPDF gives  int sRGB)
     const ci=item.color|0;
     const r=(ci>>16)&255, g=(ci>>8)&255, b=ci&255;
     const rgb=`rgb(${r},${g},${b})`;
 
-    // Font-Family aus Fontnamen ableiten
+    // Font-Family out of Fontnamen 
     const fn=(item.font||'').toLowerCase();
     const fl=item.flags||0;
     let family='Arial, Helvetica, sans-serif';
@@ -568,7 +564,7 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
     span.dataset.cssStyle=style;    
 
     if(existingEdit){
-      span.style.color = rgb;         // sichtbar statt transparent
+      span.style.color = rgb;         
       span.classList.add('is-edited');
     }
 
@@ -612,7 +608,6 @@ function setMode(m){
   ca.className='canvas-area '+(m==='look'?'look-mode':'edit-mode');
   const ol=document.getElementById('overlay-layer');
   ol.style.pointerEvents=m==='edit'?'all':'none';
-  // Text-layer direkt updaten ohne Event
   const editActive=(m==='edit'&&currentTab==='edit');
   const layer=document.querySelector('.pdf-text-layer');
   if(layer){
@@ -763,7 +758,7 @@ function addTextBox(x,y){
     document.addEventListener('mouseup',up);
   });
 
-  // ── TOOLBAR AKTIONEN ──
+  // ── TOOLBAR ACTION ──
   fontSel.addEventListener('change',()=>{body.style.fontFamily=fontSel.value});
   sizeInp.addEventListener('input',()=>{body.style.fontSize=sizeInp.value+'px'});
   colorPick.addEventListener('input',()=>{body.style.color=colorPick.value});
@@ -1679,7 +1674,7 @@ async function restoreSessionFromStorage(){
       name: s.user.user_metadata?.name || s.user.email?.split('@')[0] || 'User',
       token: s.user.access_token
     };
-    // Subscription-Status nachladen, damit isPaidUser() nach Reload/Redirect korrekt ist
+    // Subscription-Status loading, so isPaidUser() after Reload/Redirect is correct
     try{
       const profile = await sbGetProfile(currentUser.id, currentUser.token);
       currentSubscription = {
@@ -1837,7 +1832,6 @@ document.addEventListener('click',function(e){
   });
 });
 
-// 1. SICHERSTELLEN, DASS DIE VARIABLEN GLOBAL EXISTIEREN
 window.activeInlineSpan = window.activeInlineSpan || null;
 window.activeInlineInput = window.activeInlineInput || null;
 
@@ -1875,7 +1869,6 @@ async function openInlineEditor(span){
     const cx=x*scaleX, cy=y*scaleY;
     const cw=(x1-x)*scaleX, ch=(y1-y)*scaleY;
    
-    // === BG-Farbe per CLUSTER-MODE — eng am Text sampeln (1-4px) ===
     // Sampling too wide hits neighboring lines (dark) or leaves
     // colored bars (page=white). Right around the bbox is always the bar's BG.
     const samples=[];
@@ -1895,7 +1888,7 @@ async function openInlineEditor(span){
         pick(cx+cw-1+i,   cy+ch*f, 2);
       }
     }
-    // OBEN/UNTEN: nur 1-2 px (mehr trifft Nachbarzeilen!)
+    // UP/BELOW:5 only 1-2 px (more hits neighbourtext!)
     for(let i=1;i<=2;i++){
       for(let f=0.10;f<=0.90;f+=0.10){
         pick(cx+cw*f, cy-i,     1);
@@ -1940,7 +1933,7 @@ async function openInlineEditor(span){
     const mw =Math.min(canvas.width -mx0, Math.ceil(cw+padX*2));
     const mh =Math.min(canvas.height-my0, Math.ceil(ch+padY*2));
 
-    // === Schritt 1: Text-Pixel finden (Scan, ohne zu schreiben) ===
+    // === Step 1: Text-Pixel  (Scan, without writing) ===
     // → determine the actual top/bottom edge of the glyphs so the mask sits exactly
     let savedData=null;
     try{
@@ -1949,7 +1942,6 @@ async function openInlineEditor(span){
       const TH2=18*18;
       const SOFT2=42*42;
 
-      // Pass 1: ermitteln, in welchen Zeilen Text-Pixel auftreten
       const rowHasText=new Uint8Array(mh);
       const colHasText=new Uint8Array(mw);
       for(let y=0;y<mh;y++){
@@ -2059,7 +2051,7 @@ function _inlineKeyHandler(e){
   }
 }
 // ═══════════════════════════════════════════════════════════════════
-// 3. TEXT-EDITOR SCHLIESSEN & INS PDF SPEICHERN
+// 3. TEXT-EDITOR Closing  & SAVE INTO PDF
 // ═══════════════════════════════════════════════════════════════════
 async function closeInlineEditor(save=true){
   if(!window.activeInlineSpan) return;
@@ -2087,7 +2079,6 @@ async function closeInlineEditor(save=true){
   const restorePage = () => {
     if(!img) return;
     ctx.drawImage(img,0,0,canvas.width,canvas.height);
-    // Bereits zuvor gespeicherte Masken (andere Edits) wieder auftragen
     (pageMasks[pageNum]||[]).forEach(m=>{
       ctx.fillStyle=m.bg;
       ctx.fillRect(m.x,m.y,m.w,m.h);
@@ -2123,7 +2114,6 @@ async function closeInlineEditor(save=true){
     delete span.dataset.maskPage;
   }
 
-  // 2) Neuen Text im Span sichtbar lassen – Original-Farbe/Font
   span.textContent        = newText;
   span.dataset.editedText = newText;
   span.style.color        = span.dataset.cssColor  || 'black';
@@ -2173,7 +2163,6 @@ async function closeInlineEditor(save=true){
     // Draft entry already exists — just set the redo text to the final value
     span.dataset._draftFinalText = newText;
     delete span.dataset._draftHistoryPushed;
-    // Redo-Closure aktualisieren, damit Redo den finalen edit-Zustand wiederherstellt
     const _draftEntry = historyStack[historyIndex];
     const _origUndo = _draftEntry.undo;
     _draftEntry.undo = async () => {
@@ -2237,5 +2226,5 @@ window.addEventListener('load',()=>{
 // ── expose for pdfortis-translate.js ──────────────────────────
 Object.defineProperty(window, 'currentPDF',     { get: () => pdfBytes });
 Object.defineProperty(window, 'currentPageNum', { get: () => currentPage });
-Object.defineProperty(window, 'currentPdfDocLocal', { get: () => pdfDoc });   // NEU
+Object.defineProperty(window, 'currentPdfDocLocal', { get: () => pdfDoc });   
 window.openAuthModal = () => document.getElementById('auth-modal')?.classList.remove('hidden');
