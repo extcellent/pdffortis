@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dream Weaver · Living Art</title>
+    <title>Living Mandala · Bio-Geometric Evolution</title>
     <style>
         * {
             margin: 0;
@@ -11,7 +11,7 @@
             box-sizing: border-box;
         }
         body {
-            background: #0a0a12;
+            background: #0a0a10;
             overflow: hidden;
             height: 100vh;
         }
@@ -25,8 +25,8 @@
             position: fixed;
             pointer-events: none;
             z-index: 999;
-            width: 300px;
-            height: 300px;
+            width: 250px;
+            height: 250px;
             border-radius: 50%;
             background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
             transform: translate(-50%, -50%);
@@ -41,8 +41,8 @@
 
     <script>
         // ================================================================
-        // DREAM WEAVER · LIVING LIGHT ORGANISM
-        // Smooth, beautiful, and actually works
+        // LIVING MANDALA · BIO-GEOMETRIC EVOLUTION
+        // A living organism that grows, breathes, and evolves
         // ================================================================
         
         const canvas = document.getElementById('canvas');
@@ -79,213 +79,184 @@
             }
         }, { passive: true });
 
-        // ---- Color utilities ----
-        function hslToRgb(h, s, l) {
-            h /= 360;
-            s /= 100;
-            l /= 100;
-            let r, g, b;
-            if (s === 0) {
-                r = g = b = l;
-            } else {
-                const hue2rgb = (p, q, t) => {
-                    if (t < 0) t += 1;
-                    if (t > 1) t -= 1;
-                    if (t < 1/6) return p + (q - p) * 6 * t;
-                    if (t < 1/2) return q;
-                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-                    return p;
-                };
-                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-                const p = 2 * l - q;
-                r = hue2rgb(p, q, h + 1/3);
-                g = hue2rgb(p, q, h);
-                b = hue2rgb(p, q, h - 1/3);
-            }
-            return [r * 255, g * 255, b * 255];
-        }
-
-        // ---- Particle class ----
-        class Particle {
+        // ---- Living Mandala System ----
+        class Mandala {
             constructor() {
-                this.reset();
-                this.hue = Math.random() * 360;
-                this.sat = 70 + Math.random() * 30;
-                this.light = 50 + Math.random() * 30;
-                this.size = 2 + Math.random() * 3;
+                this.segments = 12;
+                this.layers = 6;
+                this.points = [];
+                this.time = 0;
                 this.phase = Math.random() * Math.PI * 2;
-                this.vx = (Math.random() - 0.5) * 0.5;
-                this.vy = (Math.random() - 0.5) * 0.5;
-                this.trail = [];
-                this.maxTrail = 8 + Math.floor(Math.random() * 8);
-                this.pulse = Math.random() * Math.PI * 2;
-                this.angle = Math.random() * Math.PI * 2;
-                this.speed = 0.5 + Math.random() * 1;
-                this.isStar = Math.random() > 0.85;
+                this.colorHue = Math.random() * 360;
+                this.evolution = 0;
+                this.generate();
             }
 
-            reset() {
-                this.x = Math.random() * W;
-                this.y = Math.random() * H;
-                this.radius = 1 + Math.random() * 2;
+            generate() {
+                this.points = [];
+                for (let layer = 0; layer < this.layers; layer++) {
+                    const radius = 30 + (layer / (this.layers - 1)) * Math.min(W, H) * 0.4;
+                    const count = this.segments * (layer + 1);
+                    const layerPoints = [];
+                    
+                    for (let i = 0; i < count; i++) {
+                        const angle = (i / count) * Math.PI * 2;
+                        const wobble = 0.2 + Math.sin(i * 0.7 + layer) * 0.3;
+                        layerPoints.push({
+                            angle: angle,
+                            radius: radius,
+                            wobble: wobble,
+                            phase: Math.random() * Math.PI * 2,
+                            speed: 0.5 + Math.random() * 0.5
+                        });
+                    }
+                    this.points.push(layerPoints);
+                }
             }
 
             update(mx, my) {
-                const dx = mx - this.x;
-                const dy = my - this.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+                this.time += 0.01;
+                this.evolution += 0.001;
+                this.colorHue = (this.colorHue + 0.05) % 360;
                 
-                // Attraction to mouse
-                if (dist > 1) {
-                    const force = 0.005 * (1 + 30 / (dist + 10));
-                    this.vx += (dx / dist) * force;
-                    this.vy += (dy / dist) * force;
+                // Mouse influence
+                const dx = mx - W/2;
+                const dy = my - H/2;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const maxDist = Math.min(W, H) * 0.5;
+                const influence = Math.min(dist / maxDist, 1);
+                
+                // Evolve structure based on time
+                if (this.time % 5 < 0.01) {
+                    this.segments = 8 + Math.floor(Math.sin(this.evolution) * 4 + 8);
+                    this.layers = 4 + Math.floor(Math.sin(this.evolution * 0.7) * 2 + 4);
+                    this.generate();
                 }
-
-                // Edge repulsion
-                const edge = 30;
-                if (this.x < edge) this.vx += 0.02;
-                if (this.x > W - edge) this.vx -= 0.02;
-                if (this.y < edge) this.vy += 0.02;
-                if (this.y > H - edge) this.vy -= 0.02;
-
-                // Damping
-                this.vx *= 0.99;
-                this.vy *= 0.99;
-
-                // Speed limit
-                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-                if (speed > 1.5) {
-                    this.vx = (this.vx / speed) * 1.5;
-                    this.vy = (this.vy / speed) * 1.5;
-                }
-
-                // Update position
-                this.x += this.vx;
-                this.y += this.vy;
-
-                // Organic wobble
-                this.angle += 0.02;
-                this.x += Math.sin(this.angle + this.phase) * 0.05;
-                this.y += Math.cos(this.angle * 0.7 + this.phase) * 0.05;
-
-                // Trail
-                this.trail.push({ x: this.x, y: this.y });
-                if (this.trail.length > this.maxTrail) {
-                    this.trail.shift();
-                }
-
-                // Color evolution
-                this.hue = (this.hue + 0.15) % 360;
-                this.light = 50 + Math.sin(Date.now() * 0.001 + this.phase) * 20;
-                this.pulse += 0.03;
             }
 
             draw(ctx) {
-                const pulse = 1 + Math.sin(this.pulse) * 0.15;
+                const centerX = W/2;
+                const centerY = H/2;
                 
-                // Draw trail
-                if (this.trail.length > 1) {
-                    for (let i = 1; i < this.trail.length; i++) {
-                        const alpha = (i / this.trail.length) * 0.2;
-                        const size = (i / this.trail.length) * this.radius * 0.6 * pulse;
+                // Draw connections between layers
+                for (let l = 0; l < this.points.length - 1; l++) {
+                    const layer1 = this.points[l];
+                    const layer2 = this.points[l + 1];
+                    
+                    for (let i = 0; i < Math.min(layer1.length, layer2.length); i++) {
+                        const p1 = layer1[i % layer1.length];
+                        const p2 = layer2[i % layer2.length];
+                        
+                        const time1 = this.time * p1.speed + p1.phase;
+                        const time2 = this.time * p2.speed + p2.phase;
+                        
+                        const r1 = p1.radius * (1 + Math.sin(time1) * p1.wobble * 0.3);
+                        const r2 = p2.radius * (1 + Math.sin(time2) * p2.wobble * 0.3);
+                        
+                        const x1 = centerX + Math.cos(p1.angle + this.time * 0.1) * r1;
+                        const y1 = centerY + Math.sin(p1.angle + this.time * 0.1) * r1;
+                        const x2 = centerX + Math.cos(p2.angle + this.time * 0.1) * r2;
+                        const y2 = centerY + Math.sin(p2.angle + this.time * 0.1) * r2;
+                        
+                        const hue = (this.colorHue + i * 360 / layer1.length + l * 20) % 360;
+                        const alpha = 0.1 + Math.sin(this.time + i * 0.1) * 0.05 + 0.05;
+                        
                         ctx.beginPath();
-                        ctx.arc(this.trail[i].x, this.trail[i].y, size, 0, Math.PI * 2);
-                        ctx.fillStyle = `hsla(${this.hue + i * 5}, ${this.sat}%, ${this.light + i * 3}%, ${alpha})`;
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(x2, y2);
+                        ctx.strokeStyle = `hsla(${hue}, 80%, 70%, ${alpha})`;
+                        ctx.lineWidth = 0.5 + Math.sin(this.time * 0.5 + i) * 0.5;
+                        ctx.stroke();
+                    }
+                }
+
+                // Draw points with glow
+                for (let l = 0; l < this.points.length; l++) {
+                    const layer = this.points[l];
+                    
+                    for (let i = 0; i < layer.length; i++) {
+                        const p = layer[i];
+                        const time = this.time * p.speed + p.phase;
+                        const radius = p.radius * (1 + Math.sin(time) * p.wobble * 0.3);
+                        
+                        const x = centerX + Math.cos(p.angle + this.time * 0.1) * radius;
+                        const y = centerY + Math.sin(p.angle + this.time * 0.1) * radius;
+                        
+                        const hue = (this.colorHue + i * 360 / layer.length + l * 30) % 360;
+                        const size = 2 + Math.sin(time) * 1 + 2;
+                        
+                        // Glow
+                        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size * 4);
+                        gradient.addColorStop(0, `hsla(${hue}, 100%, 80%, 0.6)`);
+                        gradient.addColorStop(0.5, `hsla(${hue + 30}, 100%, 60%, 0.2)`);
+                        gradient.addColorStop(1, `hsla(${hue + 60}, 100%, 40%, 0)`);
+                        
+                        ctx.beginPath();
+                        ctx.arc(x, y, size * 4, 0, Math.PI * 2);
+                        ctx.fillStyle = gradient;
+                        ctx.fill();
+                        
+                        // Core
+                        ctx.beginPath();
+                        ctx.arc(x, y, size * 0.5, 0, Math.PI * 2);
+                        ctx.fillStyle = `hsla(${hue + 60}, 100%, 90%, 0.8)`;
                         ctx.fill();
                     }
                 }
 
-                // Glow
-                const gradient = ctx.createRadialGradient(
-                    this.x, this.y, 0,
-                    this.x, this.y, this.radius * 5 * pulse
-                );
-                gradient.addColorStop(0, `hsla(${this.hue}, ${this.sat}%, ${this.light}%, 0.8)`);
-                gradient.addColorStop(0.3, `hsla(${this.hue + 20}, ${this.sat}%, ${this.light}%, 0.3)`);
-                gradient.addColorStop(1, `hsla(${this.hue + 40}, ${this.sat}%, ${this.light}%, 0)`);
-                
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius * 5 * pulse, 0, Math.PI * 2);
-                ctx.fillStyle = gradient;
-                ctx.fill();
-
-                // Core
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius * 0.8 * pulse, 0, Math.PI * 2);
-                ctx.fillStyle = `hsla(${this.hue + 30}, 100%, 90%, 0.9)`;
-                ctx.fill();
-
-                // Star
-                if (this.isStar) {
-                    ctx.save();
-                    ctx.translate(this.x, this.y);
-                    ctx.rotate(Date.now() * 0.001 + this.phase);
-                    ctx.beginPath();
-                    for (let i = 0; i < 5; i++) {
-                        const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
-                        const outer = this.radius * 2.5 * pulse;
-                        const inner = this.radius * 1 * pulse;
-                        if (i === 0) {
-                            ctx.moveTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
-                        } else {
-                            ctx.lineTo(Math.cos(angle - Math.PI/5) * inner, Math.sin(angle - Math.PI/5) * inner);
-                            ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
-                        }
-                    }
-                    ctx.closePath();
-                    ctx.fillStyle = `hsla(${this.hue + 60}, 100%, 85%, 0.4)`;
-                    ctx.fill();
-                    ctx.restore();
-                }
-            }
-        }
-
-        // ---- Create particles ----
-        const particles = [];
-        const count = 150;
-        for (let i = 0; i < count; i++) {
-            particles.push(new Particle());
-        }
-
-        // ---- Connections ----
-        function drawConnections(ctx) {
-            for (let i = 0; i < particles.length; i++) {
-                for (let j = i + 1; j < particles.length; j++) {
-                    const dx = particles[i].x - particles[j].x;
-                    const dy = particles[i].y - particles[j].y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
+                // Draw radial beams
+                for (let i = 0; i < this.points[0].length; i++) {
+                    const p = this.points[0][i];
+                    const time = this.time * p.speed + p.phase;
+                    const radius = p.radius * (1 + Math.sin(time) * p.wobble * 0.3);
                     
-                    if (dist < 100) {
-                        const alpha = (1 - dist / 100) * 0.08;
-                        const hue = (particles[i].hue + particles[j].hue) / 2;
-                        ctx.beginPath();
-                        ctx.moveTo(particles[i].x, particles[i].y);
-                        ctx.lineTo(particles[j].x, particles[j].y);
-                        ctx.strokeStyle = `hsla(${hue}, 80%, 70%, ${alpha})`;
-                        ctx.lineWidth = 0.5;
-                        ctx.stroke();
-                    }
+                    const x = centerX + Math.cos(p.angle + this.time * 0.1) * radius;
+                    const y = centerY + Math.sin(p.angle + this.time * 0.1) * radius;
+                    
+                    const hue = (this.colorHue + i * 360 / this.points[0].length) % 360;
+                    
+                    // Beam from center to point
+                    const gradient = ctx.createLinearGradient(centerX, centerY, x, y);
+                    gradient.addColorStop(0, `hsla(${hue}, 100%, 80%, 0)`);
+                    gradient.addColorStop(0.5, `hsla(${hue + 20}, 100%, 70%, 0.03)`);
+                    gradient.addColorStop(1, `hsla(${hue + 40}, 100%, 60%, 0.1)`);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    ctx.lineTo(x, y);
+                    ctx.strokeStyle = gradient;
+                    ctx.lineWidth = 1 + Math.sin(this.time + i) * 0.5;
+                    ctx.stroke();
                 }
             }
+        }
+
+        // ---- Create multiple mandalas ----
+        const mandalas = [];
+        const count = 3;
+        for (let i = 0; i < count; i++) {
+            const m = new Mandala();
+            m.phase = (i / count) * Math.PI * 2;
+            m.colorHue = (i / count) * 360;
+            mandalas.push(m);
         }
 
         // ---- Background nebula ----
-        function drawNebula(ctx) {
+        function drawBackground(ctx) {
             const time = Date.now() * 0.0001;
             const gradient = ctx.createRadialGradient(
-                W * 0.3 + Math.sin(time) * 80,
-                H * 0.4 + Math.cos(time * 0.7) * 80,
+                W * 0.3 + Math.sin(time) * 100,
+                H * 0.3 + Math.cos(time * 0.7) * 100,
                 0,
                 W * 0.5,
                 H * 0.5,
-                Math.max(W, H) * 0.7
+                Math.max(W, H) * 0.8
             );
             
-            const hue = (Date.now() * 0.003) % 360;
-            gradient.addColorStop(0, `hsla(${hue}, 70%, 15%, 0.08)`);
-            gradient.addColorStop(0.5, `hsla(${hue + 40}, 60%, 10%, 0.04)`);
-            gradient.addColorStop(1, 'rgba(10, 10, 18, 0)');
+            const hue = (Date.now() * 0.002) % 360;
+            gradient.addColorStop(0, `hsla(${hue}, 60%, 8%, 0.3)`);
+            gradient.addColorStop(0.5, `hsla(${hue + 40}, 50%, 5%, 0.1)`);
+            gradient.addColorStop(1, 'rgba(10, 10, 16, 0)');
             
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, W, H);
@@ -293,14 +264,11 @@
 
         // ---- Click to transform ----
         function transform() {
-            particles.forEach(p => {
-                p.vx += (Math.random() - 0.5) * 8;
-                p.vy += (Math.random() - 0.5) * 8;
-                p.hue = Math.random() * 360;
-                p.sat = 80 + Math.random() * 20;
-                p.light = 60 + Math.random() * 30;
-                p.maxTrail = 10 + Math.floor(Math.random() * 10);
-                p.isStar = Math.random() > 0.85;
+            mandalas.forEach(m => {
+                m.segments = 6 + Math.floor(Math.random() * 10);
+                m.layers = 3 + Math.floor(Math.random() * 6);
+                m.colorHue = Math.random() * 360;
+                m.generate();
             });
         }
 
@@ -316,28 +284,23 @@
             mx += (tx - mx) * 0.05;
             my += (ty - my) * 0.05;
 
-            // Clear with trail
-            ctx.fillStyle = 'rgba(10, 10, 18, 0.1)';
+            // Clear
+            ctx.fillStyle = 'rgba(10, 10, 16, 0.05)';
             ctx.fillRect(0, 0, W, H);
             
-            drawNebula(ctx);
+            drawBackground(ctx);
 
-            // Update and draw
-            for (const p of particles) {
-                p.update(mx, my);
-                p.draw(ctx);
+            // Update and draw mandalas
+            for (const m of mandalas) {
+                m.update(mx, my);
+                m.draw(ctx);
             }
 
-            drawConnections(ctx);
-
-            // Vignette
-            const vignette = ctx.createRadialGradient(
-                W/2, H/2, H * 0.2,
-                W/2, H/2, H * 0.9
-            );
-            vignette.addColorStop(0, 'rgba(0,0,0,0)');
-            vignette.addColorStop(1, 'rgba(0,0,0,0.2)');
-            ctx.fillStyle = vignette;
+            // Mouse influence overlay
+            const gradient = ctx.createRadialGradient(mx, my, 0, mx, my, 150);
+            gradient.addColorStop(0, 'rgba(255,255,255,0.02)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, W, H);
 
             requestAnimationFrame(animate);
@@ -347,10 +310,6 @@
 
         window.addEventListener('resize', () => {
             resize();
-            particles.forEach(p => {
-                p.x = Math.min(p.x, W);
-                p.y = Math.min(p.y, H);
-            });
         });
     </script>
 </body>
