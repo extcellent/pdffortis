@@ -1,108 +1,133 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1.0"
+>
 
 <style>
+
 html,
 body {
-    margin: 0;
-    padding: 0;
+
     width: 100%;
     height: 100%;
+
+    margin: 0;
+    padding: 0;
+
     overflow: hidden;
+
     background: transparent;
+
+}
+
+body {
+
+    position: relative;
+
 }
 
 canvas {
-    position: fixed;
+
+    position: absolute;
+
     inset: 0;
+
     width: 100%;
     height: 100%;
+
     display: block;
+
 }
+
+#tubes {
+
+    z-index: 1;
+
+}
+
+#fractures {
+
+    z-index: 2;
+
+    pointer-events: none;
+
+}
+
+#glow {
+
+    z-index: 3;
+
+    pointer-events: none;
+
+    mix-blend-mode: screen;
+
+}
+
 </style>
+
 </head>
 
 <body>
 
-<canvas id="blackhole"></canvas>
+<canvas id="tubes"></canvas>
+
+<canvas id="fractures"></canvas>
+
+<canvas id="glow"></canvas>
+
 
 <script>
 
-(() => {
-
-"use strict";
-
 /* ================================================================
-   NEXUS BLACK HOLE
-   Self-contained WebGL2/WEBGL iframe background
+   
+   F R A C T U R E D   D I M E N S I O N
+   
+   A procedural rainbow reality fracture.
+   
    ================================================================ */
 
-const canvas =
-    document.getElementById("blackhole");
 
-const gl =
-    canvas.getContext("webgl2", {
-        alpha: true,
-        antialias: false,
-        depth: false,
-        stencil: false,
-        powerPreference: "high-performance"
-    }) ||
-    canvas.getContext("webgl", {
-        alpha: true,
-        antialias: false,
-        depth: false,
-        stencil: false,
-        powerPreference: "high-performance"
-    });
+/* ================================================================
+   CANVASES
+   ================================================================ */
 
-if (!gl) {
-    console.error("WebGL unavailable");
-    return;
-}
+const tubesCanvas =
+    document.getElementById("tubes");
+
+const fractureCanvas =
+    document.getElementById("fractures");
+
+const glowCanvas =
+    document.getElementById("glow");
+
+const ctx =
+    fractureCanvas.getContext("2d");
+
+const glow =
+    glowCanvas.getContext("2d");
 
 
 /* ================================================================
-   STATE
+   SIZE
    ================================================================ */
 
 let W = 1;
 let H = 1;
-let DPR = Math.min(window.devicePixelRatio || 1, 2);
-
-const mouse = {
-    x: .5,
-    y: .5,
-
-    tx: .5,
-    ty: .5,
-
-    vx: 0,
-    vy: 0,
-
-    speed: 0
-};
-
-let lastMouseX = .5;
-let lastMouseY = .5;
-
-let startTime = performance.now();
-
-let pulse = 0;
-let explosion = 0;
-
-
-/* ================================================================
-   RESIZE
-   ================================================================ */
+let DPR = 1;
 
 function resize() {
 
-    W = Math.max(1, window.innerWidth);
-    H = Math.max(1, window.innerHeight);
+    W =
+        window.innerWidth;
+
+    H =
+        window.innerHeight;
 
     DPR =
         Math.min(
@@ -110,1396 +135,1471 @@ function resize() {
             2
         );
 
-    canvas.width =
-        Math.floor(W * DPR);
+    fractureCanvas.width =
+        W * DPR;
 
-    canvas.height =
-        Math.floor(H * DPR);
+    fractureCanvas.height =
+        H * DPR;
 
-    canvas.style.width =
+    glowCanvas.width =
+        W * DPR;
+
+    glowCanvas.height =
+        H * DPR;
+
+    fractureCanvas.style.width =
         W + "px";
 
-    canvas.style.height =
+    fractureCanvas.style.height =
         H + "px";
 
-    gl.viewport(
+    glowCanvas.style.width =
+        W + "px";
+
+    glowCanvas.style.height =
+        H + "px";
+
+    ctx.setTransform(
+        DPR,
         0,
         0,
-        canvas.width,
-        canvas.height
+        DPR,
+        0,
+        0
     );
+
+    glow.setTransform(
+        DPR,
+        0,
+        0,
+        DPR,
+        0,
+        0
+    );
+
 }
+
+resize();
 
 window.addEventListener(
     "resize",
     resize
 );
 
-resize();
-
 
 /* ================================================================
    POINTER
    ================================================================ */
 
+const mouse = {
+
+    x: W * .5,
+    y: H * .5,
+
+    tx: W * .5,
+    ty: H * .5,
+
+    vx: 0,
+    vy: 0,
+
+    speed: 0
+
+};
+
+
+let previousX =
+    mouse.x;
+
+let previousY =
+    mouse.y;
+
+
 window.addEventListener(
     "pointermove",
     e => {
 
-        const nx =
-            e.clientX / W;
+        mouse.tx =
+            e.clientX;
 
-        const ny =
-            e.clientY / H;
+        mouse.ty =
+            e.clientY;
 
         mouse.vx =
-            nx - lastMouseX;
+            mouse.tx -
+            previousX;
 
         mouse.vy =
-            ny - lastMouseY;
+            mouse.ty -
+            previousY;
 
         mouse.speed =
             Math.min(
-                1,
+                35,
                 Math.sqrt(
-                    mouse.vx * mouse.vx +
-                    mouse.vy * mouse.vy
-                ) * 12
+                    mouse.vx *
+                    mouse.vx +
+                    mouse.vy *
+                    mouse.vy
+                )
             );
 
-        mouse.tx = nx;
-        mouse.ty = ny;
+        previousX =
+            mouse.tx;
 
-        lastMouseX = nx;
-        lastMouseY = ny;
+        previousY =
+            mouse.ty;
+
     },
-    { passive: true }
+    {
+        passive: true
+    }
 );
 
 
 /* ================================================================
-   INTERACTION
+   FRACTURE SYSTEM
    ================================================================ */
 
-window.addEventListener(
-    "pointerdown",
-    () => {
+const fractures = [];
 
-        pulse = 1;
-        explosion = 1;
+const MAX_FRACTURES =
+    18;
 
-    },
-    { passive: true }
-);
 
-window.addEventListener(
-    "dblclick",
-    () => {
+/* ================================================================
+   RANDOM
+   ================================================================ */
 
-        pulse = 1.5;
-        explosion = 1.5;
+function random(
+    min,
+    max
+) {
+
+    return (
+        Math.random() *
+        (
+            max -
+            min
+        )
+    ) + min;
+
+}
+
+
+/* ================================================================
+   CREATE FRACTURE
+   ================================================================ */
+
+function createFracture(
+    x,
+    y,
+    angle,
+    length,
+    depth = 0
+) {
+
+    if (
+        depth >
+        4
+    ) {
+        return;
+    }
+
+
+    const points = [];
+
+    let px =
+        x;
+
+    let py =
+        y;
+
+    let direction =
+        angle;
+
+
+    const segments =
+        Math.floor(
+            random(
+                7,
+                18
+            )
+        );
+
+
+    for (
+        let i = 0;
+        i < segments;
+        i++
+    ) {
+
+        direction +=
+            random(
+                -.42,
+                .42
+            );
+
+
+        const step =
+            length /
+            segments *
+            random(
+                .65,
+                1.35
+            );
+
+
+        px +=
+            Math.cos(
+                direction
+            ) *
+            step;
+
+        py +=
+            Math.sin(
+                direction
+            ) *
+            step;
+
+
+        points.push({
+
+            x: px,
+
+            y: py
+
+        });
+
+    }
+
+
+    fractures.push({
+
+        x,
+        y,
+
+        angle,
+
+        points,
+
+        life: 1,
+
+        width:
+            random(
+                .8,
+                2.8
+            ),
+
+        hue:
+            random(
+                0,
+                360
+            ),
+
+        phase:
+            random(
+                0,
+                Math.PI * 2
+            ),
+
+        depth
+
+    });
+
+
+    /*
+    Branches.
+
+    */
+
+    if (
+        depth <
+        3 &&
+        Math.random() <
+        .72
+    ) {
+
+        const branchIndex =
+            Math.floor(
+                random(
+                    2,
+                    segments - 2
+                )
+            );
+
+
+        const branch =
+            points[
+                branchIndex
+            ];
+
+
+        createFracture(
+
+            branch.x,
+
+            branch.y,
+
+            angle +
+            random(
+                -.9,
+                .9
+            ),
+
+            length *
+            random(
+                .35,
+                .65
+            ),
+
+            depth + 1
+
+        );
+
+    }
+
+}
+
+
+/* ================================================================
+   INITIAL FRACTURE NETWORK
+   ================================================================ */
+
+function generateFractures() {
+
+    fractures.length =
+        0;
+
+
+    /*
+    Main dimensional rupture.
+    */
+
+    const centerX =
+        W * .5;
+
+    const centerY =
+        H * .5;
+
+
+    for (
+        let i = 0;
+        i < 8;
+        i++
+    ) {
+
+        createFracture(
+
+            centerX +
+            random(
+                -120,
+                120
+            ),
+
+            centerY +
+            random(
+                -100,
+                100
+            ),
+
+            random(
+                0,
+                Math.PI * 2
+            ),
+
+            random(
+                W * .18,
+                W * .48
+            )
+
+        );
+
+    }
+
+
+    /*
+    Peripheral fractures.
+    */
+
+    for (
+        let i = 0;
+        i < 6;
+        i++
+    ) {
+
+        createFracture(
+
+            random(
+                0,
+                W
+            ),
+
+            random(
+                0,
+                H
+            ),
+
+            random(
+                0,
+                Math.PI * 2
+            ),
+
+            random(
+                100,
+                350
+            )
+
+        );
+
+    }
+
+}
+
+generateFractures();
+
+
+/* ================================================================
+   FLOATING PARTICLES
+   ================================================================ */
+
+const particles = [];
+
+const particleCount =
+    W < 700
+        ? 250
+        : 600;
+
+
+for (
+    let i = 0;
+    i < particleCount;
+    i++
+) {
+
+    particles.push({
+
+        x:
+            random(
+                0,
+                W
+            ),
+
+        y:
+            random(
+                0,
+                H
+            ),
+
+        vx:
+            random(
+                -.15,
+                .15
+            ),
+
+        vy:
+            random(
+                -.15,
+                .15
+            ),
+
+        size:
+            random(
+                .4,
+                2.3
+            ),
+
+        hue:
+            random(
+                0,
+                360
+            ),
+
+        phase:
+            random(
+                0,
+                Math.PI * 2
+            )
+
+    });
+
+}
+
+
+/* ================================================================
+   RAINBOW
+   ================================================================ */
+
+function rainbow(
+    hue,
+    saturation = 100,
+    lightness = 65
+) {
+
+    return `
+        hsl(
+            ${hue},
+            ${saturation}%,
+            ${lightness}%
+        )
+    `;
+
+}
+
+
+/* ================================================================
+   TUBES ENGINE
+   
+   THIS IS THE PART THAT KEEPS THE SAME WORKING ARCHITECTURE
+   AS YOUR ORIGINAL.
+   ================================================================ */
+
+function randomColors(
+    count
+) {
+
+    return Array.from(
+        {
+            length:
+                count
+        },
+
+        function() {
+
+            const hue =
+                Math.floor(
+                    Math.random() *
+                    360
+                );
+
+            return `
+                hsl(
+                    ${hue},
+                    100%,
+                    65%
+                )
+            `;
+
+        }
+    );
+
+}
+
+
+import(
+    "https://cdn.jsdelivr.net/npm/threejs-components@0.0.19/build/cursors/tubes1.min.js"
+)
+
+.then(
+    function(mod) {
+
+        const TubesCursor =
+            mod.default;
+
+
+        const app =
+            TubesCursor(
+                tubesCanvas,
+                {
+
+                    tubes: {
+
+                        colors: [
+
+                            "#00ffff",
+
+                            "#0066ff",
+
+                            "#7a00ff",
+
+                            "#ff00cc",
+
+                            "#ff0066",
+
+                            "#ff6600"
+
+                        ],
+
+                        lights: {
+
+                            intensity:
+                                220,
+
+                            colors: [
+
+                                "#00ffff",
+
+                                "#0066ff",
+
+                                "#9d00ff",
+
+                                "#ff00cc",
+
+                                "#ff0066",
+
+                                "#00ff88"
+
+                            ]
+
+                        }
+
+                    }
+
+                }
+            );
+
+
+        /*
+        ------------------------------------------------------------
+        PERIODIC COLOR EVOLUTION
+        ------------------------------------------------------------
+        */
+
+        let hueShift =
+            0;
+
+
+        setInterval(
+            () => {
+
+                hueShift +=
+                    27;
+
+
+                const colors = [
+
+                    `hsl(${hueShift},100%,65%)`,
+
+                    `hsl(${hueShift + 55},100%,65%)`,
+
+                    `hsl(${hueShift + 110},100%,65%)`
+
+                ];
+
+
+                const lights = [
+
+                    `hsl(${hueShift + 25},100%,70%)`,
+
+                    `hsl(${hueShift + 150},100%,70%)`,
+
+                    `hsl(${hueShift + 240},100%,70%)`,
+
+                    `hsl(${hueShift + 310},100%,70%)`
+
+                ];
+
+
+                try {
+
+                    app.tubes
+                        .setColors(
+                            colors
+                        );
+
+                    app.tubes
+                        .setLightsColors(
+                            lights
+                        );
+
+                }
+
+                catch (_) {}
+
+            },
+
+            2600
+
+        );
+
+
+        /*
+        ------------------------------------------------------------
+        CLICK = DIMENSIONAL COLLAPSE
+        ------------------------------------------------------------
+        */
+
+        window.addEventListener(
+            "click",
+            () => {
+
+                try {
+
+                    app.tubes
+                        .setColors(
+                            randomColors(
+                                3
+                            )
+                        );
+
+                    app.tubes
+                        .setLightsColors(
+                            randomColors(
+                                4
+                            )
+                        );
+
+                }
+
+                catch (_) {}
+
+
+                /*
+                New fracture explosion.
+                */
+
+                for (
+                    let i = 0;
+                    i < 7;
+                    i++
+                ) {
+
+                    createFracture(
+
+                        mouse.x,
+
+                        mouse.y,
+
+                        random(
+                            0,
+                            Math.PI * 2
+                        ),
+
+                        random(
+                            150,
+                            450
+                        )
+
+                    );
+
+                }
+
+            }
+        );
+
+    }
+)
+
+.catch(
+    function(err) {
+
+        console.error(
+            "Tubes engine failed:",
+            err
+        );
 
     }
 );
 
-window.addEventListener(
-    "keydown",
-    e => {
 
-        if (e.code === "Space") {
+/* ================================================================
+   DRAW FRACTURES
+   ================================================================ */
 
-            pulse = 1.4;
-            explosion = 1.4;
+function drawFractures(
+    time
+) {
+
+    ctx.clearRect(
+        0,
+        0,
+        W,
+        H
+    );
+
+
+    /*
+    Screen blend gives the cracks
+    a true light-emitting appearance.
+    */
+
+    ctx.globalCompositeOperation =
+        "screen";
+
+
+    for (
+        let i = 0;
+        i < fractures.length;
+        i++
+    ) {
+
+        const f =
+            fractures[i];
+
+
+        /*
+        Cursor attraction.
+
+        */
+
+        let closest =
+            Infinity;
+
+
+        for (
+            let j = 0;
+            j < f.points.length;
+            j++
+        ) {
+
+            const p =
+                f.points[j];
+
+
+            const dx =
+                p.x -
+                mouse.x;
+
+            const dy =
+                p.y -
+                mouse.y;
+
+
+            const d =
+                Math.sqrt(
+                    dx * dx +
+                    dy * dy
+                );
+
+
+            closest =
+                Math.min(
+                    closest,
+                    d
+                );
+
+        }
+
+
+        const activation =
+            Math.max(
+                0,
+                1 -
+                closest /
+                420
+            );
+
+
+        /*
+        Animated intensity.
+        */
+
+        const flicker =
+            .65 +
+            .35 *
+            Math.sin(
+                time *
+                .004 +
+                f.phase
+            );
+
+
+        const hue =
+            (
+                f.hue +
+                time *
+                .025 +
+                activation *
+                120
+            )
+            %
+            360;
+
+
+        /*
+        Glow layer.
+        */
+
+        glow.beginPath();
+
+        glow.moveTo(
+            f.x,
+            f.y
+        );
+
+
+        for (
+            let j = 0;
+            j < f.points.length;
+            j++
+        ) {
+
+            glow.lineTo(
+                f.points[j].x,
+                f.points[j].y
+            );
+
+        }
+
+
+        glow.strokeStyle =
+            rainbow(
+                hue,
+                100,
+                60
+            );
+
+
+        glow.lineWidth =
+            (
+                f.width *
+                8
+            )
+            +
+            activation *
+            18;
+
+
+        glow.globalAlpha =
+            .025 +
+            activation *
+            .08;
+
+
+        glow.stroke();
+
+
+        /*
+        Main crack.
+        */
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            f.x,
+            f.y
+        );
+
+
+        for (
+            let j = 0;
+            j < f.points.length;
+            j++
+        ) {
+
+            ctx.lineTo(
+                f.points[j].x,
+                f.points[j].y
+            );
+
+        }
+
+
+        ctx.strokeStyle =
+            rainbow(
+                hue,
+                100,
+                68 +
+                activation *
+                20
+            );
+
+
+        ctx.lineWidth =
+            f.width *
+            (
+                1 +
+                activation *
+                1.8
+            );
+
+
+        ctx.globalAlpha =
+            (
+                .22 +
+                activation *
+                .7
+            )
+            *
+            flicker;
+
+
+        ctx.shadowBlur =
+            5 +
+            activation *
+            25;
+
+
+        ctx.shadowColor =
+            rainbow(
+                hue
+            );
+
+
+        ctx.stroke();
+
+
+        /*
+        White-hot core.
+        */
+
+        if (
+            activation >
+            .15
+        ) {
+
+            ctx.beginPath();
+
+            ctx.moveTo(
+                f.x,
+                f.y
+            );
+
+
+            for (
+                let j = 0;
+                j < f.points.length;
+                j++
+            ) {
+
+                ctx.lineTo(
+                    f.points[j].x,
+                    f.points[j].y
+                );
+
+            }
+
+
+            ctx.strokeStyle =
+                "#ffffff";
+
+
+            ctx.lineWidth =
+                .35 +
+                activation *
+                .8;
+
+
+            ctx.globalAlpha =
+                activation *
+                .8;
+
+
+            ctx.shadowBlur =
+                10;
+
+
+            ctx.shadowColor =
+                rainbow(
+                    hue
+                );
+
+
+            ctx.stroke();
 
         }
 
     }
-);
 
 
-/* ================================================================
-   FULL SCREEN SHADER
-   ================================================================ */
-
-const vertexSource = `
-
-attribute vec2 a_position;
-
-void main() {
-
-    gl_Position =
-        vec4(
-            a_position,
-            0.0,
-            1.0
-        );
+    ctx.shadowBlur =
+        0;
 
 }
-`;
-
-
-/*
-================================================================
-FRAGMENT SHADER
-
-This is the actual black hole.
-
-The important difference from a normal "glowing circle":
-
-We're calculating a distorted coordinate field around
-an event horizon and then sampling procedural volumetric
-noise through that warped field.
-================================================================
-*/
-
-const fragmentSource = `
-
-precision highp float;
-
-uniform vec2 u_resolution;
-uniform vec2 u_mouse;
-uniform float u_time;
-uniform float u_speed;
-uniform float u_pulse;
-uniform float u_explosion;
 
 
 /* ================================================================
-   HASH
+   PARTICLE FIELD
    ================================================================ */
 
-float hash21(vec2 p) {
-
-    p =
-        fract(
-            p *
-            vec2(
-                123.34,
-                456.21
-            )
-        );
-
-    p +=
-        dot(
-            p,
-            p + 45.32
-        );
-
-    return fract(
-        p.x * p.y
-    );
-}
-
-
-/* ================================================================
-   NOISE
-   ================================================================ */
-
-float noise(vec2 p) {
-
-    vec2 i =
-        floor(p);
-
-    vec2 f =
-        fract(p);
-
-    f =
-        f *
-        f *
-        (3.0 - 2.0 * f);
-
-    return mix(
-
-        mix(
-            hash21(i),
-            hash21(
-                i +
-                vec2(
-                    1.0,
-                    0.0
-                )
-            ),
-            f.x
-        ),
-
-        mix(
-            hash21(
-                i +
-                vec2(
-                    0.0,
-                    1.0
-                )
-            ),
-
-            hash21(
-                i +
-                vec2(
-                    1.0,
-                    1.0
-                )
-            ),
-
-            f.x
-        ),
-
-        f.y
-    );
-}
-
-
-/* ================================================================
-   FRACTAL BROWNIAN MOTION
-   ================================================================ */
-
-float fbm(vec2 p) {
-
-    float value = 0.0;
-    float amp = .5;
-
-    for(int i = 0; i < 6; i++) {
-
-        value +=
-            noise(p) *
-            amp;
-
-        p *= 2.02;
-        amp *= .5;
-    }
-
-    return value;
-}
-
-
-/* ================================================================
-   ROTATION
-   ================================================================ */
-
-mat2 rot(float a) {
-
-    float c = cos(a);
-    float s = sin(a);
-
-    return mat2(
-        c, -s,
-        s,  c
-    );
-}
-
-
-/* ================================================================
-   MAIN
-   ================================================================ */
-
-void main() {
-
-    /*
-    --------------------------------------------------------------
-    SCREEN COORDINATES
-    --------------------------------------------------------------
-    */
-
-    vec2 uv =
-        gl_FragCoord.xy /
-        u_resolution.xy;
-
-    vec2 p =
-        uv -
-        .5;
-
-    p.x *=
-        u_resolution.x /
-        u_resolution.y;
-
-
-    /*
-    --------------------------------------------------------------
-    MOUSE POSITION
-
-    The black hole follows the cursor.
-    --------------------------------------------------------------
-    */
-
-    vec2 m =
-        u_mouse -
-        .5;
-
-    m.x *=
-        u_resolution.x /
-        u_resolution.y;
-
-
-    /*
-    --------------------------------------------------------------
-    LOCAL SPACE AROUND BLACK HOLE
-    --------------------------------------------------------------
-    */
-
-    vec2 q =
-        p -
-        m;
-
-
-    float r =
-        length(q);
-
-    float angle =
-        atan(
-            q.y,
-            q.x
-        );
-
-
-    /*
-    ==============================================================
-                    GRAVITATIONAL LENSING
-    ==============================================================
-
-    The coordinate itself is bent.
-
-    This is what makes the region around the event horizon
-    visually "pull" the surrounding field around it.
-    */
-
-    float gravity =
-        .115 /
-        max(
-            r,
-            .025
-        );
-
-
-    gravity =
-        min(
-            gravity,
-            2.4
-        );
-
-
-    vec2 lens =
-        normalize(
-            q +
-            vec2(.00001)
-        );
-
-
-    q +=
-        lens *
-        gravity *
-        .065;
-
-
-    /*
-    Additional angular deflection.
-    */
-
-    float lensAngle =
-        gravity *
-        .9;
-
-
-    q =
-        rot(
-            lensAngle
-        ) *
-        q;
-
-
-    /*
-    Recalculate.
-    */
-
-    r =
-        length(q);
-
-    angle =
-        atan(
-            q.y,
-            q.x
-        );
-
-
-    /*
-    ==============================================================
-                         SPACETIME SWIRL
-    ==============================================================
-
-    Close to the horizon the entire coordinate system rotates.
-    */
-
-    float swirl =
-        1.8 *
-        exp(
-            -r *
-            3.8
-        );
-
-
-    angle +=
-        swirl;
-
-
-    /*
-    ==============================================================
-                         VOLUMETRIC SPACE
-    ==============================================================
-
-    Multiple layers moving at different rates.
-    */
-
-    vec2 flow =
-        vec2(
-            cos(angle),
-            sin(angle)
-        ) *
-        r;
-
-
-    flow *=
-        3.4;
-
-
-    flow.x +=
-        u_time *
-        .00006;
-
-    flow.y -=
-        u_time *
-        .000035;
-
-
-    float n1 =
-        fbm(flow);
-
-
-    float n2 =
-        fbm(
-            flow *
-            2.1 +
-            vec2(
-                -u_time * .00008,
-                u_time * .00005
-            )
-        );
-
-
-    float n3 =
-        fbm(
-            flow *
-            .42 -
-            vec2(
-                u_time * .000025,
-                0.0
-            )
-        );
-
-
-    /*
-    ==============================================================
-                      ACCRETION DISK
-    ==============================================================
-
-    A luminous rotating disk around the horizon.
-    */
-
-    float diskDistance =
-        abs(
-            r -
-            .245
-        );
-
-
-    float disk =
-        exp(
-            -diskDistance *
-            38.0
-        );
-
-
-    /*
-    Turbulence inside disk.
-    */
-
-    float diskNoise =
-        fbm(
-            vec2(
-                angle * 4.0,
-                r * 35.0
-            )
-            +
-            u_time *
-            vec2(
-                -.0007,
-                .00012
-            )
-        );
-
-
-    disk *=
-        .55 +
-        diskNoise *
-        1.3;
-
-
-    /*
-    Rotating bright sections.
-    */
-
-    float rotating =
-        .5 +
-        .5 *
-        sin(
-            angle *
-            8.0
-            -
-            u_time *
-            .0022
-        );
-
-
-    disk *=
-        .55 +
-        rotating *
-        .75;
-
-
-    /*
-    ==============================================================
-                         INNER RING
-    ============================================================== */
-
-    float innerRing =
-        exp(
-            -abs(
-                r -
-                .105
-            )
-            *
-            85.0
-        );
-
-
-    innerRing *=
-        .4 +
-        .6 *
-        sin(
-            angle *
-            18.0
-            -
-            u_time *
-            .003
-        );
-
-
-    /*
-    ==============================================================
-                        OUTER RINGS
-    ============================================================== */
-
-    float ring1 =
-        pow(
-            max(
-                0.0,
-                sin(
-                    r *
-                    42.0
-                    -
-                    u_time *
-                    .001
-                )
-            ),
-            20.0
-        );
-
-
-    ring1 *=
-        smoothstep(
-            .7,
-            .08,
-            r
-        );
-
-
-    float ring2 =
-        pow(
-            max(
-                0.0,
-                sin(
-                    r *
-                    73.0
-                    +
-                    angle *
-                    3.0
-                    -
-                    u_time *
-                    .0015
-                )
-            ),
-            35.0
-        );
-
-
-    ring2 *=
-        smoothstep(
-            .55,
-            .12,
-            r
-        );
-
-
-    /*
-    ==============================================================
-                       ENERGY FILAMENTS
-    ============================================================== */
-
-    float filament =
-        abs(
-            sin(
-                angle *
-                17.0
-                +
-                r *
-                32.0
-                -
-                u_time *
-                .001
-            )
-        );
-
-
-    filament =
-        pow(
-            filament,
-            19.0
-        );
-
-
-    filament *=
-        smoothstep(
-            .65,
-            .05,
-            r
-        );
-
-
-    /*
-    ==============================================================
-                         EVENT HORIZON
-    ============================================================== */
-
-    float horizon =
-        smoothstep(
-            .115,
-            .065,
-            r
-        );
-
-
-    /*
-    ==============================================================
-                             CORE
-    ============================================================== */
-
-    float core =
-        exp(
-            -r *
-            75.0
-        );
-
-
-    /*
-    ==============================================================
-                       PHOTON RING
-    ============================================================== */
-
-    float photon =
-        exp(
-            -abs(
-                r -
-                .073
-            )
-            *
-            160.0
-        );
-
-
-    photon *=
-        .5 +
-        .5 *
-        sin(
-            angle *
-            12.0
-            -
-            u_time *
-            .004
-        );
-
-
-    /*
-    ==============================================================
-                     MOUSE VELOCITY ENERGY
-    ============================================================== */
-
-    float velocityEnergy =
-        u_speed *
-        (
-            .5 +
-            .5 *
-            sin(
-                angle -
-                u_time *
-                .002
-            )
-        );
-
-
-    /*
-    ==============================================================
-                       SHOCKWAVE
-    ============================================================== */
-
-    float waveRadius =
-        .08 +
-        u_pulse *
-        .8;
-
-
-    float wave =
-        exp(
-            -abs(
-                r -
-                waveRadius
-            )
-            *
-            80.0
-        );
-
-
-    wave *=
-        u_pulse;
-
-
-    /*
-    ==============================================================
-                       EXPLOSION SHELL
-    ============================================================== */
-
-    float blast =
-        exp(
-            -abs(
-                r -
-                (
-                    .12 +
-                    u_explosion *
-                    .9
-                )
-            )
-            *
-            20.0
-        );
-
-
-    blast *=
-        u_explosion;
-
-
-    /*
-    ==============================================================
-                            COLORS
-    ============================================================== */
-
-    vec3 black =
-        vec3(
-            0.0,
-            0.0,
-            0.002
-        );
-
-
-    vec3 cyan =
-        vec3(
-            .01,
-            .75,
-            1.0
-        );
-
-
-    vec3 electricBlue =
-        vec3(
-            .02,
-            .18,
-            1.0
-        );
-
-
-    vec3 violet =
-        vec3(
-            .45,
-            .02,
-            1.0
-        );
-
-
-    vec3 magenta =
-        vec3(
-            1.0,
-            .015,
-            .35
-        );
-
-
-    vec3 white =
-        vec3(
-            1.0,
-            .98,
-            .92
-        );
-
-
-    /*
-    --------------------------------------------------------------
-    BASE SPACE
-    --------------------------------------------------------------
-    */
-
-    vec3 color =
-        black;
-
-
-    /*
-    Nebula volume.
-    */
-
-    color +=
-        cyan *
-        n1 *
-        .075;
-
-
-    color +=
-        electricBlue *
-        n2 *
-        .10;
-
-
-    color +=
-        violet *
-        n3 *
-        .055;
-
-
-    /*
-    Accretion disk.
-    */
-
-    color +=
-        cyan *
-        disk *
-        .72;
-
-
-    color +=
-        violet *
-        disk *
-        .24;
-
-
-    color +=
-        magenta *
-        disk *
-        .12;
-
-
-    /*
-    Inner ring.
-    */
-
-    color +=
-        electricBlue *
-        innerRing *
-        .75;
-
-
-    color +=
-        magenta *
-        innerRing *
-        .32;
-
-
-    /*
-    Photon ring.
-    */
-
-    color +=
-        white *
-        photon *
-        1.25;
-
-
-    /*
-    Procedural outer rings.
-    */
-
-    color +=
-        cyan *
-        ring1 *
-        .22;
-
-
-    color +=
-        violet *
-        ring2 *
-        .18;
-
-
-    /*
-    Filaments.
-    */
-
-    color +=
-        magenta *
-        filament *
-        .28;
-
-
-    color +=
-        cyan *
-        filament *
-        .20;
-
-
-    /*
-    Velocity energy.
-    */
-
-    color +=
-        magenta *
-        velocityEnergy *
-        filament *
-        .45;
-
-
-    /*
-    Shockwave.
-    */
-
-    color +=
-        cyan *
-        wave *
-        1.25;
-
-
-    color +=
-        violet *
-        wave *
-        .5;
-
-
-    /*
-    Explosion.
-    */
-
-    color +=
-        white *
-        blast *
-        .55;
-
-
-    color +=
-        magenta *
-        blast *
-        .8;
-
-
-    /*
-    Event horizon.
-
-    Almost all light disappears here.
-    */
-
-    color *=
-        1.0 -
-        horizon *
-        .98;
-
-
-    /*
-    Black-hole core.
-    */
-
-    color +=
-        white *
-        core *
-        2.0;
-
-
-    /*
-    ==============================================================
-                    CHROMATIC ABERRATION
-    ==============================================================
-
-    Artificial RGB separation around the gravitational edge.
-    */
-
-    float aberration =
-        smoothstep(
-            .34,
-            .05,
-            r
-        )
-        *
-        (
-            1.0 -
-            smoothstep(
-                .04,
-                .09,
-                r
-            )
-        );
-
-
-    color.r +=
-        aberration *
-        .22;
-
-
-    color.b +=
-        aberration *
-        .38;
-
-
-    /*
-    ==============================================================
-                       DISTANT ENERGY FIELD
-    ============================================================== */
-
-    float field =
-        exp(
-            -r *
-            .9
-        );
-
-
-    color +=
-        cyan *
-        field *
-        n1 *
-        .035;
-
-
-    /*
-    ==============================================================
-                          VIGNETTE
-    ============================================================== */
-
-    float screenDistance =
-        length(
-            (
-                gl_FragCoord.xy /
-                u_resolution.xy
-            )
-            *
-            2.0
-            -
-            1.0
-        );
-
-
-    float vignette =
-        smoothstep(
-            1.5,
-            .35,
-            screenDistance
-        );
-
-
-    color *=
-        vignette;
-
-
-    /*
-    ==============================================================
-                        HDR TONEMAPPING
-    ============================================================== */
-
-    color =
-        color /
-        (
-            1.0 +
-            color
-        );
-
-
-    color =
-        pow(
-            color,
-            vec3(
-                .82
-            )
-        );
-
-
-    /*
-    ==============================================================
-                           ALPHA
-    ==============================================================
-
-    Critical for iframe transparency.
-    */
-
-    float brightness =
-        max(
-            color.r,
-            max(
-                color.g,
-                color.b
-            )
-        );
-
-
-    float alpha =
-        smoothstep(
-            .004,
-            .12,
-            brightness
-        );
-
-
-    /*
-    Keep the effect atmospheric rather
-    than creating an opaque rectangle.
-    */
-
-    alpha *=
-        .82;
-
-
-    gl_FragColor =
-        vec4(
-            color,
-            alpha
-        );
-
-}
-
-`;
-
-
-/* ================================================================
-   COMPILE
-   ================================================================ */
-
-function compile(
-    type,
-    source
+function drawParticles(
+    time
 ) {
 
-    const shader =
-        gl.createShader(type);
+    ctx.globalCompositeOperation =
+        "lighter";
 
-    gl.shaderSource(
-        shader,
-        source
-    );
 
-    gl.compileShader(
-        shader
-    );
-
-    if (
-        !gl.getShaderParameter(
-            shader,
-            gl.COMPILE_STATUS
-        )
+    for (
+        let i = 0;
+        i < particles.length;
+        i++
     ) {
 
-        console.error(
-            gl.getShaderInfoLog(shader)
+        const p =
+            particles[i];
+
+
+        /*
+        Cursor gravity.
+        */
+
+        const dx =
+            mouse.x -
+            p.x;
+
+        const dy =
+            mouse.y -
+            p.y;
+
+
+        const distance =
+            Math.sqrt(
+                dx * dx +
+                dy * dy
+            );
+
+
+        const force =
+            Math.max(
+                0,
+                1 -
+                distance /
+                500
+            );
+
+
+        p.vx +=
+            dx /
+            (
+                distance +
+                1
+            )
+            *
+            force
+            *
+            .025;
+
+
+        p.vy +=
+            dy /
+            (
+                distance +
+                1
+            )
+            *
+            force
+            *
+            .025;
+
+
+        /*
+        Orbital component.
+        */
+
+        p.vx +=
+            -dy /
+            (
+                distance +
+                100
+            )
+            *
+            force
+            *
+            .012;
+
+
+        p.vy +=
+            dx /
+            (
+                distance +
+                100
+            )
+            *
+            force
+            *
+            .012;
+
+
+        /*
+        Velocity.
+        */
+
+        p.x +=
+            p.vx;
+
+        p.y +=
+            p.vy;
+
+
+        /*
+        Friction.
+        */
+
+        p.vx *=
+            .992;
+
+        p.vy *=
+            .992;
+
+
+        /*
+        Wrap.
+        */
+
+        if (
+            p.x < -20
+        )
+            p.x = W + 20;
+
+        if (
+            p.x > W + 20
+        )
+            p.x = -20;
+
+        if (
+            p.y < -20
+        )
+            p.y = H + 20;
+
+        if (
+            p.y > H + 20
+        )
+            p.y = -20;
+
+
+        /*
+        Particle brightness.
+        */
+
+        const brightness =
+            .45 +
+            force *
+            2 +
+            Math.sin(
+                time *
+                .003 +
+                p.phase
+            )
+            *
+            .2;
+
+
+        const hue =
+            (
+                p.hue +
+                time *
+                .02
+            )
+            %
+            360;
+
+
+        ctx.beginPath();
+
+        ctx.arc(
+            p.x,
+            p.y,
+            p.size *
+            (
+                1 +
+                force *
+                2
+            ),
+            0,
+            Math.PI * 2
         );
 
-        return null;
+
+        ctx.fillStyle =
+            rainbow(
+                hue,
+                100,
+                70
+            );
+
+
+        ctx.globalAlpha =
+            Math.min(
+                1,
+                brightness *
+                .4
+            );
+
+
+        ctx.shadowBlur =
+            8 +
+            force *
+            15;
+
+
+        ctx.shadowColor =
+            rainbow(
+                hue
+            );
+
+
+        ctx.fill();
+
     }
 
-    return shader;
+
+    ctx.shadowBlur =
+        0;
+
 }
 
 
-const vertex =
-    compile(
-        gl.VERTEX_SHADER,
-        vertexSource
-    );
+/* ================================================================
+   CURSOR RIFT
+   ================================================================ */
 
-
-const fragment =
-    compile(
-        gl.FRAGMENT_SHADER,
-        fragmentSource
-    );
-
-
-if (!vertex || !fragment) {
-    return;
-}
-
-
-const program =
-    gl.createProgram();
-
-
-gl.attachShader(
-    program,
-    vertex
-);
-
-gl.attachShader(
-    program,
-    fragment
-);
-
-gl.linkProgram(
-    program
-);
-
-
-if (
-    !gl.getProgramParameter(
-        program,
-        gl.LINK_STATUS
-    )
+function drawCursorRift(
+    time
 ) {
 
-    console.error(
-        gl.getProgramInfoLog(program)
+    const x =
+        mouse.x;
+
+    const y =
+        mouse.y;
+
+
+    const radius =
+        55 +
+        mouse.speed *
+        5;
+
+
+    /*
+    Rotating chromatic halo.
+    */
+
+    for (
+        let i = 0;
+        i < 3;
+        i++
+    ) {
+
+        const hue =
+            (
+                time *
+                .08 +
+                i *
+                120
+            )
+            %
+            360;
+
+
+        ctx.beginPath();
+
+        ctx.arc(
+
+            x,
+
+            y,
+
+            radius +
+            i *
+            9,
+
+            time *
+            .001 +
+            i,
+
+            time *
+            .001 +
+            i +
+            Math.PI *
+            1.45
+
+        );
+
+
+        ctx.strokeStyle =
+            rainbow(
+                hue,
+                100,
+                68
+            );
+
+
+        ctx.lineWidth =
+            1.5 +
+            mouse.speed *
+            .08;
+
+
+        ctx.globalAlpha =
+            .15 +
+            mouse.speed *
+            .015;
+
+
+        ctx.shadowBlur =
+            18;
+
+
+        ctx.shadowColor =
+            rainbow(
+                hue
+            );
+
+
+        ctx.stroke();
+
+    }
+
+
+    /*
+    Tiny dimensional core.
+    */
+
+    const gradient =
+        ctx.createRadialGradient(
+            x,
+            y,
+            0,
+            x,
+            y,
+            radius
+        );
+
+
+    gradient.addColorStop(
+        0,
+        "rgba(255,255,255,.18)"
     );
 
-    return;
+
+    gradient.addColorStop(
+        .15,
+        "rgba(0,255,255,.08)"
+    );
+
+
+    gradient.addColorStop(
+        .5,
+        "rgba(150,0,255,.025)"
+    );
+
+
+    gradient.addColorStop(
+        1,
+        "rgba(0,0,0,0)"
+    );
+
+
+    ctx.fillStyle =
+        gradient;
+
+
+    ctx.beginPath();
+
+    ctx.arc(
+        x,
+        y,
+        radius,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fill();
+
+
 }
 
 
-gl.useProgram(
-    program
-);
-
-
 /* ================================================================
-   FULL SCREEN TRIANGLE
+   MAIN LOOP
    ================================================================ */
 
-const buffer =
-    gl.createBuffer();
-
-
-gl.bindBuffer(
-    gl.ARRAY_BUFFER,
-    buffer
-);
-
-
-gl.bufferData(
-    gl.ARRAY_BUFFER,
-
-    new Float32Array([
-
-        -1, -1,
-
-         3, -1,
-
-        -1,  3
-
-    ]),
-
-    gl.STATIC_DRAW
-);
-
-
-const position =
-    gl.getAttribLocation(
-        program,
-        "a_position"
-    );
-
-
-gl.enableVertexAttribArray(
-    position
-);
-
-
-gl.vertexAttribPointer(
-    position,
-    2,
-    gl.FLOAT,
-    false,
-    0,
-    0
-);
-
-
-/* ================================================================
-   UNIFORMS
-   ================================================================ */
-
-const uniforms = {
-
-    resolution:
-        gl.getUniformLocation(
-            program,
-            "u_resolution"
-        ),
-
-    mouse:
-        gl.getUniformLocation(
-            program,
-            "u_mouse"
-        ),
-
-    time:
-        gl.getUniformLocation(
-            program,
-            "u_time"
-        ),
-
-    speed:
-        gl.getUniformLocation(
-            program,
-            "u_speed"
-        ),
-
-    pulse:
-        gl.getUniformLocation(
-            program,
-            "u_pulse"
-        ),
-
-    explosion:
-        gl.getUniformLocation(
-            program,
-            "u_explosion"
-        )
-};
-
-
-/* ================================================================
-   BLENDING
-   ================================================================ */
-
-gl.enable(
-    gl.BLEND
-);
-
-gl.blendFunc(
-    gl.SRC_ALPHA,
-    gl.ONE
-);
-
-
-/* ================================================================
-   RENDER
-   ================================================================ */
-
-function render(now) {
+function animate(
+    time
+) {
 
     /*
-    Smooth pointer.
+    Smooth cursor.
     */
 
     mouse.x +=
@@ -1520,110 +1620,71 @@ function render(now) {
         .075;
 
 
-    /*
-    Velocity decay.
-    */
-
-    mouse.vx *= .91;
-    mouse.vy *= .91;
-
-    mouse.speed *= .93;
+    mouse.speed *=
+        .92;
 
 
     /*
-    Event decay.
+    Clear.
     */
 
-    pulse *= .965;
-
-    explosion *= .95;
-
-
-    gl.viewport(
+    ctx.clearRect(
         0,
         0,
-        canvas.width,
-        canvas.height
+        W,
+        H
     );
 
 
-    gl.clearColor(
+    glow.clearRect(
         0,
         0,
-        0,
-        0
+        W,
+        H
     );
 
 
-    gl.clear(
-        gl.COLOR_BUFFER_BIT
+    /*
+    Fractures.
+    */
+
+    drawFractures(
+        time
     );
 
 
-    gl.useProgram(
-        program
+    /*
+    Particles.
+    */
+
+    drawParticles(
+        time
     );
 
 
-    gl.uniform2f(
-        uniforms.resolution,
-        canvas.width,
-        canvas.height
-    );
+    /*
+    Cursor anomaly.
+    */
 
-
-    gl.uniform2f(
-        uniforms.mouse,
-        mouse.x,
-        1.0 - mouse.y
-    );
-
-
-    gl.uniform1f(
-        uniforms.time,
-        now -
-        startTime
-    );
-
-
-    gl.uniform1f(
-        uniforms.speed,
-        mouse.speed
-    );
-
-
-    gl.uniform1f(
-        uniforms.pulse,
-        pulse
-    );
-
-
-    gl.uniform1f(
-        uniforms.explosion,
-        explosion
-    );
-
-
-    gl.drawArrays(
-        gl.TRIANGLES,
-        0,
-        3
+    drawCursorRift(
+        time
     );
 
 
     requestAnimationFrame(
-        render
+        animate
     );
+
 }
 
 
 requestAnimationFrame(
-    render
+    animate
 );
 
 
 /* ================================================================
-   CLEANUP WHEN IFRAME IS UNLOADED
+   CLEANUP
    ================================================================ */
 
 window.addEventListener(
@@ -1632,21 +1693,17 @@ window.addEventListener(
 
         try {
 
-            const loseContext =
-                gl.getExtension(
-                    "WEBGL_lose_context"
-                );
+            fractureCanvas.width = 1;
+            fractureCanvas.height = 1;
 
-            if (loseContext) {
-                loseContext.loseContext();
-            }
+            glowCanvas.width = 1;
+            glowCanvas.height = 1;
 
-        } catch (_) {}
+        }
+        catch (_) {}
 
     }
 );
-
-})();
 
 </script>
 
