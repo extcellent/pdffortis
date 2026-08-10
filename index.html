@@ -188,9 +188,6 @@ input,select,textarea{font-family:var(--font)}
 .nav-logo-text{font-size:15px;font-weight:700;color:var(--gray-900);letter-spacing:-.3px}
 .nav-logo-text span{background:linear-gradient(135deg,var(--rb1),var(--rb3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .nav-right{display:flex;align-items:center;gap:10px}
-.lang-toggle{display:flex;background:var(--gray-100);border-radius:99px;padding:2px;border:none}
-.lang-btn{padding:3px 10px;font-size:11px;font-weight:600;border:none;background:none;border-radius:99px;color:var(--gray-500);transition:all .15s;cursor:pointer}
-.lang-btn.active{background:white;color:var(--gray-900);box-shadow:var(--shadow)}
 .nav-auth-btn{padding:6px 14px;font-size:12px;font-weight:600;border-radius:99px;border:none;cursor:pointer;transition:all .15s}
 .nav-login{background:none;color:var(--gray-600);border:1px solid var(--gray-200)}
 .nav-login:hover{background:var(--gray-50);color:var(--gray-900)}
@@ -653,9 +650,6 @@ input,select,textarea{font-family:var(--font)}
 
 #page-landing .nav{background:rgba(5,5,7,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.08);position:relative;z-index:2}
 #page-landing .nav-logo-text{color:#fff}
-#page-landing .lang-toggle{background:rgba(255,255,255,.08)}
-#page-landing .lang-btn{color:rgba(255,255,255,.55)}
-#page-landing .lang-btn.active{background:rgba(255,255,255,.16);color:#fff;box-shadow:none}
 #page-landing .nav-login{color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.25)}
 #page-landing .nav-login:hover{background:rgba(255,255,255,.1);color:#fff}
 #page-landing .nav-signup{background:#fff;color:#0a0a0a}
@@ -696,9 +690,6 @@ input,select,textarea{font-family:var(--font)}
 
 #page-upload .nav{background:rgba(15,15,18,.9);border-bottom:1px solid rgba(255,255,255,.08)}
 #page-upload .nav-logo-text{color:#fff}
-#page-upload .lang-toggle{background:rgba(255,255,255,.08)}
-#page-upload .lang-btn{color:rgba(255,255,255,.55)}
-#page-upload .lang-btn.active{background:rgba(255,255,255,.16);color:#fff;box-shadow:none}
 #page-upload .nav-login{color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.25)}
 #page-upload .nav-login:hover{background:rgba(255,255,255,.1);color:#fff}
 #page-upload .nav-signup{background:#fff;color:#0a0a0a}
@@ -728,9 +719,6 @@ input,select,textarea{font-family:var(--font)}
 #page-editor .editor-mode-toggle{background:rgba(255,255,255,.08)}
 #page-editor .mode-btn{color:rgba(255,255,255,.5)}
 #page-editor .mode-btn.active{background:rgba(255,255,255,.16);color:#fff;box-shadow:none}
-#page-editor .lang-toggle{background:rgba(255,255,255,.08)}
-#page-editor .lang-btn{color:rgba(255,255,255,.55)}
-#page-editor .lang-btn.active{background:rgba(255,255,255,.16);color:#fff;box-shadow:none}
 #page-editor .bar-btn{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.14);color:rgba(255,255,255,.75)}
 #page-editor .bar-btn:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff}
 #page-editor .bar-btn.primary{background:#fff;color:#0a0a0a;border-color:#fff}
@@ -796,10 +784,6 @@ input,select,textarea{font-family:var(--font)}
       <span class="nav-logo-text">PDF<span>ortis</span></span>
     </a>
     <div class="nav-right">
-      <div class="lang-toggle">
-        <button class="lang-btn active" onclick="setLang('en')">EN</button>
-        <button class="lang-btn" onclick="setLang('de')">DE</button>
-      </div>
       <div id="landing-auth-btns">
         <button class="nav-auth-btn nav-login" onclick="openAuth('login')" data-i="nav_login">Sign in</button>
         <button class="nav-auth-btn nav-signup" onclick="openAuth('signup')" data-i="nav_signup">Get started</button>
@@ -901,10 +885,6 @@ window.stopTubes = function(){
       <span class="nav-logo-text">PDF<span>ortis</span></span>
     </a>
     <div class="nav-right">
-      <div class="lang-toggle">
-        <button class="lang-btn active" onclick="setLang('en')">EN</button>
-        <button class="lang-btn" onclick="setLang('de')">DE</button>
-      </div>
       <div id="upload-auth-btns">
         <button class="nav-auth-btn nav-login" onclick="openAuth('login')" data-i="nav_login">Sign in</button>
         <button class="nav-auth-btn nav-signup" onclick="openAuth('signup')" data-i="nav_signup">Get started</button>
@@ -982,10 +962,6 @@ window.stopTubes = function(){
       </button>
     </div>
     <div class="editor-sep"></div>
-    <div class="lang-toggle">
-      <button class="lang-btn active" onclick="setLang('en')">EN</button>
-      <button class="lang-btn" onclick="setLang('de')">DE</button>
-    </div>
     <div class="editor-bar-right">
       <span class="dl-count" id="dl-count-display">5 left</span>
       <button class="bar-btn" onclick="openTokenModal()">
