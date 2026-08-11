@@ -3313,3 +3313,4 @@ Object.defineProperty(window, 'currentPDF',     { get: () => pdfBytes });
 Object.defineProperty(window, 'currentPageNum', { get: () => currentPage });
 Object.defineProperty(window, 'currentPdfDocLocal', { get: () => pdfDoc });   
 window.openAuthModal = () => document.getElementById('auth-modal')?.classList.remove('hidden');
+});
