@@ -917,95 +917,471 @@ function addDelBtn(el){
   el.appendChild(btn);
 }
 
-// ═══════════════════════════════════════
-// FORMAT (ribbon Edit tab)
-// ═══════════════════════════════════════
-// The ribbon controls (select / number input / color input) all steal
-// focus away from the contentEditable text span the moment they're
-// interacted with. Once focus moves off the span, the browser no longer
-// considers it "the" editable element, so document.execCommand() silently
-// no-ops even though window.getSelection() still looks populated.
-// To fix this we continuously remember the last selection Range that lived
-// inside the span being edited, and before running any format command we
-// re-focus that span and restore the remembered range first.
-let _fmtSavedRange = null;
+// ═══════════════════════════════════════════════════════════════════
+// FORMAT — INLINE TEXT FORMATTING
+// ═══════════════════════════════════════════════════════════════════
+//
+// Verhalten:
+//   - Keine Auswahl:
+//       Bold/Farbe/Italic/Underline wird ab dem Cursor für neu
+//       geschriebenen Text verwendet.
+//   - Auswahl vorhanden:
+//       Nur die Auswahl wird formatiert.
+//   - Mausauswahl bleibt erhalten.
+//   - Toolbar darf den Fokus übernehmen, ohne die Selection zu zerstören.
+//   - Formatierungen werden über innerHTML gespeichert und sind damit
+//     nicht mehr auf den kompletten PDF-Text beschränkt.
+//
 
+let _fmtSavedRange = null;
+let _fmtTypingState = {
+  bold: false,
+  italic: false,
+  underline: false,
+  color: null
+};
+
+function _isRangeInsideSpan(range, span){
+  if(!range || !span) return false;
+
+  const container = range.commonAncestorContainer;
+
+  return container === span ||
+         span.contains(container);
+}
+
+function _getInlineSelection(){
+  const span = window.activeInlineSpan;
+  if(!span) return null;
+
+  const sel = window.getSelection();
+  if(!sel || !sel.rangeCount) return null;
+
+  const range = sel.getRangeAt(0);
+
+  if(!_isRangeInsideSpan(range, span)) return null;
+
+  return {
+    selection: sel,
+    range
+  };
+}
+
+// Speichert IMMER die letzte gültige Auswahl innerhalb des Textfeldes.
 document.addEventListener('selectionchange', () => {
   const span = window.activeInlineSpan;
-  if (!span) return;
+  if(!span) return;
+
   const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return;
+  if(!sel || !sel.rangeCount) return;
+
   const range = sel.getRangeAt(0);
-  if (span.contains(range.commonAncestorContainer)) {
+
+  if(_isRangeInsideSpan(range, span)){
     _fmtSavedRange = range.cloneRange();
   }
 });
 
 function _restoreFormatSelection(){
   const span = window.activeInlineSpan;
-  if (!span) return false;
+  if(!span) return false;
 
   span.focus();
+
   const sel = window.getSelection();
+  if(!sel) return false;
+
   sel.removeAllRanges();
 
-  if (_fmtSavedRange && span.contains(_fmtSavedRange.commonAncestorContainer)) {
-    sel.addRange(_fmtSavedRange);
-  } else {
-    // Nothing usable was saved (e.g. user hasn't clicked into the text yet) —
-    // fall back to placing the cursor at the end of the editable span so the
-    // command still has somewhere to apply.
-    const r = document.createRange();
-    r.selectNodeContents(span);
-    r.collapse(false);
-    sel.addRange(r);
+  if(_fmtSavedRange && _isRangeInsideSpan(_fmtSavedRange, span)){
+    try{
+      sel.addRange(_fmtSavedRange);
+      return true;
+    }catch(e){}
   }
-  return true;
-}
 
-function applyFormat(cmd){
-  const span = window.activeInlineSpan;
-  if (!span) { toast('Click into a text field first', 'err'); return; }
-  span.focus();
-
-  if(cmd==='bold'){
-    const isBold = span.dataset.cssWeight === '700';
-    span.dataset.cssWeight = isBold ? '400' : '700';
-    span.style.fontWeight = span.dataset.cssWeight;
-    document.getElementById('fmt-bold')?.classList.toggle('on', !isBold);
-  }
-  else if(cmd==='italic'){
-    const isItalic = span.dataset.cssStyle === 'italic';
-    span.dataset.cssStyle = isItalic ? 'normal' : 'italic';
-    span.style.fontStyle = span.dataset.cssStyle;
-    document.getElementById('fmt-italic')?.classList.toggle('on', !isItalic);
-  }
-  else if(cmd==='underline'){
-    const on = span.style.textDecoration === 'underline';
-    span.style.textDecoration = on ? 'none' : 'underline';
-    document.getElementById('fmt-underline')?.classList.toggle('on', !on);
-  }
-  else if(cmd==='font'){
-    span.dataset.cssFamily = document.getElementById('font-family').value;
-    span.style.fontFamily = span.dataset.cssFamily;
-  }
-  else if(cmd==='size'){
-    span.style.fontSize = document.getElementById('font-size').value + 'px';
-  }
-  else if(cmd==='color'){
-    span.dataset.cssColor = document.getElementById('text-color').value;
-    span.style.color = span.dataset.cssColor;
-  }
-  else if(cmd==='align-left'){ span.style.textAlign='left' }
-  else if(cmd==='align-center'){ span.style.textAlign='center' }
-
-  // Cursor ans Ende setzen, damit weitergeschrieben werden kann
+  // Kein gespeicherter Bereich:
+  // Cursor ans Ende setzen.
   const r=document.createRange();
   r.selectNodeContents(span);
   r.collapse(false);
-  const sel=window.getSelection();
-  sel.removeAllRanges();
+
   sel.addRange(r);
+
+  _fmtSavedRange=r.cloneRange();
+
+  return true;
+}
+
+function _saveInlineFormatState(span){
+  if(!span) return null;
+
+  return {
+    html: span.innerHTML,
+    cssColor: span.dataset.cssColor || '',
+    cssWeight: span.dataset.cssWeight || '400',
+    cssStyle: span.dataset.cssStyle || 'normal',
+    textDecoration: span.style.textDecoration || 'none',
+    typing: {..._fmtTypingState}
+  };
+}
+
+function _restoreInlineFormatState(span, state){
+  if(!span || !state) return;
+
+  span.innerHTML = state.html;
+
+  span.dataset.cssColor = state.cssColor || '';
+  span.dataset.cssWeight = state.cssWeight || '400';
+  span.dataset.cssStyle = state.cssStyle || 'normal';
+
+  span.style.color =
+    state.cssColor ||
+    span.style.color ||
+    'black';
+
+  span.style.fontWeight =
+    state.cssWeight || '400';
+
+  span.style.fontStyle =
+    state.cssStyle || 'normal';
+
+  span.style.textDecoration =
+    state.textDecoration || 'none';
+
+  _fmtTypingState = {...state.typing};
+
+  // Selection nach Undo/Redo wiederherstellen
+  setTimeout(()=>{
+    if(window.activeInlineSpan === span){
+      _restoreFormatSelection();
+    }
+  },0);
+}
+
+function _pushInlineFormatHistory(span, before, after){
+  if(!span || !before || !after) return;
+
+  if(
+    before.html === after.html &&
+    before.cssColor === after.cssColor &&
+    before.cssWeight === after.cssWeight &&
+    before.cssStyle === after.cssStyle &&
+    before.textDecoration === after.textDecoration &&
+    JSON.stringify(before.typing) === JSON.stringify(after.typing)
+  ){
+    return;
+  }
+
+  pushHistory({
+    undo: async ()=>{
+      _restoreInlineFormatState(span,before);
+    },
+
+    redo: async ()=>{
+      _restoreInlineFormatState(span,after);
+    }
+  });
+}
+
+// Erzeugt einen echten DOM-Bereich für das aktuelle Selection-Verhalten.
+function _getCurrentOrSavedRange(){
+  const span=window.activeInlineSpan;
+  if(!span) return null;
+
+  const sel=window.getSelection();
+
+  if(sel && sel.rangeCount){
+    const r=sel.getRangeAt(0);
+
+    if(_isRangeInsideSpan(r,span)){
+      return r.cloneRange();
+    }
+  }
+
+  if(_fmtSavedRange && _isRangeInsideSpan(_fmtSavedRange,span)){
+    return _fmtSavedRange.cloneRange();
+  }
+
+  return null;
+}
+
+// Prüft ob wirklich Text markiert wurde.
+function _hasRealSelection(range){
+  if(!range) return false;
+
+  return !range.collapsed &&
+         range.toString().length > 0;
+}
+
+// Nach execCommand Auswahl/Cursor möglichst exakt wiederherstellen.
+function _restoreRangeAfterCommand(range){
+  if(!range) return;
+
+  const span=window.activeInlineSpan;
+  if(!span) return;
+
+  const sel=window.getSelection();
+  if(!sel) return;
+
+  try{
+    sel.removeAllRanges();
+    sel.addRange(range);
+    _fmtSavedRange=range.cloneRange();
+  }catch(e){}
+}
+
+function _toggleTypingFormat(cmd,value){
+  if(cmd==='bold'){
+    _fmtTypingState.bold =
+      value !== undefined ? !!value : !_fmtTypingState.bold;
+  }
+
+  if(cmd==='italic'){
+    _fmtTypingState.italic =
+      value !== undefined ? !!value : !_fmtTypingState.italic;
+  }
+
+  if(cmd==='underline'){
+    _fmtTypingState.underline =
+      value !== undefined ? !!value : !_fmtTypingState.underline;
+  }
+
+  if(cmd==='color'){
+    _fmtTypingState.color=value;
+  }
+}
+
+function _updateFormatButtons(){
+  document.getElementById('fmt-bold')
+    ?.classList.toggle('on',_fmtTypingState.bold);
+
+  document.getElementById('fmt-italic')
+    ?.classList.toggle('on',_fmtTypingState.italic);
+
+  document.getElementById('fmt-underline')
+    ?.classList.toggle('on',_fmtTypingState.underline);
+}
+
+function _applyTypingFormat(span){
+  if(!span) return;
+
+  // Browser-Editing-State für zukünftige Eingaben.
+  //
+  // Diese execCommand-Aufrufe arbeiten auch bei einem collapsed Cursor:
+  // Der nächste eingegebene Text übernimmt den Stil.
+  try{
+    document.execCommand(
+      'bold',
+      false,
+      null
+    );
+  }catch(e){}
+
+  try{
+    document.execCommand(
+      'italic',
+      false,
+      null
+    );
+  }catch(e){}
+
+  try{
+    document.execCommand(
+      'underline',
+      false,
+      null
+    );
+  }catch(e){}
+
+  if(_fmtTypingState.color){
+    try{
+      document.execCommand(
+        'foreColor',
+        false,
+        _fmtTypingState.color
+      );
+    }catch(e){}
+  }
+}
+
+function applyFormat(cmd){
+
+  const span=window.activeInlineSpan;
+
+  if(!span){
+    toast('Click into a text field first','err');
+    return;
+  }
+
+  const before=_saveInlineFormatState(span);
+
+  // Selection wiederherstellen, bevor der Toolbar-Button den Fokus übernimmt.
+  _restoreFormatSelection();
+
+  const range=_getCurrentOrSavedRange();
+  const hasSelection=_hasRealSelection(range);
+
+  /*
+   * ================================================================
+   * FALL A:
+   * TEXT IST MARKIERT
+   *
+   * Nur die Auswahl wird formatiert.
+   * ================================================================
+   */
+  if(hasSelection){
+
+    const savedRange=range.cloneRange();
+
+    span.focus();
+
+    const sel=window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
+
+    try{
+
+      if(cmd==='bold'){
+        document.execCommand('bold',false,null);
+      }
+
+      else if(cmd==='italic'){
+        document.execCommand('italic',false,null);
+      }
+
+      else if(cmd==='underline'){
+        document.execCommand('underline',false,null);
+      }
+
+      else if(cmd==='color'){
+        const color=
+          document.getElementById('text-color')?.value ||
+          '#000000';
+
+        document.execCommand(
+          'foreColor',
+          false,
+          color
+        );
+      }
+
+      else if(cmd==='font'){
+        const family=
+          document.getElementById('font-family')?.value;
+
+        if(family){
+          document.execCommand(
+            'fontName',
+            false,
+            family
+          );
+        }
+      }
+
+      else if(cmd==='size'){
+        const size=
+          document.getElementById('font-size')?.value;
+
+        if(size){
+          document.execCommand(
+            'fontSize',
+            false,
+            '7'
+          );
+
+          // execCommand fontSize benutzt HTML <font size="7">.
+          // Anschließend auf die gewünschte CSS-Größe umstellen.
+          span.querySelectorAll('font[size="7"]').forEach(el=>{
+            el.removeAttribute('size');
+            el.style.fontSize=size+'px';
+          });
+        }
+      }
+
+    }catch(e){
+      console.warn('Inline format failed:',e);
+    }
+
+    // Auswahl wiederherstellen, damit der Benutzer direkt weiterarbeiten kann.
+    setTimeout(()=>{
+      _restoreRangeAfterCommand(savedRange);
+    },0);
+
+    const after=_saveInlineFormatState(span);
+
+    _pushInlineFormatHistory(
+      span,
+      before,
+      after
+    );
+
+    return;
+  }
+
+  /*
+   * ================================================================
+   * FALL B:
+   * KEINE AUSWAHL
+   *
+   * Nur der zukünftige Text wird formatiert.
+   * Der bestehende Text bleibt unverändert.
+   * ================================================================
+   */
+
+  if(cmd==='bold'){
+    _toggleTypingFormat('bold');
+  }
+
+  else if(cmd==='italic'){
+    _toggleTypingFormat('italic');
+  }
+
+  else if(cmd==='underline'){
+    _toggleTypingFormat('underline');
+  }
+
+  else if(cmd==='color'){
+    const color=
+      document.getElementById('text-color')?.value ||
+      '#000000';
+
+    _toggleTypingFormat('color',color);
+  }
+
+  else if(cmd==='font'){
+    const family=
+      document.getElementById('font-family')?.value;
+
+    if(family){
+      _fmtTypingState.font=family;
+    }
+  }
+
+  else if(cmd==='size'){
+    const size=
+      document.getElementById('font-size')?.value;
+
+    if(size){
+      _fmtTypingState.size=size;
+    }
+  }
+
+  _updateFormatButtons();
+
+  /*
+   * Bei collapsed Cursor den Editing-State setzen.
+   * Der vorhandene Text wird NICHT verändert.
+   */
+  _restoreFormatSelection();
+
+  const after=_saveInlineFormatState(span);
+
+  _pushInlineFormatHistory(
+    span,
+    before,
+    after
+  );
 }
 // ═══════════════════════════════════════
 // DRAGGABLE
@@ -1895,19 +2271,25 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   // ── EDIT TEXT: click on PDF text span → floating editor ──
 document.addEventListener('click',function(e){
-  if(editorMode!=='edit')return;
-  if(currentTab!=='edit')return;
-  if(!e.target.classList.contains('pdf-text-item'))return;
-  e.stopPropagation();
-  openInlineEditor(e.target);
-});
+  if(editorMode!=='edit') return;
+  if(currentTab!=='edit') return;
 
-  // Click on empty area in the Edit tab → close editor
-  ol.addEventListener('click',function(e){
-    if(e.target.classList.contains('pdf-text-item'))return;
-    if(e.target.id==='pdf-inline-editor')return;
-    closeInlineEditor();
-  });
+  const target=e.target.closest?.('.pdf-text-item');
+  if(!target) return;
+
+  e.stopPropagation();
+
+  // WICHTIG:
+  // Wenn genau dieser Text bereits bearbeitet wird,
+  // NICHT erneut openInlineEditor() aufrufen.
+  //
+  // Das war der Grund dafür, dass eine Mausauswahl
+  // nach dem Mouse-Up wieder zum Ende gesprungen ist.
+  if(window.activeInlineSpan === target){
+    return;
+  }
+
+  openInlineEditor(target);
 });
 
 window.activeInlineSpan = window.activeInlineSpan || null;
@@ -1922,6 +2304,18 @@ async function openInlineEditor(span){
   }
 
   window.activeInlineSpan=span;
+
+  // Formatierungsstatus für neu geschriebenen Text zurücksetzen
+  _fmtSavedRange=null;
+
+  _fmtTypingState={
+    bold:false,
+    italic:false,
+    underline:false,
+    color:null
+  };
+
+  _updateFormatButtons();
 
   if(!span.dataset.originalText){
     span.dataset.originalText=span.textContent;
@@ -2129,6 +2523,120 @@ function _inlineKeyHandler(e){
   }
 }
 // ═══════════════════════════════════════════════════════════════════
+// INLINE FORMAT RUNS
+// Wandelt z.B.
+//
+//   Hello <b>World</b> <span style="color:red">!</span>
+//
+// in einzelne PDF-Zeichenbereiche um.
+// ═══════════════════════════════════════════════════════════════════
+
+function _extractInlineFormatRuns(span){
+
+  const runs=[];
+
+  function walk(node,state){
+
+    if(node.nodeType===Node.TEXT_NODE){
+
+      const text=node.nodeValue || '';
+
+      if(!text) return;
+
+      runs.push({
+        text,
+
+        bold:!!state.bold,
+        italic:!!state.italic,
+        underline:!!state.underline,
+
+        color:state.color || null,
+
+        fontFamily:state.fontFamily || null,
+        fontSize:state.fontSize || null
+      });
+
+      return;
+    }
+
+    if(node.nodeType!==Node.ELEMENT_NODE) return;
+
+    const tag=node.tagName.toLowerCase();
+
+    const next={
+      ...state
+    };
+
+    if(tag==='b' || tag==='strong'){
+      next.bold=true;
+    }
+
+    if(tag==='i' || tag==='em'){
+      next.italic=true;
+    }
+
+    if(tag==='u'){
+      next.underline=true;
+    }
+
+    if(tag==='font'){
+      if(node.color){
+        next.color=node.color;
+      }
+
+      if(node.face){
+        next.fontFamily=node.face;
+      }
+    }
+
+    if(node.style){
+
+      if(node.style.color){
+        next.color=node.style.color;
+      }
+
+      if(node.style.fontWeight){
+        next.bold =
+          node.style.fontWeight==='bold' ||
+          parseInt(node.style.fontWeight,10)>=600;
+      }
+
+      if(node.style.fontStyle){
+        next.italic =
+          node.style.fontStyle==='italic';
+      }
+
+      if(node.style.textDecoration){
+        next.underline =
+          node.style.textDecoration.includes('underline');
+      }
+
+      if(node.style.fontFamily){
+        next.fontFamily=node.style.fontFamily;
+      }
+
+      if(node.style.fontSize){
+        next.fontSize=node.style.fontSize;
+      }
+    }
+
+    node.childNodes.forEach(child=>{
+      walk(child,next);
+    });
+  }
+
+  walk(span,{
+    bold:false,
+    italic:false,
+    underline:false,
+    color:null,
+    fontFamily:null,
+    fontSize:null
+  });
+
+  return runs;
+}
+// ═══════════════════════════════════════════════════════════════════
 // 3. TEXT-EDITOR Closing  & SAVE INTO PDF
 // ═══════════════════════════════════════════════════════════════════
 async function closeInlineEditor(save=true){
@@ -2137,8 +2645,15 @@ async function closeInlineEditor(save=true){
   window.activeInlineSpan = null;
   span.removeEventListener('keydown', _inlineKeyHandler);
 
-  const newText  = span.textContent.trim();
+  const newText = span.textContent.trim();
   const origText = span.dataset.originalText || '';
+  
+  // HTML enthält jetzt die tatsächlichen Inline-Formatierungen:
+  // <b>, <i>, <u>, <span style="color:..."> usw.
+  const formattedHTML = span.innerHTML;
+  
+  // Nur für Prüfung / Vergleich
+  const plainText = span.textContent.trim();
   const pageNum  = parseInt(span.dataset.pageNumber || currentPage, 10);
 
   span.contentEditable = 'false';
@@ -2163,8 +2678,21 @@ async function closeInlineEditor(save=true){
     });
   };
 
+  const hasInlineFormatting =
+    span.querySelector('b,strong,i,em,u,font,[style]') !== null;
+  
+  span.dataset._hasInlineFormatting =
+    hasInlineFormatting ? '1' : '0';
+  if(
+    !save ||
+    (
+      plainText === origText &&
+      !hasInlineFormatting
+    )
+  ){
+  
   // Cancel OR no change → restore original text
-  if(!save || newText === origText){
+  if(!save || (plainText === origText && !span.dataset._hasInlineFormatting)){
     span.textContent     = origText;
     span.style.color     = 'transparent';
     span.style.background= 'transparent';
@@ -2226,11 +2754,26 @@ async function closeInlineEditor(save=true){
       color,
       font,
       flags,
+  
+      // Plain text bleibt für Fallback / Matching erhalten
       newText,
+  
+      // NEU:
+      // komplette Inline-Struktur für gemischte Formatierung
+      formattedHTML,
+  
+      // NEU:
+      // einzelne Formatierungs-Runs für den PDF-Export
+      formatRuns: _extractInlineFormatRuns(span),
+  
       spanOrigText:origText,
       bgColor,
-      originalItemIndices: isNaN(itemIndex) ? [] : [itemIndex],
-      pdfJsTotalItemsCount: (window._pfItemCounts || {})[pageNum] || 0
+  
+      originalItemIndices:
+        isNaN(itemIndex) ? [] : [itemIndex],
+  
+      pdfJsTotalItemsCount:
+        (window._pfItemCounts || {})[pageNum] || 0
   };
   const editIdx = idx > -1 ? idx : pendingEdits.length;
   if(idx > -1) pendingEdits[idx] = edit;
