@@ -521,17 +521,197 @@ async function editBatchLocal(pdfBytes, edits){
       color: PDFLib.rgb(bgR,bgG,bgB),
     });
 
+    // ═══════════════════════════════════════════════════════════════════
+    // DRAW TEXT — unterstützt jetzt gemischte Inline-Formatierung
+    // ═══════════════════════════════════════════════════════════════════
+    
     if(edit.newText && edit.newText.trim()){
-      const stdFont = _pickStandardFont(edit.flags, edit.font);
-      if(!fontCache[stdFont]) fontCache[stdFont] = await doc.embedFont(stdFont);
-      const font = fontCache[stdFont];
-      const [tr,tg,tb] = _intColorToFloats(edit.color || 0);
-      const baselineY = pageHeight - edit.y1 + (edit.y1 - edit.y) * 0.15;
-      page.drawText(edit.newText, {
-        x: edit.x, y: baselineY,
-        size: edit.size || 12,
-        font, color: PDFLib.rgb(tr,tg,tb),
-      });
+    
+      const baseSize = edit.size || 12;
+    
+      const baselineY =
+        pageHeight -
+        edit.y1 +
+        (edit.y1 - edit.y) * 0.15;
+    
+      /*
+       * Wenn formatRuns vorhanden sind, wird jeder Run einzeln
+       * mit seinem eigenen Font / seiner eigenen Farbe gezeichnet.
+       */
+      if(
+        Array.isArray(edit.formatRuns) &&
+        edit.formatRuns.length > 0
+      ){
+    
+        let cursorX=edit.x;
+    
+        for(const run of edit.formatRuns){
+    
+          if(!run.text) continue;
+    
+          let flags=0;
+    
+          if(run.bold)    flags |= 16;
+          if(run.italic)  flags |= 2;
+    
+          const runFontName =
+            run.fontFamily ||
+            edit.font ||
+            '';
+    
+          const stdFont =
+            _pickStandardFont(
+              flags || edit.flags || 0,
+              runFontName
+            );
+    
+          if(!fontCache[stdFont]){
+            fontCache[stdFont] =
+              await doc.embedFont(stdFont);
+          }
+    
+          const font =
+            fontCache[stdFont];
+    
+          let colorValue =
+            run.color ||
+            null;
+    
+          let rgb;
+    
+          if(colorValue){
+    
+            // #RRGGBB
+            if(/^#[0-9a-f]{6}$/i.test(colorValue)){
+    
+              const r=parseInt(
+                colorValue.slice(1,3),
+                16
+              );
+    
+              const g=parseInt(
+                colorValue.slice(3,5),
+                16
+              );
+    
+              const b=parseInt(
+                colorValue.slice(5,7),
+                16
+              );
+    
+              rgb=PDFLib.rgb(
+                r/255,
+                g/255,
+                b/255
+              );
+    
+            }else{
+    
+              // rgb(r,g,b)
+              const m=
+                colorValue.match(
+                  /rgb\s*\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)\s*\)/i
+                );
+    
+              if(m){
+    
+                rgb=PDFLib.rgb(
+                  parseInt(m[1])/255,
+                  parseInt(m[2])/255,
+                  parseInt(m[3])/255
+                );
+    
+              }else{
+    
+                const [r,g,b]=
+                  _intColorToFloats(
+                    edit.color || 0
+                  );
+    
+                rgb=PDFLib.rgb(r,g,b);
+              }
+            }
+    
+          }else{
+    
+            const [r,g,b]=
+              _intColorToFloats(
+                edit.color || 0
+              );
+    
+            rgb=PDFLib.rgb(r,g,b);
+          }
+    
+          let runSize=baseSize;
+    
+          if(run.fontSize){
+    
+            const parsed=
+              parseFloat(run.fontSize);
+    
+            if(Number.isFinite(parsed)){
+              runSize=parsed;
+            }
+          }
+    
+          page.drawText(
+            run.text,
+            {
+              x:cursorX,
+              y:baselineY,
+              size:runSize,
+              font,
+              color:rgb
+            }
+          );
+    
+          // Breite des gerade gezeichneten Runs ermitteln,
+          // damit der nächste Run direkt danach beginnt.
+          const runWidth =
+            font.widthOfTextAtSize(
+              run.text,
+              runSize
+            );
+    
+          cursorX += runWidth;
+        }
+    
+      }else{
+    
+        // ─────────────────────────────────────────────
+        // ALTER/FALLBACK-MODUS
+        // ─────────────────────────────────────────────
+    
+        const stdFont =
+          _pickStandardFont(
+            edit.flags,
+            edit.font
+          );
+    
+        if(!fontCache[stdFont]){
+          fontCache[stdFont] =
+            await doc.embedFont(stdFont);
+        }
+    
+        const font =
+          fontCache[stdFont];
+    
+        const [tr,tg,tb] =
+          _intColorToFloats(
+            edit.color || 0
+          );
+    
+        page.drawText(
+          edit.newText,
+          {
+            x:edit.x,
+            y:baselineY,
+            size:baseSize,
+            font,
+            color:PDFLib.rgb(tr,tg,tb)
+          }
+        );
+      }
     }
   }
 
