@@ -1410,6 +1410,7 @@ function loadStoredToken(){
 }
   
 async function validateToken(){
+  if(!isLoggedIn()){ closeModal('token-modal'); openAuth('signup'); return; }
   const val=document.getElementById('token-val').value.trim();
   if(!val){toast('Enter a token','err');return}
   toast('Checking token...');
@@ -1777,7 +1778,10 @@ function openSignModal(){
   if(!currentUser&&!currentToken){toast('Please sign in first','warn');openAuth('signup');return}
   document.getElementById('sign-modal').classList.remove('hidden');
 }
-function openTokenModal(){document.getElementById('token-modal').classList.remove('hidden')}
+function openTokenModal(){
+  if(!isLoggedIn()){ openAuth('signup'); return; }
+  document.getElementById('token-modal').classList.remove('hidden');
+}
 function closeModal(id){document.getElementById(id).classList.add('hidden')}
 document.addEventListener('click',e=>{if(e.target.classList.contains('modal-bg'))e.target.classList.add('hidden')});
 
