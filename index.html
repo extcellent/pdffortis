@@ -1040,23 +1040,23 @@ window.stopTubes = function(){
       </div>
       <div class="rsep"></div>
       <div class="rgrp">
-        <button class="rbtn" id="fmt-bold" onclick="applyFormat('bold')" title="Bold">
+        <button class="rbtn" id="fmt-bold" onmousedown="event.preventDefault()" onclick="applyFormat('bold')" title="Bold">
           <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M4 3h5a3 3 0 010 6H4V3zM4 9h6a3 3 0 010 6H4V9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
           <span>Bold</span>
         </button>
-        <button class="rbtn" id="fmt-italic" onclick="applyFormat('italic')">
+        <button class="rbtn" id="fmt-italic" onmousedown="event.preventDefault()" onclick="applyFormat('italic')">
           <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M10 3H6M10 13H6M9 3L7 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           <span>Italic</span>
         </button>
-        <button class="rbtn" id="fmt-underline" onclick="applyFormat('underline')">
+        <button class="rbtn" id="fmt-underline" onmousedown="event.preventDefault()" onclick="applyFormat('underline')">
           <svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M4 3v5a4 4 0 008 0V3M2 13h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           <span>Underline</span>
         </button>
       </div>
       <div class="rsep"></div>
+        <button class="rbtn" onmousedown="event.preventDefault()" onclick="applyFormat('align-left')"><svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Left</span></button>
       <div class="rgrp">
-        <button class="rbtn" onclick="applyFormat('align-left')"><svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Left</span></button>
-        <button class="rbtn" onclick="applyFormat('align-center')"><svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M2 4h12M4 8h8M3 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Center</span></button>
+        <button class="rbtn" onmousedown="event.preventDefault()" onclick="applyFormat('align-center')"><svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M2 4h12M4 8h8M3 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Center</span></button>
       </div>
       <div class="rsep"></div>
       <div class="rgrp">
