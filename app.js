@@ -38,46 +38,114 @@ async function redo(){
 // Undo becomes active immediately while typing, not just after blur/Enter
 // ═══════════════════════════════════════
 document.addEventListener('input', function(e){
-  const span = e.target;
-  if(!span || !span.classList || !span.classList.contains('pdf-text-item')) return;
-  if(span.getAttribute('contenteditable') !== 'true') return;
 
-  const origText = span.dataset.originalText || '';
-  const currentText = span.textContent;
+  const span=e.target;
 
-  if(span.dataset._draftHistoryPushed !== '1'){
-    // Erster Input → Draft-History-Eintrag pushen
-    if(currentText === origText) return; // no real change yet
+  if(
+    !span ||
+    !span.classList ||
+    !span.classList.contains('pdf-text-item')
+  ) return;
 
-    const spanRef = span;
-    const pageNum = parseInt(span.dataset.pageNumber || currentPage, 10);
-    const x = parseFloat(span.dataset.pdfX);
-    const y = parseFloat(span.dataset.pdfY);
+  if(span.getAttribute('contenteditable')!=='true') return;
+
+  const origText=
+    span.dataset.originalText || '';
+
+  const currentText=
+    span.textContent;
+
+  if(span.dataset._draftHistoryPushed!=='1'){
+
+    if(currentText===origText){
+      return;
+    }
+
+    const spanRef=span;
+
+    const beforeHTML=
+      span.dataset._historyBeforeHTML ??
+      span.innerHTML;
+
+    const beforeState={
+      html:beforeHTML,
+      cssColor:span.dataset.cssColor || '',
+      cssWeight:span.dataset.cssWeight || '400',
+      cssStyle:span.dataset.cssStyle || 'normal',
+      textDecoration:span.style.textDecoration || 'none',
+      typing:{..._fmtTypingState}
+    };
 
     pushHistory({
-      undo: async () => {
-        spanRef.textContent = origText;
-        spanRef.dataset.editedText = origText;
-        spanRef.classList.remove('is-edited');
-        spanRef.style.color = 'transparent';
-        const idx = pendingEdits.findIndex(ed => ed.page===pageNum && ed.x===x && ed.y===y);
-        if(idx > -1) pendingEdits.splice(idx, 1);
-        if(pageNum === currentPage && typeof redrawPageCanvas === 'function') redrawPageCanvas(pageNum);
+
+      undo:async()=>{
+
+        spanRef.innerHTML=
+          beforeState.html;
+
+        spanRef.dataset.editedText=
+          spanRef.textContent;
+
+        spanRef.classList.remove(
+          'is-edited'
+        );
+
+        spanRef.style.color=
+          'transparent';
+
         delete spanRef.dataset._draftHistoryPushed;
+
+        if(
+          window.activeInlineSpan===spanRef
+        ){
+          setTimeout(()=>{
+            _restoreFormatSelection();
+          },0);
+        }
       },
-      redo: async () => {
-        const finalText = spanRef.dataset._draftFinalText || spanRef.textContent;
-        spanRef.textContent = finalText;
-        spanRef.dataset.editedText = finalText;
-        spanRef.classList.add('is-edited');
-        spanRef.style.color = spanRef.dataset.cssColor || 'black';
+
+      redo:async()=>{
+
+        const finalHTML=
+          spanRef.dataset._draftFinalHTML ||
+          spanRef.innerHTML;
+
+        spanRef.innerHTML=
+          finalHTML;
+
+        spanRef.dataset.editedText=
+          spanRef.textContent;
+
+        spanRef.classList.add(
+          'is-edited'
+        );
+
+        spanRef.style.color=
+          spanRef.dataset.cssColor ||
+          'black';
+
+        if(
+          window.activeInlineSpan===spanRef
+        ){
+          setTimeout(()=>{
+            _restoreFormatSelection();
+          },0);
+        }
       }
+
     });
-    span.dataset._draftHistoryPushed = '1';
-    span.dataset._draftFinalText = currentText;
-  } else {
-    span.dataset._draftFinalText = currentText;
+
+    span.dataset._draftHistoryPushed='1';
+
+    span.dataset._draftFinalHTML=
+      span.innerHTML;
+
+  }else{
+
+    span.dataset._draftFinalHTML=
+      span.innerHTML;
   }
+
 });
 
 function updateUndoRedoButtons(){
@@ -503,7 +571,14 @@ async function loadTextItems(pageNum, imgWidth, canvasWidth){
 
     const span=document.createElement('span');
     span.className='pdf-text-item';
-    span.textContent = existingEdit ? existingEdit.newText : item.text;
+    if(existingEdit && existingEdit.formattedHTML){
+      span.innerHTML = existingEdit.formattedHTML;
+    }else{
+      span.textContent =
+        existingEdit
+          ? existingEdit.newText
+          : item.text;
+    }
     span.dataset.originalText = existingEdit ? existingEdit.spanOrigText : item.text;
     span.dataset.editedText   = existingEdit ? existingEdit.newText : item.text;
 
