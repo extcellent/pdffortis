@@ -640,8 +640,8 @@ function switchRTab(tab){
       }
     });
   }
-  // Automatically activate edit mode when the Edit tab is selected
-  if(tab==='edit'&&editorMode!=='edit'){setMode('edit')}
+  // Automatically activate edit mode for any tool tab; only Navigate stays in look mode
+  if(tab!=='nav'&&editorMode!=='edit'){setMode('edit')}
 }
 
 // ═══════════════════════════════════════
