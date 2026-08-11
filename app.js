@@ -964,29 +964,48 @@ function _restoreFormatSelection(){
 }
 
 function applyFormat(cmd){
-  if (!window.activeInlineSpan) {
-    toast('Click into a text field first', 'err');
-    return;
+  const span = window.activeInlineSpan;
+  if (!span) { toast('Click into a text field first', 'err'); return; }
+  span.focus();
+
+  if(cmd==='bold'){
+    const isBold = span.dataset.cssWeight === '700';
+    span.dataset.cssWeight = isBold ? '400' : '700';
+    span.style.fontWeight = span.dataset.cssWeight;
+    document.getElementById('fmt-bold')?.classList.toggle('on', !isBold);
   }
-  if (!_restoreFormatSelection()) return;
-
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return;
-
-  if(cmd==='bold'){document.execCommand('bold')}
-  else if(cmd==='italic'){document.execCommand('italic')}
-  else if(cmd==='underline'){document.execCommand('underline')}
-  else if(cmd==='font'){document.execCommand('fontName',false,document.getElementById('font-family').value)}
-  else if(cmd==='size'){document.execCommand('fontSize',false,'3');const nodes=document.querySelectorAll('font[size="3"]');nodes.forEach(n=>{n.removeAttribute('size');n.style.fontSize=document.getElementById('font-size').value+'px'})}
-  else if(cmd==='color'){document.execCommand('foreColor',false,document.getElementById('text-color').value)}
-  else if(cmd==='align-left'){document.execCommand('justifyLeft')}
-  else if(cmd==='align-center'){document.execCommand('justifyCenter')}
-
-  // Remember where the selection ended up so the next command (e.g. clicking
-  // Bold then Italic in a row) still has a valid range to restore.
-  if (sel.rangeCount > 0) {
-    _fmtSavedRange = sel.getRangeAt(0).cloneRange();
+  else if(cmd==='italic'){
+    const isItalic = span.dataset.cssStyle === 'italic';
+    span.dataset.cssStyle = isItalic ? 'normal' : 'italic';
+    span.style.fontStyle = span.dataset.cssStyle;
+    document.getElementById('fmt-italic')?.classList.toggle('on', !isItalic);
   }
+  else if(cmd==='underline'){
+    const on = span.style.textDecoration === 'underline';
+    span.style.textDecoration = on ? 'none' : 'underline';
+    document.getElementById('fmt-underline')?.classList.toggle('on', !on);
+  }
+  else if(cmd==='font'){
+    span.dataset.cssFamily = document.getElementById('font-family').value;
+    span.style.fontFamily = span.dataset.cssFamily;
+  }
+  else if(cmd==='size'){
+    span.style.fontSize = document.getElementById('font-size').value + 'px';
+  }
+  else if(cmd==='color'){
+    span.dataset.cssColor = document.getElementById('text-color').value;
+    span.style.color = span.dataset.cssColor;
+  }
+  else if(cmd==='align-left'){ span.style.textAlign='left' }
+  else if(cmd==='align-center'){ span.style.textAlign='center' }
+
+  // Cursor ans Ende setzen, damit weitergeschrieben werden kann
+  const r=document.createRange();
+  r.selectNodeContents(span);
+  r.collapse(false);
+  const sel=window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
 }
 // ═══════════════════════════════════════
 // DRAGGABLE
