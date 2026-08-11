@@ -920,9 +920,59 @@ function addDelBtn(el){
 // ═══════════════════════════════════════
 // FORMAT (ribbon Edit tab)
 // ═══════════════════════════════════════
+// The ribbon controls (select / number input / color input) all steal
+// focus away from the contentEditable text span the moment they're
+// interacted with. Once focus moves off the span, the browser no longer
+// considers it "the" editable element, so document.execCommand() silently
+// no-ops even though window.getSelection() still looks populated.
+// To fix this we continuously remember the last selection Range that lived
+// inside the span being edited, and before running any format command we
+// re-focus that span and restore the remembered range first.
+let _fmtSavedRange = null;
+
+document.addEventListener('selectionchange', () => {
+  const span = window.activeInlineSpan;
+  if (!span) return;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  if (span.contains(range.commonAncestorContainer)) {
+    _fmtSavedRange = range.cloneRange();
+  }
+});
+
+function _restoreFormatSelection(){
+  const span = window.activeInlineSpan;
+  if (!span) return false;
+
+  span.focus();
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+
+  if (_fmtSavedRange && span.contains(_fmtSavedRange.commonAncestorContainer)) {
+    sel.addRange(_fmtSavedRange);
+  } else {
+    // Nothing usable was saved (e.g. user hasn't clicked into the text yet) —
+    // fall back to placing the cursor at the end of the editable span so the
+    // command still has somewhere to apply.
+    const r = document.createRange();
+    r.selectNodeContents(span);
+    r.collapse(false);
+    sel.addRange(r);
+  }
+  return true;
+}
+
 function applyFormat(cmd){
-  const sel=window.getSelection();
-  if(!sel||sel.rangeCount===0)return;
+  if (!window.activeInlineSpan) {
+    toast('Click into a text field first', 'err');
+    return;
+  }
+  if (!_restoreFormatSelection()) return;
+
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+
   if(cmd==='bold'){document.execCommand('bold')}
   else if(cmd==='italic'){document.execCommand('italic')}
   else if(cmd==='underline'){document.execCommand('underline')}
@@ -931,8 +981,13 @@ function applyFormat(cmd){
   else if(cmd==='color'){document.execCommand('foreColor',false,document.getElementById('text-color').value)}
   else if(cmd==='align-left'){document.execCommand('justifyLeft')}
   else if(cmd==='align-center'){document.execCommand('justifyCenter')}
-}
 
+  // Remember where the selection ended up so the next command (e.g. clicking
+  // Bold then Italic in a row) still has a valid range to restore.
+  if (sel.rangeCount > 0) {
+    _fmtSavedRange = sel.getRangeAt(0).cloneRange();
+  }
+}
 // ═══════════════════════════════════════
 // DRAGGABLE
 // ═══════════════════════════════════════
