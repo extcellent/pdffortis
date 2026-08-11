@@ -2711,53 +2711,117 @@ function _extractInlineFormatRuns(span){
 
   return runs;
 }
+
 // ═══════════════════════════════════════════════════════════════════
-// 3. TEXT-EDITOR Closing  & SAVE INTO PDF
+// 3. TEXT-EDITOR — Closing & SAVE INTO PDF
 // ═══════════════════════════════════════════════════════════════════
 async function closeInlineEditor(save=true){
+
   if(!window.activeInlineSpan) return;
+
   const span = window.activeInlineSpan;
+
+  // WICHTIG:
+  // activeInlineSpan erst NACH dem Sichern der relevanten Daten löschen.
   window.activeInlineSpan = null;
+
   span.removeEventListener('keydown', _inlineKeyHandler);
 
-  const newText = span.textContent.trim();
-  const origText = span.dataset.originalText || '';
-  
-  // HTML enthält jetzt die tatsächlichen Inline-Formatierungen:
-  // <b>, <i>, <u>, <span style="color:..."> usw.
-  const formattedHTML = span.innerHTML;
-  
-  // Nur für Prüfung / Vergleich
-  const plainText = span.textContent.trim();
-  const pageNum  = parseInt(span.dataset.pageNumber || currentPage, 10);
+  // ────────────────────────────────────────────────────────────────
+  // ORIGINAL / AKTUELL
+  // ────────────────────────────────────────────────────────────────
+
+  const origText =
+    span.dataset.originalText || '';
+
+  const plainText =
+    span.textContent.trim();
+
+  // Das ist der entscheidende Unterschied:
+  //
+  // textContent  = reiner Text
+  // innerHTML    = Text + Bold + Farbe + Italic + Underline
+  //
+  const formattedHTML =
+    span.innerHTML;
+
+  const pageNum =
+    parseInt(
+      span.dataset.pageNumber || currentPage,
+      10
+    );
+
+  // ────────────────────────────────────────────────────────────────
+  // FORMATIERUNG ERKENNEN
+  // ────────────────────────────────────────────────────────────────
+
+  const hasInlineFormatting =
+    span.querySelector(
+      'b,strong,i,em,u,font,[style]'
+    ) !== null;
+
+  span.dataset._hasInlineFormatting =
+    hasInlineFormatting ? '1' : '0';
+
+  // ────────────────────────────────────────────────────────────────
+  // EDITOR-MODUS SCHLIESSEN
+  // ────────────────────────────────────────────────────────────────
 
   span.contentEditable = 'false';
   span.classList.remove('editing');
-  // Safety: kill all inline styles from editing mode
+
   span.style.boxShadow = 'none';
   span.style.border    = 'none';
   span.style.outline   = 'none';
   span.style.background= 'transparent';
   span.style.padding   = '0';
 
-  const canvas = document.getElementById('pdf-canvas');
-  const ctx    = canvas.getContext('2d',{willReadFrequently:true});
-  const img    = pageImages[pageNum];
+  // ────────────────────────────────────────────────────────────────
+  // CANVAS / ORIGINAL SEITE
+  // ────────────────────────────────────────────────────────────────
+
+  const canvas =
+    document.getElementById('pdf-canvas');
+
+  const ctx =
+    canvas.getContext(
+      '2d',
+      {willReadFrequently:true}
+    );
+
+  const img =
+    pageImages[pageNum];
 
   const restorePage = () => {
+
     if(!img) return;
-    ctx.drawImage(img,0,0,canvas.width,canvas.height);
-    (pageMasks[pageNum]||[]).forEach(m=>{
-      ctx.fillStyle=m.bg;
-      ctx.fillRect(m.x,m.y,m.w,m.h);
+
+    ctx.drawImage(
+      img,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    (pageMasks[pageNum] || []).forEach(m => {
+
+      ctx.fillStyle = m.bg;
+
+      ctx.fillRect(
+        m.x,
+        m.y,
+        m.w,
+        m.h
+      );
+
     });
   };
 
-  const hasInlineFormatting =
-    span.querySelector('b,strong,i,em,u,font,[style]') !== null;
-  
-  span.dataset._hasInlineFormatting =
-    hasInlineFormatting ? '1' : '0';
+  // ────────────────────────────────────────────────────────────────
+  // CANCEL / KEINE ÄNDERUNG
+  // ────────────────────────────────────────────────────────────────
+
   if(
     !save ||
     (
@@ -2765,150 +2829,475 @@ async function closeInlineEditor(save=true){
       !hasInlineFormatting
     )
   ){
-  
-  // Cancel OR no change → restore original text
-  if(!save || (plainText === origText && !span.dataset._hasInlineFormatting)){
-    span.textContent     = origText;
-    span.style.color     = 'transparent';
-    span.style.background= 'transparent';
-    span.classList.remove('is-edited');
+
+    span.textContent =
+      origText;
+
+    span.style.color =
+      'transparent';
+
+    span.style.background =
+      'transparent';
+
+    span.classList.remove(
+      'is-edited'
+    );
+
     delete span.dataset.maskInfo;
     delete span.dataset.maskPage;
+
     restorePage();
+
     return;
   }
 
-  // === Text was changed ===
-  if (typeof window.pftNotifyPageEdited === 'function') {
-    window.pftNotifyPageEdited(pageNum);
+  // ────────────────────────────────────────────────────────────────
+  // SEITE ALS EDITIERT MARKIEREN
+  // ────────────────────────────────────────────────────────────────
+
+  if(
+    typeof window.pftNotifyPageEdited ===
+    'function'
+  ){
+
+    window.pftNotifyPageEdited(
+      pageNum
+    );
   }
 
-  // === Text was changed ===
-  const _prevMaskRect = span._maskRect;
+  // ────────────────────────────────────────────────────────────────
+  // MASK RECT
+  // ────────────────────────────────────────────────────────────────
 
-  // 1) Permanently move mask into pageMasks → persists after re-render
+  const _prevMaskRect =
+    span._maskRect;
+
   if(span._maskRect){
-    if(!pageMasks[pageNum]) pageMasks[pageNum]=[];
-    pageMasks[pageNum].push(span._maskRect);
+
+    if(!pageMasks[pageNum]){
+      pageMasks[pageNum] = [];
+    }
+
+    pageMasks[pageNum].push(
+      span._maskRect
+    );
+
     delete span._maskRect;
     delete span.dataset.maskInfo;
     delete span.dataset.maskPage;
   }
 
-  span.textContent        = newText;
-  span.dataset.editedText = newText;
-  span.style.color        = span.dataset.cssColor  || 'black';
-  span.style.fontFamily   = span.dataset.cssFamily || 'Arial,sans-serif';
-  span.style.fontWeight   = span.dataset.cssWeight || '400';
-  span.style.fontStyle    = span.dataset.cssStyle  || 'normal';
-  span.style.background   = 'transparent';
-  span.style.boxShadow    = 'none';
-  span.style.border       = 'none';
-  span.style.outline      = 'none';
-  span.style.padding      = '0';
-  span.classList.add('is-edited');
+  // ────────────────────────────────────────────────────────────────
+  // WICHTIG:
+  //
+  // NICHT:
+  // span.textContent = newText
+  //
+  // Denn das würde alle Inline-Formatierungen zerstören.
+  //
+  // Stattdessen bleibt innerHTML erhalten.
+  // ────────────────────────────────────────────────────────────────
 
-  // 3) Remember for download to backend
-  const x  = parseFloat(span.dataset.pdfX);
-  const y  = parseFloat(span.dataset.pdfY);
-  const x1 = parseFloat(span.dataset.pdfX1);
-  const y1 = parseFloat(span.dataset.pdfY1);
-  const size = parseFloat(span.dataset.pdfFontSize) || 12;
+  span.dataset.editedText =
+    plainText;
 
-  const color = parseInt(span.dataset.pdfColor||0,10);
-  const font  = span.dataset.pdfFont  || '';
-  const flags = parseInt(span.dataset.pdfFlags||0,10);
-  const idx = pendingEdits.findIndex(e => e.page===pageNum && e.x===x && e.y===y);
-  const prevEdit = idx > -1 ? {...pendingEdits[idx]} : null;
-  const bgColor = _prevMaskRect ? _prevMaskRect.bg : null; // exact background color from the preview
-  const itemIndex = parseInt(span.dataset.pdfItemIndex, 10);
+  span.dataset.formattedHTML =
+    formattedHTML;
+
+  span.style.color =
+    span.dataset.cssColor ||
+    'black';
+
+  span.style.fontFamily =
+    span.dataset.cssFamily ||
+    'Arial,sans-serif';
+
+  span.style.fontWeight =
+    span.dataset.cssWeight ||
+    '400';
+
+  span.style.fontStyle =
+    span.dataset.cssStyle ||
+    'normal';
+
+  span.style.background =
+    'transparent';
+
+  span.style.boxShadow =
+    'none';
+
+  span.style.border =
+    'none';
+
+  span.style.outline =
+    'none';
+
+  span.style.padding =
+    '0';
+
+  span.classList.add(
+    'is-edited'
+  );
+
+  // ────────────────────────────────────────────────────────────────
+  // PDF POSITION / FONT
+  // ────────────────────────────────────────────────────────────────
+
+  const x =
+    parseFloat(
+      span.dataset.pdfX
+    );
+
+  const y =
+    parseFloat(
+      span.dataset.pdfY
+    );
+
+  const x1 =
+    parseFloat(
+      span.dataset.pdfX1
+    );
+
+  const y1 =
+    parseFloat(
+      span.dataset.pdfY1
+    );
+
+  const size =
+    parseFloat(
+      span.dataset.pdfFontSize
+    ) || 12;
+
+  const color =
+    parseInt(
+      span.dataset.pdfColor || 0,
+      10
+    );
+
+  const font =
+    span.dataset.pdfFont || '';
+
+  const flags =
+    parseInt(
+      span.dataset.pdfFlags || 0,
+      10
+    );
+
+  const itemIndex =
+    parseInt(
+      span.dataset.pdfItemIndex,
+      10
+    );
+
+  // ────────────────────────────────────────────────────────────────
+  // FORMAT RUNS ERZEUGEN
+  //
+  // Beispiel:
+  //
+  // Hallo <b>Welt</b> <span style="color:red">!</span>
+  //
+  // wird zu:
+  //
+  // [
+  //   {text:"Hallo ", bold:false},
+  //   {text:"Welt", bold:true},
+  //   {text:" !", color:"red"}
+  // ]
+  // ────────────────────────────────────────────────────────────────
+
+  const formatRuns =
+    typeof _extractInlineFormatRuns ===
+    'function'
+      ? _extractInlineFormatRuns(span)
+      : [];
+
+  // ────────────────────────────────────────────────────────────────
+  // EXISTING PENDING EDIT
+  // ────────────────────────────────────────────────────────────────
+
+  const idx =
+    pendingEdits.findIndex(
+      e =>
+        e.page === pageNum &&
+        e.x === x &&
+        e.y === y
+    );
+
+  const prevEdit =
+    idx > -1
+      ? {...pendingEdits[idx]}
+      : null;
+
+  const bgColor =
+    _prevMaskRect
+      ? _prevMaskRect.bg
+      : null;
+
+  // ────────────────────────────────────────────────────────────────
+  // EDIT OBJEKT
+  // ────────────────────────────────────────────────────────────────
+
   const edit = {
-      page:pageNum,
-      x, y, x1, y1,
-      size,
-      color,
-      font,
-      flags,
-  
-      // Plain text bleibt für Fallback / Matching erhalten
-      newText,
-  
-      // NEU:
-      // komplette Inline-Struktur für gemischte Formatierung
-      formattedHTML,
-  
-      // NEU:
-      // einzelne Formatierungs-Runs für den PDF-Export
-      formatRuns: _extractInlineFormatRuns(span),
-  
-      spanOrigText:origText,
-      bgColor,
-  
-      originalItemIndices:
-        isNaN(itemIndex) ? [] : [itemIndex],
-  
-      pdfJsTotalItemsCount:
-        (window._pfItemCounts || {})[pageNum] || 0
-  };
-  const editIdx = idx > -1 ? idx : pendingEdits.length;
-  if(idx > -1) pendingEdits[idx] = edit;
-  else pendingEdits.push(edit);
 
-  // 4) Register undo/redo — take over draft from input listener if present
-  if(span.dataset._draftHistoryPushed === '1' && historyStack[historyIndex]){
-    // Draft entry already exists — just set the redo text to the final value
-    span.dataset._draftFinalText = newText;
+    page: pageNum,
+
+    x,
+    y,
+    x1,
+    y1,
+
+    size,
+    color,
+    font,
+    flags,
+
+    // Reiner Text
+    newText: plainText,
+
+    // KOMPLETTER HTML-INHALT
+    formattedHTML,
+
+    // GEMISCHTE FORMATIERUNG
+    formatRuns,
+
+    spanOrigText:
+      origText,
+
+    bgColor,
+
+    originalItemIndices:
+      isNaN(itemIndex)
+        ? []
+        : [itemIndex],
+
+    pdfJsTotalItemsCount:
+      (window._pfItemCounts || {})[pageNum] || 0
+  };
+
+  const editIdx =
+    idx > -1
+      ? idx
+      : pendingEdits.length;
+
+  if(idx > -1){
+
+    pendingEdits[idx] =
+      edit;
+
+  }else{
+
+    pendingEdits.push(
+      edit
+    );
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // UNDO / REDO
+  // ────────────────────────────────────────────────────────────────
+
+  if(
+    span.dataset._draftHistoryPushed ===
+    '1' &&
+    historyStack[historyIndex]
+  ){
+
+    // Draft-History existiert bereits.
+    // Wir aktualisieren nur den finalen Zustand.
+
+    span.dataset._draftFinalText =
+      plainText;
+
+    span.dataset._draftFinalHTML =
+      formattedHTML;
+
     delete span.dataset._draftHistoryPushed;
-    const _draftEntry = historyStack[historyIndex];
-    const _origUndo = _draftEntry.undo;
-    _draftEntry.undo = async () => {
-      await _origUndo();
-      // additionally: cleanly remove pendingEdits like in the full closeInlineEditor
-      const idx2 = pendingEdits.findIndex(ed => ed===edit);
-      if(idx2 > -1) pendingEdits.splice(idx2, 1);
-    };
-    _draftEntry.redo = async () => {
-      pendingEdits[editIdx]=edit;
-      span.textContent=newText;
-      span.classList.add('is-edited');
-      span.style.color=span.dataset.cssColor||'black';
-      if(pageNum===currentPage && typeof redrawPageCanvas==='function') redrawPageCanvas(pageNum);
-    };
+
+    const _draftEntry =
+      historyStack[historyIndex];
+
+    const _origUndo =
+      _draftEntry.undo;
+
+    _draftEntry.undo =
+      async () => {
+
+        await _origUndo();
+
+        const idx2 =
+          pendingEdits.findIndex(
+            ed => ed === edit
+          );
+
+        if(idx2 > -1){
+
+          pendingEdits.splice(
+            idx2,
+            1
+          );
+        }
+      };
+
+    _draftEntry.redo =
+      async () => {
+
+        pendingEdits[editIdx] =
+          edit;
+
+        // HTML wiederherstellen,
+        // NICHT textContent!
+        span.innerHTML =
+          formattedHTML;
+
+        span.dataset.editedText =
+          plainText;
+
+        span.classList.add(
+          'is-edited'
+        );
+
+        span.style.color =
+          span.dataset.cssColor ||
+          'black';
+
+        if(
+          pageNum === currentPage &&
+          typeof redrawPageCanvas ===
+          'function'
+        ){
+
+          redrawPageCanvas(
+            pageNum
+          );
+        }
+      };
+
     updateUndoRedoButtons();
-  } else {
-  pushHistory({
-    undo:()=>{
-      if(_prevMaskRect){
-        const arr=pageMasks[pageNum]||[];
-        const mi=arr.indexOf(_prevMaskRect);
-        if(mi>-1) arr.splice(mi,1);
+
+  }else{
+
+    // ────────────────────────────────────────────────────────────
+    // NORMALER UNDO/REDO EINTRAG
+    // ────────────────────────────────────────────────────────────
+
+    pushHistory({
+
+      undo: () => {
+
+        if(_prevMaskRect){
+
+          const arr =
+            pageMasks[pageNum] ||
+            [];
+
+          const mi =
+            arr.indexOf(
+              _prevMaskRect
+            );
+
+          if(mi > -1){
+
+            arr.splice(
+              mi,
+              1
+            );
+          }
+        }
+
+        if(prevEdit){
+
+          pendingEdits[editIdx] =
+            prevEdit;
+
+          // Vorherigen HTML-Zustand wiederherstellen
+          if(prevEdit.formattedHTML){
+
+            span.innerHTML =
+              prevEdit.formattedHTML;
+
+          }else{
+
+            span.textContent =
+              prevEdit.newText;
+          }
+
+          span.classList.add(
+            'is-edited'
+          );
+
+          span.style.color =
+            span.dataset.cssColor ||
+            'black';
+
+        }else{
+
+          pendingEdits.splice(
+            editIdx,
+            1
+          );
+
+          span.textContent =
+            origText;
+
+          span.classList.remove(
+            'is-edited'
+          );
+
+          span.style.color =
+            'transparent';
+        }
+
+        if(
+          pageNum === currentPage
+        ){
+
+          redrawPageCanvas(
+            pageNum
+          );
+        }
+      },
+
+      redo: () => {
+
+        if(_prevMaskRect){
+
+          if(!pageMasks[pageNum]){
+            pageMasks[pageNum] = [];
+          }
+
+          pageMasks[pageNum].push(
+            _prevMaskRect
+          );
+        }
+
+        pendingEdits[editIdx] =
+          edit;
+
+        // HTML wiederherstellen
+        span.innerHTML =
+          formattedHTML;
+
+        span.dataset.editedText =
+          plainText;
+
+        span.classList.add(
+          'is-edited'
+        );
+
+        span.style.color =
+          span.dataset.cssColor ||
+          'black';
+
+        if(
+          pageNum === currentPage
+        ){
+
+          redrawPageCanvas(
+            pageNum
+          );
+        }
       }
-      if(prevEdit){
-        pendingEdits[editIdx]=prevEdit;
-        span.textContent=prevEdit.newText;
-        span.classList.add('is-edited');
-        span.style.color=span.dataset.cssColor||'black';
-      } else {
-        pendingEdits.splice(editIdx,1);
-        span.textContent=origText;
-        span.classList.remove('is-edited');
-        span.style.color='transparent';
-      }
-      if(pageNum===currentPage) redrawPageCanvas(pageNum);
-    },
-    redo:()=>{
-      if(_prevMaskRect){
-        if(!pageMasks[pageNum]) pageMasks[pageNum]=[];
-        pageMasks[pageNum].push(_prevMaskRect);
-      }
-      pendingEdits[editIdx]=edit;
-      span.textContent=newText;
-      span.classList.add('is-edited');
-      span.style.color=span.dataset.cssColor||'black';
-      if(pageNum===currentPage) redrawPageCanvas(pageNum);
-    }
-  });
-}
+    });
+  }
 }
    
 // ═══════════════════════════════════════
