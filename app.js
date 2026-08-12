@@ -1282,55 +1282,67 @@ function _applyTypingFormat(span){
 
 function applyFormat(cmd){
 
-  const span=window.activeInlineSpan;
+  const span = window.activeInlineSpan;
 
   if(!span){
     toast('Click into a text field first','err');
     return;
   }
 
-  const before=_saveInlineFormatState(span);
+  const before = _saveInlineFormatState(span);
 
-  // Selection wiederherstellen, bevor der Toolbar-Button den Fokus übernimmt.
-  _restoreFormatSelection();
+  /*
+   * SELECTION ZUERST SICHERN
+   *
+   * Der Toolbar-Button bekommt sonst den Fokus und
+   * die Browser-Selection verschwindet.
+   */
+  const range = _getCurrentOrSavedRange();
 
-  const range=_getCurrentOrSavedRange();
-  const hasSelection=_hasRealSelection(range);
+  if(!range){
+    toast('Click into the text first','err');
+    return;
+  }
+
+  const hasSelection = _hasRealSelection(range);
 
   /*
    * ================================================================
-   * FALL A:
-   * TEXT IST MARKIERT
-   *
-   * Nur die Auswahl wird formatiert.
+   * FALL A — TEXT IST MARKIERT
    * ================================================================
+   *
+   * Nur die Markierung wird verändert.
    */
   if(hasSelection){
 
-    const savedRange=range.cloneRange();
+    const savedRange = range.cloneRange();
 
     span.focus();
 
-    const sel=window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(savedRange);
+    const sel = window.getSelection();
+
+    if(sel){
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+    }
 
     try{
 
-      if(cmd==='bold'){
-        document.execCommand('bold',false,null);
+      if(cmd === 'bold'){
+        document.execCommand('bold', false, null);
       }
 
-      else if(cmd==='italic'){
-        document.execCommand('italic',false,null);
+      else if(cmd === 'italic'){
+        document.execCommand('italic', false, null);
       }
 
-      else if(cmd==='underline'){
-        document.execCommand('underline',false,null);
+      else if(cmd === 'underline'){
+        document.execCommand('underline', false, null);
       }
 
-      else if(cmd==='color'){
-        const color=
+      else if(cmd === 'color'){
+
+        const color =
           document.getElementById('text-color')?.value ||
           '#000000';
 
@@ -1341,11 +1353,13 @@ function applyFormat(cmd){
         );
       }
 
-      else if(cmd==='font'){
-        const family=
+      else if(cmd === 'font'){
+
+        const family =
           document.getElementById('font-family')?.value;
 
         if(family){
+
           document.execCommand(
             'fontName',
             false,
@@ -1354,36 +1368,76 @@ function applyFormat(cmd){
         }
       }
 
-      else if(cmd==='size'){
-        const size=
+      else if(cmd === 'size'){
+
+        const size =
           document.getElementById('font-size')?.value;
 
         if(size){
+
           document.execCommand(
             'fontSize',
             false,
             '7'
           );
 
-          // execCommand fontSize benutzt HTML <font size="7">.
-          // Anschließend auf die gewünschte CSS-Größe umstellen.
-          span.querySelectorAll('font[size="7"]').forEach(el=>{
-            el.removeAttribute('size');
-            el.style.fontSize=size+'px';
-          });
+          span
+            .querySelectorAll('font[size="7"]')
+            .forEach(el => {
+
+              el.removeAttribute('size');
+              el.style.fontSize = size + 'px';
+
+            });
         }
       }
 
     }catch(e){
-      console.warn('Inline format failed:',e);
+
+      console.warn(
+        'Inline selection formatting failed:',
+        e
+      );
+
     }
 
-    // Auswahl wiederherstellen, damit der Benutzer direkt weiterarbeiten kann.
-    setTimeout(()=>{
-      _restoreRangeAfterCommand(savedRange);
+    /*
+     * Selection nach dem Formatieren wieder einsetzen.
+     *
+     * WICHTIG:
+     * Nicht den alten Range blind wiederverwenden,
+     * falls execCommand die DOM-Struktur verändert hat.
+     */
+    setTimeout(() => {
+
+      const currentSel = window.getSelection();
+
+      if(!currentSel) return;
+
+      try{
+
+        currentSel.removeAllRanges();
+
+        /*
+         * Der gespeicherte Range funktioniert in den meisten Fällen.
+         */
+        currentSel.addRange(savedRange);
+
+        _fmtSavedRange = savedRange.cloneRange();
+
+      }catch(e){
+
+        /*
+         * Fallback:
+         * gespeicherte Auswahl aus dem aktuellen DOM holen.
+         */
+        _fmtSavedRange = null;
+
+      }
+
     },0);
 
-    const after=_saveInlineFormatState(span);
+    const after = _saveInlineFormatState(span);
 
     _pushInlineFormatHistory(
       span,
@@ -1394,63 +1448,225 @@ function applyFormat(cmd){
     return;
   }
 
+
   /*
    * ================================================================
-   * FALL B:
-   * KEINE AUSWAHL
+   * FALL B — KEINE MARKIERUNG
+   * ================================================================
    *
-   * Nur der zukünftige Text wird formatiert.
-   * Der bestehende Text bleibt unverändert.
-   * ================================================================
+   * Jetzt kommt der wichtige Fix:
+   *
+   * Der Browser bekommt tatsächlich execCommand().
+   *
+   * Dadurch gilt z.B.:
+   *
+   *   Cursor
+   *   ↓
+   *   |Hallo
+   *
+   * Bold klicken
+   * ↓
+   *   |Hallo
+   *
+   * danach schreiben:
+   *   Hallo NEUER TEXT
+   *
+   * wobei NEUER TEXT bold ist.
+   *
+   * Der bereits vorhandene Text bleibt unverändert.
    */
 
-  if(cmd==='bold'){
-    _toggleTypingFormat('bold');
-  }
-
-  else if(cmd==='italic'){
-    _toggleTypingFormat('italic');
-  }
-
-  else if(cmd==='underline'){
-    _toggleTypingFormat('underline');
-  }
-
-  else if(cmd==='color'){
-    const color=
-      document.getElementById('text-color')?.value ||
-      '#000000';
-
-    _toggleTypingFormat('color',color);
-  }
-
-  else if(cmd==='font'){
-    const family=
-      document.getElementById('font-family')?.value;
-
-    if(family){
-      _fmtTypingState.font=family;
-    }
-  }
-
-  else if(cmd==='size'){
-    const size=
-      document.getElementById('font-size')?.value;
-
-    if(size){
-      _fmtTypingState.size=size;
-    }
-  }
-
-  _updateFormatButtons();
-
-  /*
-   * Bei collapsed Cursor den Editing-State setzen.
-   * Der vorhandene Text wird NICHT verändert.
-   */
   _restoreFormatSelection();
 
-  const after=_saveInlineFormatState(span);
+  const typingRange = _getCurrentOrSavedRange();
+
+  if(!typingRange){
+    return;
+  }
+
+  const sel = window.getSelection();
+
+  if(!sel){
+    return;
+  }
+
+  try{
+
+    sel.removeAllRanges();
+    sel.addRange(typingRange);
+
+  }catch(e){
+
+    console.warn(
+      'Could not restore typing cursor:',
+      e
+    );
+
+    return;
+  }
+
+
+  try{
+
+    if(cmd === 'bold'){
+
+      /*
+       * Das ist der entscheidende Fix.
+       *
+       * execCommand bei collapsed Cursor setzt
+       * den Browser-Editing-State für den nächsten Text.
+       */
+      document.execCommand(
+        'bold',
+        false,
+        null
+      );
+
+      _fmtTypingState.bold =
+        !_fmtTypingState.bold;
+    }
+
+
+    else if(cmd === 'italic'){
+
+      document.execCommand(
+        'italic',
+        false,
+        null
+      );
+
+      _fmtTypingState.italic =
+        !_fmtTypingState.italic;
+    }
+
+
+    else if(cmd === 'underline'){
+
+      document.execCommand(
+        'underline',
+        false,
+        null
+      );
+
+      _fmtTypingState.underline =
+        !_fmtTypingState.underline;
+    }
+
+
+    else if(cmd === 'color'){
+
+      const color =
+        document.getElementById('text-color')?.value ||
+        '#000000';
+
+      /*
+       * WICHTIG:
+       * Farbe wirklich am Cursor setzen.
+       * Nicht nur _fmtTypingState verändern.
+       */
+      document.execCommand(
+        'foreColor',
+        false,
+        color
+      );
+
+      _fmtTypingState.color = color;
+    }
+
+
+    else if(cmd === 'font'){
+
+      const family =
+        document.getElementById('font-family')?.value;
+
+      if(family){
+
+        document.execCommand(
+          'fontName',
+          false,
+          family
+        );
+
+        _fmtTypingState.font = family;
+      }
+    }
+
+
+    else if(cmd === 'size'){
+
+      const size =
+        document.getElementById('font-size')?.value;
+
+      if(size){
+
+        document.execCommand(
+          'fontSize',
+          false,
+          '7'
+        );
+
+        span
+          .querySelectorAll('font[size="7"]')
+          .forEach(el => {
+
+            el.removeAttribute('size');
+            el.style.fontSize =
+              size + 'px';
+
+          });
+
+        _fmtTypingState.size = size;
+      }
+    }
+
+  }catch(e){
+
+    console.warn(
+      'Inline typing formatting failed:',
+      e
+    );
+  }
+
+
+  /*
+   * Cursor wieder exakt an seiner Stelle lassen.
+   */
+  setTimeout(() => {
+
+    try{
+
+      const currentSel =
+        window.getSelection();
+
+      if(currentSel){
+
+        currentSel.removeAllRanges();
+
+        /*
+         * Nach execCommand kann sich der Range
+         * leicht verändert haben.
+         *
+         * Deshalb Cursor nicht ans Ende setzen.
+         */
+        if(_fmtSavedRange){
+
+          currentSel.addRange(
+            _fmtSavedRange
+          );
+
+        }
+
+      }
+
+    }catch(e){}
+
+    _updateFormatButtons();
+
+  },0);
+
+
+  const after =
+    _saveInlineFormatState(span);
 
   _pushInlineFormatHistory(
     span,
@@ -2578,12 +2794,22 @@ async function openInlineEditor(span){
 
 
   span.focus();
-  const range=document.createRange();
+  
+  const range = document.createRange();
+  
   range.selectNodeContents(span);
   range.collapse(false);
-  const sel=window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
+  
+  const sel = window.getSelection();
+  
+  if(sel){
+  
+    sel.removeAllRanges();
+    sel.addRange(range);
+  
+    _fmtSavedRange = range.cloneRange();
+  
+  }
 
   span.addEventListener('keydown',_inlineKeyHandler);
 }
@@ -2821,33 +3047,56 @@ async function closeInlineEditor(save=true){
   // ────────────────────────────────────────────────────────────────
   // CANCEL / KEINE ÄNDERUNG
   // ────────────────────────────────────────────────────────────────
-
-  if(
-    !save ||
-    (
-      plainText === origText &&
-      !hasInlineFormatting
-    )
-  ){
-
-    span.textContent =
-      origText;
-
-    span.style.color =
-      'transparent';
-
-    span.style.background =
-      'transparent';
-
-    span.classList.remove(
-      'is-edited'
-    );
-
+  
+  if(!save){
+  
+    /*
+     * ESC = wirklich abbrechen.
+     * Deshalb HTML komplett auf den ursprünglichen Text zurücksetzen.
+     */
+    span.textContent = origText;
+  
+    span.style.color = 'transparent';
+  
+    span.style.background = 'transparent';
+  
+    span.classList.remove('is-edited');
+  
     delete span.dataset.maskInfo;
     delete span.dataset.maskPage;
-
+  
     restorePage();
-
+  
+    return;
+  }
+  
+  
+  /*
+   * SAVE:
+   *
+   * Auch wenn der reine Text gleich geblieben ist,
+   * kann sich die Formatierung geändert haben.
+   *
+   * Deshalb NICHT nur plainText vergleichen.
+   */
+  if(
+    plainText === origText &&
+    !hasInlineFormatting
+  ){
+  
+    span.textContent = origText;
+  
+    span.style.color = 'transparent';
+  
+    span.style.background = 'transparent';
+  
+    span.classList.remove('is-edited');
+  
+    delete span.dataset.maskInfo;
+    delete span.dataset.maskPage;
+  
+    restorePage();
+  
     return;
   }
 
