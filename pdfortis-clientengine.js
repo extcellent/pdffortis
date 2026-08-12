@@ -767,7 +767,13 @@ async function editBatchLocal(pdfBytes, edits){
               runSize=parsed;
             }
           }
-    
+          console.log(
+            '[PDF RUN COLOR]',
+            run.text,
+            run.color,
+            rgb
+          );
+
           page.drawText(
             run.text,
             {
