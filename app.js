@@ -1864,57 +1864,113 @@ const COMPRESS_PRESETS={
   low:   {jpegQ:0.35, maxDim:1000}
 };
 
-// Recompress a single embedded JPEG (DCTDecode) image XObject in place.
-// Returns true if the image was replaced with a smaller version.
-async function _recompressImageXObject(xobj, jpegQ, maxDim){
+function _colorSpaceComponents(csObj, context){
+  if(csObj instanceof PDFLib.PDFName){
+    const n=csObj.toString();
+    if(n==='/DeviceRGB') return 3;
+    if(n==='/DeviceGray') return 1;
+    if(n==='/DeviceCMYK') return null; // unsupported here
+    return null;
+  }
+  if(csObj instanceof PDFLib.PDFArray && csObj.size()>0){
+    const kind=csObj.get(0);
+    const kindName=kind instanceof PDFLib.PDFName?kind.toString():null;
+    if(kindName==='/ICCBased'){
+      const streamRef=csObj.get(1);
+      const stream=context.lookup(streamRef);
+      if(stream instanceof PDFLib.PDFRawStream){
+        const N=stream.dict.get(PDFLib.PDFName.of('N'));
+        if(N instanceof PDFLib.PDFNumber) return N.asNumber();
+      }
+      return null;
+    }
+    if(kindName==='/CalRGB') return 3;
+    if(kindName==='/CalGray') return 1;
+    return null; // Indexed, Separation, DeviceN, Lab, etc — skip
+  }
+  return null;
+}
+
+async function _recompressImageXObject(xobj, jpegQ, maxDim, context){
   const dict=xobj.dict;
   const nameOf=k=>PDFLib.PDFName.of(k);
 
   const subtype=dict.get(nameOf('Subtype'));
   if(!subtype||subtype.toString()!=='/Image') return false;
+  if(dict.get(nameOf('SMask'))) return false; // don't flatten alpha
 
-  // Only handle plain JPEG streams — safest to decode/re-encode without
-  // corrupting colorspace-sensitive formats (Indexed, CCITT fax, JPX, etc.)
   let filter=dict.get(nameOf('Filter'));
   let filterName=null;
   if(filter instanceof PDFLib.PDFName) filterName=filter.toString();
   else if(filter instanceof PDFLib.PDFArray && filter.size()>0) filterName=filter.get(filter.size()-1).toString();
-  if(filterName!=='/DCTDecode') return false;
-
-  // Skip CMYK JPEGs — browsers commonly mis-decode these, which would
-  // corrupt colors on re-encode.
-  let cs=dict.get(nameOf('ColorSpace'));
-  if(cs instanceof PDFLib.PDFName && cs.toString()==='/DeviceCMYK') return false;
-
-  // Skip images that carry a soft mask (alpha) — flattening would lose transparency.
-  if(dict.get(nameOf('SMask'))) return false;
 
   const origBytes=xobj.contents;
-  if(!origBytes||origBytes.length<6000) return false; // not worth touching tiny images
+  if(!origBytes||origBytes.length<6000) return false;
 
-  let bitmap;
-  try{
-    bitmap=await createImageBitmap(new Blob([origBytes],{type:'image/jpeg'}));
-  }catch(e){
-    return false; // undecodable / unsupported — leave untouched
+  let sourceCanvas=null; // canvas holding decoded, full-res RGB pixels
+
+  if(filterName==='/DCTDecode'){
+    // Already a JPEG — decode it directly
+    let bitmap;
+    try{ bitmap=await createImageBitmap(new Blob([origBytes],{type:'image/jpeg'})); }
+    catch(e){ return false; }
+    const cs=dict.get(nameOf('ColorSpace'));
+    if(cs instanceof PDFLib.PDFName && cs.toString()==='/DeviceCMYK') return false;
+    sourceCanvas=document.createElement('canvas');
+    sourceCanvas.width=bitmap.width;sourceCanvas.height=bitmap.height;
+    sourceCanvas.getContext('2d').drawImage(bitmap,0,0);
+    if(bitmap.close) bitmap.close();
+
+  }else if(filterName==='/FlateDecode'){
+    // Likely a raw, uncompressed bitmap wrapped in zip compression
+    const bpc=dict.get(nameOf('BitsPerComponent'));
+    const bpcNum=bpc instanceof PDFLib.PDFNumber?bpc.asNumber():null;
+    if(bpcNum!==8) return false; // only handle 8-bit samples
+
+    const wNum=dict.get(nameOf('Width')), hNum=dict.get(nameOf('Height'));
+    const W=wNum instanceof PDFLib.PDFNumber?wNum.asNumber():null;
+    const H=hNum instanceof PDFLib.PDFNumber?hNum.asNumber():null;
+    if(!W||!H) return false;
+
+    const components=_colorSpaceComponents(dict.get(nameOf('ColorSpace')), context);
+    if(components!==1 && components!==3) return false; // skip CMYK/Indexed/etc
+
+    let raw;
+    try{ raw=PDFLib.decodePDFRawStream(xobj).decode(); }
+    catch(e){ return false; }
+    if(raw.length!==W*H*components) return false; // sanity check, bail if mismatched
+
+    const rgba=new Uint8ClampedArray(W*H*4);
+    if(components===3){
+      for(let i=0,j=0;i<raw.length;i+=3,j+=4){
+        rgba[j]=raw[i];rgba[j+1]=raw[i+1];rgba[j+2]=raw[i+2];rgba[j+3]=255;
+      }
+    }else{
+      for(let i=0,j=0;i<raw.length;i++,j+=4){
+        const g=raw[i];rgba[j]=g;rgba[j+1]=g;rgba[j+2]=g;rgba[j+3]=255;
+      }
+    }
+    sourceCanvas=document.createElement('canvas');
+    sourceCanvas.width=W;sourceCanvas.height=H;
+    sourceCanvas.getContext('2d').putImageData(new ImageData(rgba,W,H),0,0);
+
+  }else{
+    return false; // JPX, CCITT, LZW, etc — not handled
   }
 
-  const {width,height}=bitmap;
+  const {width,height}=sourceCanvas;
   const scale=Math.min(1,maxDim/Math.max(width,height));
   const newW=Math.max(1,Math.round(width*scale));
   const newH=Math.max(1,Math.round(height*scale));
 
-  const canvas=document.createElement('canvas');
-  canvas.width=newW;canvas.height=newH;
-  const ctx=canvas.getContext('2d');
-  ctx.drawImage(bitmap,0,0,newW,newH);
-  if(bitmap.close) bitmap.close();
+  const outCanvas=document.createElement('canvas');
+  outCanvas.width=newW;outCanvas.height=newH;
+  outCanvas.getContext('2d').drawImage(sourceCanvas,0,0,newW,newH);
 
-  const newBlob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',jpegQ));
+  const newBlob=await new Promise(res=>outCanvas.toBlob(res,'image/jpeg',jpegQ));
   if(!newBlob) return false;
   const newBytes=new Uint8Array(await newBlob.arrayBuffer());
-
-  if(newBytes.length>=origBytes.length) return false; // don't replace if not actually smaller
+  if(newBytes.length>=origBytes.length) return false;
 
   dict.set(nameOf('Width'),PDFLib.PDFNumber.of(newW));
   dict.set(nameOf('Height'),PDFLib.PDFNumber.of(newH));
@@ -1961,7 +2017,7 @@ async function compressAndSave(){
         if(ref) seen.add(ref.tag);
 
         try{
-          const changed=await _recompressImageXObject(xobj,preset.jpegQ,preset.maxDim);
+          const changed=await _recompressImageXObject(xobj,preset.jpegQ,preset.maxDim,context);
           if(changed) imagesProcessed++;
         }catch(imgErr){
           console.warn('Skipping image (recompress failed):',imgErr);
