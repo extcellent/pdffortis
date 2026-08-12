@@ -408,9 +408,37 @@ function _findTextShowOps(tokens){
 function _decodeShowOpText(bytes, op){
   const a = op.argToken;
   if(op.opName === 'TJ'){
-    // ... unverändert, bleibt wie es ist ...
+    let r = '';
+    let i = a.start + 1;
+    while(i < a.end - 1){
+      const b = bytes[i];
+      if(b === 0x28){
+        let depth = 1; i++;
+        while(i < a.end && depth > 0){
+          const c = bytes[i];
+          if(c === 0x5C){ if(i+1<a.end) r += String.fromCharCode(bytes[i+1]); i += 2; continue; }
+          if(c === 0x28){ depth++; r += '('; i++; continue; }
+          if(c === 0x29){ depth--; if(depth>0) r += ')'; i++; continue; }
+          r += String.fromCharCode(c); i++;
+        }
+      } else if(b === 0x3C){
+        i++;
+        let hex = '';
+        while(i < a.end && bytes[i] !== 0x3E){
+          const c = bytes[i];
+          if(!_isWs(c)) hex += String.fromCharCode(c);
+          i++;
+        }
+        i++;
+        for(let h=0; h<hex.length; h+=2){
+          r += String.fromCharCode(parseInt(hex.substr(h,2)||'0',16));
+        }
+      } else {
+        i++;
+      }
+    }
+    return r;
   } else if(a.type === 'hexString'){
-    // <...>  → Hex-Paare direkt dekodieren
     let r = '';
     let hex = '';
     for(let i = a.start+1; i < a.end-1; i++){
@@ -422,7 +450,6 @@ function _decodeShowOpText(bytes, op){
     }
     return r;
   } else {
-    // (string) Tj/'/"  — unverändert, bestehender Code bleibt
     let r = '';
     for(let i = a.start+1; i < a.end-1; i++){
       const c = bytes[i];
@@ -448,7 +475,6 @@ function _decodeShowOpText(bytes, op){
     return r;
   }
 }
-
 // Führe die Byte-Splices durch (deskend. Reihenfolge, damit Offsets stabil bleiben)
 function _spliceRemoveOps(bytes, showOps, indices){
   const idxs = [...new Set(indices)].filter(i => i>=0 && i<showOps.length).sort((a,b)=>b-a);
