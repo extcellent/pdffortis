@@ -622,6 +622,13 @@ async function editBatchLocal(pdfBytes, edits){
     if(!page) continue;
     const pageHeight = page.getHeight();
     const surgeryOk = surgeryResults[edit.page] && surgeryResults[edit.page].ok;
+    console.log(
+      '[PDF EDIT DEBUG]',
+      edit.newText,
+      'formatRuns:', edit.formatRuns,
+      'formatRuns.length:', (edit.formatRuns||[]).length,
+      'edit.color(int):', edit.color
+    );
 
     // Deck-Rechteck immer zeichnen (verhindert visuelle Reste, ist billig)
     const bottomPad = (edit.y1 - edit.y) * 0.12;
@@ -767,12 +774,13 @@ async function editBatchLocal(pdfBytes, edits){
               runSize=parsed;
             }
           }
-          console.log(
-            '[PDF RUN COLOR]',
-            run.text,
-            run.color,
-            rgb
-          );
+    console.log(
+      '[PDF RUN COLOR]',
+      run.text,
+      'run.color:', run.color,
+      'colorValue used:', colorValue,
+      'rgb:', rgb
+    );
 
           page.drawText(
             run.text,
@@ -820,7 +828,12 @@ async function editBatchLocal(pdfBytes, edits){
           _intColorToFloats(
             edit.color || 0
           );
-    
+      console.warn(
+        '[PDF FALLBACK PATH — formatRuns wurde NICHT benutzt!]',
+        edit.newText,
+        'edit.color(int):', edit.color,
+        'tr/tg/tb:', tr, tg, tb
+      );    
         page.drawText(
           edit.newText,
           {
