@@ -124,10 +124,124 @@ async function extractPageLocal(pdfDocLocal, pageIndex){
 // ═══════════════════════════════════════
 
 function _rgbStringToFloats(str){
-  if(!str) return [1,1,1];
-  const m = str.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-  if(!m) return [1,1,1];
-  return [parseInt(m[1])/255, parseInt(m[2])/255, parseInt(m[3])/255];
+
+  if(!str){
+    return [1,1,1];
+  }
+
+  let value = String(str).trim().toLowerCase();
+
+  /*
+   * ============================================================
+   * #RRGGBB
+   * ============================================================
+   */
+  if(/^#[0-9a-f]{6}$/i.test(value)){
+
+    return [
+      parseInt(value.slice(1,3),16)/255,
+      parseInt(value.slice(3,5),16)/255,
+      parseInt(value.slice(5,7),16)/255
+    ];
+  }
+
+
+  /*
+   * ============================================================
+   * #RGB
+   * ============================================================
+   */
+  if(/^#[0-9a-f]{3}$/i.test(value)){
+
+    return [
+      parseInt(value[1] + value[1],16)/255,
+      parseInt(value[2] + value[2],16)/255,
+      parseInt(value[3] + value[3],16)/255
+    ];
+  }
+
+
+  /*
+   * ============================================================
+   * rgb(...)
+   * rgb(255, 0, 0)
+   * rgb(255,0,0)
+   * ============================================================
+   */
+  const rgbMatch =
+    value.match(
+      /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/
+    );
+
+  if(rgbMatch){
+
+    return [
+      parseInt(rgbMatch[1],10)/255,
+      parseInt(rgbMatch[2],10)/255,
+      parseInt(rgbMatch[3],10)/255
+    ];
+  }
+
+
+  /*
+   * ============================================================
+   * BROWSER-FARBEN
+   * ============================================================
+   */
+  const namedColors = {
+
+    black:   [0,0,0],
+    white:   [255,255,255],
+
+    red:     [255,0,0],
+    green:   [0,128,0],
+    blue:    [0,0,255],
+
+    yellow:  [255,255,0],
+    cyan:    [0,255,255],
+    aqua:    [0,255,255],
+
+    magenta: [255,0,255],
+    fuchsia: [255,0,255],
+
+    orange:  [255,165,0],
+    purple:  [128,0,128],
+
+    pink:    [255,192,203],
+    brown:   [165,42,42],
+
+    gray:    [128,128,128],
+    grey:    [128,128,128],
+
+    lime:    [0,255,0],
+    navy:    [0,0,128],
+
+    teal:    [0,128,128],
+    olive:   [128,128,0],
+
+    maroon:  [128,0,0],
+    silver:  [192,192,192]
+  };
+
+
+  if(namedColors[value]){
+
+    const [r,g,b] =
+      namedColors[value];
+
+    return [
+      r/255,
+      g/255,
+      b/255
+    ];
+  }
+
+
+  /*
+   * Unbekannte Farbe:
+   * nicht abstürzen.
+   */
+  return [0,0,0];
 }
 
 function _intColorToFloats(colorInt){
