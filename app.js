@@ -2016,6 +2016,40 @@ function _removeUnusedObjects(pdfDoc){
   }
   return removed;
 }
+// Recursively walks a Resources dict, collecting every Image XObject found —
+// including ones nested inside Form XObjects (Form -> Form -> Image chains
+// are common in Illustrator/InDesign-exported PDFs with grouped layers).
+function _collectImageXObjects(resources, context, out, seenRefs){
+  if(!resources) return;
+  const xobjDict=resources.lookupMaybe(PDFLib.PDFName.of('XObject'),PDFLib.PDFDict);
+  if(!xobjDict) return;
+
+  for(const [,value] of xobjDict.entries()){
+    let ref=null,xobj=null;
+    if(value instanceof PDFLib.PDFRef){
+      ref=value;
+      if(seenRefs.has(ref.tag)) continue;
+      seenRefs.add(ref.tag);
+      const looked=context.lookup(ref);
+      if(looked instanceof PDFLib.PDFRawStream) xobj=looked;
+    }else if(value instanceof PDFLib.PDFRawStream){
+      xobj=value;
+    }
+    if(!xobj) continue;
+
+    const subtype=xobj.dict.get(PDFLib.PDFName.of('Subtype'));
+    const subtypeName=subtype instanceof PDFLib.PDFName?subtype.toString():null;
+
+    if(subtypeName==='/Image'){
+      out.push(xobj);
+    }else if(subtypeName==='/Form'){
+      // Recurse into the nested Form's own Resources
+      const nestedResources=xobj.dict.lookupMaybe(PDFLib.PDFName.of('Resources'),PDFLib.PDFDict);
+      _collectImageXObjects(nestedResources, context, out, seenRefs);
+    }
+  }
+}
+
 async function compressAndSave(){
   if(!pdfLibDoc){toast('No document loaded','err');return}
   toast('Compressing…');
@@ -2027,36 +2061,23 @@ async function compressAndSave(){
   try{
     const context=pdfLibDoc.context;
     const pages=pdfLibDoc.getPages();
-    const seen=new Set(); // dedupe images shared across pages (same ref)
+    const seen=new Set(); // dedupe images shared across pages/forms (same ref)
+    const allImages=[];
 
     for(const page of pages){
       const resources=page.node.Resources();
-      if(!resources) continue;
-      const xobjDict=resources.lookupMaybe(PDFLib.PDFName.of('XObject'),PDFLib.PDFDict);
-      if(!xobjDict) continue;
+      _collectImageXObjects(resources, context, allImages, seen);
+    }
 
-      for(const [,value] of xobjDict.entries()){
-        let ref=null,xobj=null;
-        if(value instanceof PDFLib.PDFRef){
-          ref=value;
-          if(seen.has(ref.tag)) continue;
-          const looked=context.lookup(ref);
-          if(looked instanceof PDFLib.PDFRawStream) xobj=looked;
-        }else if(value instanceof PDFLib.PDFRawStream){
-          xobj=value;
-        }
-        if(!xobj) continue;
-        if(ref) seen.add(ref.tag);
-
-        try{
-          const changed=await _recompressImageXObject(xobj,preset.jpegQ,preset.maxDim,context);
-          if(changed) imagesProcessed++;
-        }catch(imgErr){
-          console.warn('Skipping image (recompress failed):',imgErr);
-        }
+    for(const xobj of allImages){
+      try{
+        const changed=await _recompressImageXObject(xobj,preset.jpegQ,preset.maxDim,context);
+        if(changed) imagesProcessed++;
+      }catch(imgErr){
+        console.warn('Skipping image (recompress failed):',imgErr);
       }
     }
-    const removedCount=_removeUnusedObjects(pdfLibDoc);
+
     const bytes=await pdfLibDoc.save({useObjectStreams:true});
     const after=bytes.length;
     const saved=Math.max(0,Math.round((1-after/before)*100));
