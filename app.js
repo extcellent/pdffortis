@@ -1983,7 +1983,39 @@ async function _recompressImageXObject(xobj, jpegQ, maxDim, context){
   xobj.contents=newBytes;
   return true;
 }
+// Walks the whole PDF from the root and deletes any indirect object
+// nothing actually references anymore (leftover/orphaned data).
+function _removeUnusedObjects(pdfDoc){
+  const context=pdfDoc.context;
+  const visited=new Set();
+  const stack=[context.trailerInfo.Root];
+  if(context.trailerInfo.Info) stack.push(context.trailerInfo.Info);
 
+  const pushChildren=(obj)=>{
+    if(obj instanceof PDFLib.PDFRef){
+      if(visited.has(obj.tag)) return;
+      visited.add(obj.tag);
+      stack.push(context.lookup(obj));
+    }else if(obj instanceof PDFLib.PDFRawStream){
+      for(const [,v] of obj.dict.entries()) stack.push(v);
+    }else if(obj instanceof PDFLib.PDFDict){
+      for(const [,v] of obj.entries()) stack.push(v);
+    }else if(obj instanceof PDFLib.PDFArray){
+      for(let i=0;i<obj.size();i++) stack.push(obj.get(i));
+    }
+  };
+
+  while(stack.length) pushChildren(stack.pop());
+
+  let removed=0;
+  for(const [ref] of context.enumerateIndirectObjects()){
+    if(!visited.has(ref.tag)){
+      context.delete(ref);
+      removed++;
+    }
+  }
+  return removed;
+}
 async function compressAndSave(){
   if(!pdfLibDoc){toast('No document loaded','err');return}
   toast('Compressing…');
@@ -2024,7 +2056,7 @@ async function compressAndSave(){
         }
       }
     }
-
+    const removedCount=_removeUnusedObjects(pdfLibDoc);
     const bytes=await pdfLibDoc.save({useObjectStreams:true});
     const after=bytes.length;
     const saved=Math.max(0,Math.round((1-after/before)*100));
