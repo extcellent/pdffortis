@@ -2926,13 +2926,15 @@ function _extractInlineFormatRuns(span){
     });
   }
 
-  walk(span,{
-    bold:false,
-    italic:false,
-    underline:false,
-    color:null,
-    fontFamily:null,
-    fontSize:null
+  span.childNodes.forEach(child=>{
+    walk(child,{
+      bold:false,
+      italic:false,
+      underline:false,
+      color:null,
+      fontFamily:null,
+      fontSize:null
+    });
   });
 
   return runs;
