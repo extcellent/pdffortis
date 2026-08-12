@@ -1874,8 +1874,8 @@ async function compressAndSave(){
 // ═══════════════════════════════════════
 async function triggerDownload(){
  
-  if(window.activeInlineSpan){
-    await closeInlineEditor(true);
+  if(window.activeInlineSpan && typeof window.closeInlineEditor==='function'){
+    await window.closeInlineEditor(true);
   }
   
   if(!pdfLibDoc){toast('No document loaded','err');return}
@@ -3076,7 +3076,7 @@ async function closeInlineEditor(save=true){
   
     return;
   }
-  
+  window.closeInlineEditor = closeInlineEditor;
   
   /*
    * SAVE:
