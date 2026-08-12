@@ -3259,6 +3259,10 @@ async function closeInlineEditor(save=true){
     'function'
       ? _extractInlineFormatRuns(span)
       : [];
+    console.log(
+    '[FORMAT DEBUG]',
+    formatRuns
+  );
 
   // ────────────────────────────────────────────────────────────────
   // EXISTING PENDING EDIT
