@@ -3076,7 +3076,6 @@ async function closeInlineEditor(save=true){
   
     return;
   }
-  window.closeInlineEditor = closeInlineEditor;
   
   /*
    * SAVE:
@@ -3245,21 +3244,6 @@ async function closeInlineEditor(save=true){
       10
     );
 
-  // ────────────────────────────────────────────────────────────────
-  // FORMAT RUNS ERZEUGEN
-  //
-  // Beispiel:
-  //
-  // Hallo <b>Welt</b> <span style="color:red">!</span>
-  //
-  // wird zu:
-  //
-  // [
-  //   {text:"Hallo ", bold:false},
-  //   {text:"Welt", bold:true},
-  //   {text:" !", color:"red"}
-  // ]
-  // ────────────────────────────────────────────────────────────────
 
   const formatRuns =
     typeof _extractInlineFormatRuns ===
@@ -3559,6 +3543,7 @@ async function closeInlineEditor(save=true){
     });
   }
 }
+window.closeInlineEditor = closeInlineEditor;
    
 // ═══════════════════════════════════════
 // INIT
