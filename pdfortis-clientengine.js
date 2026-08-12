@@ -637,11 +637,11 @@ async function editBatchLocal(pdfBytes, edits){
     const rectW = edit.x1 - edit.x;
     const rectH = (edit.y1 + bottomPad) - edit.y;
     const [bgR,bgG,bgB] = _rgbStringToFloats(edit.bgColor);
-    page.drawRectangle({
+/*    page.drawRectangle({
       x: rectX, y: rectY, width: rectW, height: rectH,
       color: PDFLib.rgb(bgR,bgG,bgB),
-    });
-
+    });  
+*/
     // ═══════════════════════════════════════════════════════════════════
     // DRAW TEXT — unterstützt jetzt gemischte Inline-Formatierung
     // ═══════════════════════════════════════════════════════════════════
