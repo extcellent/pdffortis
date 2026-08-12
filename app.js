@@ -1857,18 +1857,137 @@ function setQ(q){
     b.classList.toggle('active',b.dataset.i===map[q]||(q==='high'&&b.textContent==='High')||(q==='medium'&&(b.textContent==='Med'||b.textContent==='Mittel'))||(q==='low'&&(b.textContent==='Small'||b.textContent==='Klein')));
   });
 }
-async function compressAndSave(){
-  if(!pdfLibDoc){toast('No document loaded','err');return}
-  const bytes=await pdfLibDoc.save({useObjectStreams:true});
-  const before=pdfBytes.length,after=bytes.length;
-  const saved=Math.max(0,Math.round((1-after/before)*100));
-  const blob=new Blob([bytes],{type:'application/pdf'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download='compressed_'+fileName;a.click();
-  URL.revokeObjectURL(url);
-  toast(`${'Saved'}${saved>0?` (${saved}% ${'smaller'})`:''}`)
+// Quality presets: JPEG re-encode quality + max long-edge dimension (px)
+const COMPRESS_PRESETS={
+  high:  {jpegQ:0.82, maxDim:2400},
+  medium:{jpegQ:0.60, maxDim:1600},
+  low:   {jpegQ:0.35, maxDim:1000}
+};
+
+// Recompress a single embedded JPEG (DCTDecode) image XObject in place.
+// Returns true if the image was replaced with a smaller version.
+async function _recompressImageXObject(xobj, jpegQ, maxDim){
+  const dict=xobj.dict;
+  const nameOf=k=>PDFLib.PDFName.of(k);
+
+  const subtype=dict.get(nameOf('Subtype'));
+  if(!subtype||subtype.toString()!=='/Image') return false;
+
+  // Only handle plain JPEG streams — safest to decode/re-encode without
+  // corrupting colorspace-sensitive formats (Indexed, CCITT fax, JPX, etc.)
+  let filter=dict.get(nameOf('Filter'));
+  let filterName=null;
+  if(filter instanceof PDFLib.PDFName) filterName=filter.toString();
+  else if(filter instanceof PDFLib.PDFArray && filter.size()>0) filterName=filter.get(filter.size()-1).toString();
+  if(filterName!=='/DCTDecode') return false;
+
+  // Skip CMYK JPEGs — browsers commonly mis-decode these, which would
+  // corrupt colors on re-encode.
+  let cs=dict.get(nameOf('ColorSpace'));
+  if(cs instanceof PDFLib.PDFName && cs.toString()==='/DeviceCMYK') return false;
+
+  // Skip images that carry a soft mask (alpha) — flattening would lose transparency.
+  if(dict.get(nameOf('SMask'))) return false;
+
+  const origBytes=xobj.contents;
+  if(!origBytes||origBytes.length<6000) return false; // not worth touching tiny images
+
+  let bitmap;
+  try{
+    bitmap=await createImageBitmap(new Blob([origBytes],{type:'image/jpeg'}));
+  }catch(e){
+    return false; // undecodable / unsupported — leave untouched
+  }
+
+  const {width,height}=bitmap;
+  const scale=Math.min(1,maxDim/Math.max(width,height));
+  const newW=Math.max(1,Math.round(width*scale));
+  const newH=Math.max(1,Math.round(height*scale));
+
+  const canvas=document.createElement('canvas');
+  canvas.width=newW;canvas.height=newH;
+  const ctx=canvas.getContext('2d');
+  ctx.drawImage(bitmap,0,0,newW,newH);
+  if(bitmap.close) bitmap.close();
+
+  const newBlob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',jpegQ));
+  if(!newBlob) return false;
+  const newBytes=new Uint8Array(await newBlob.arrayBuffer());
+
+  if(newBytes.length>=origBytes.length) return false; // don't replace if not actually smaller
+
+  dict.set(nameOf('Width'),PDFLib.PDFNumber.of(newW));
+  dict.set(nameOf('Height'),PDFLib.PDFNumber.of(newH));
+  dict.set(nameOf('BitsPerComponent'),PDFLib.PDFNumber.of(8));
+  dict.set(nameOf('ColorSpace'),nameOf('DeviceRGB'));
+  dict.set(nameOf('Filter'),nameOf('DCTDecode'));
+  dict.delete(nameOf('DecodeParms'));
+  dict.delete(nameOf('Decode'));
+  dict.set(nameOf('Length'),PDFLib.PDFNumber.of(newBytes.length));
+  xobj.contents=newBytes;
+  return true;
 }
 
+async function compressAndSave(){
+  if(!pdfLibDoc){toast('No document loaded','err');return}
+  toast('Compressing…');
+
+  const preset=COMPRESS_PRESETS[compressQ]||COMPRESS_PRESETS.medium;
+  const before=pdfBytes.length;
+  let imagesProcessed=0;
+
+  try{
+    const context=pdfLibDoc.context;
+    const pages=pdfLibDoc.getPages();
+    const seen=new Set(); // dedupe images shared across pages (same ref)
+
+    for(const page of pages){
+      const resources=page.node.Resources();
+      if(!resources) continue;
+      const xobjDict=resources.lookup(PDFLib.PDFName.of('XObject'),PDFLib.PDFDict);
+      if(!xobjDict) continue;
+
+      for(const [,value] of xobjDict.entries()){
+        let ref=null,xobj=null;
+        if(value instanceof PDFLib.PDFRef){
+          ref=value;
+          if(seen.has(ref.tag)) continue;
+          const looked=context.lookup(ref);
+          if(looked instanceof PDFLib.PDFRawStream) xobj=looked;
+        }else if(value instanceof PDFLib.PDFRawStream){
+          xobj=value;
+        }
+        if(!xobj) continue;
+        if(ref) seen.add(ref.tag);
+
+        try{
+          const changed=await _recompressImageXObject(xobj,preset.jpegQ,preset.maxDim);
+          if(changed) imagesProcessed++;
+        }catch(imgErr){
+          console.warn('Skipping image (recompress failed):',imgErr);
+        }
+      }
+    }
+
+    const bytes=await pdfLibDoc.save({useObjectStreams:true});
+    const after=bytes.length;
+    const saved=Math.max(0,Math.round((1-after/before)*100));
+
+    const blob=new Blob([bytes],{type:'application/pdf'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download='compressed_'+fileName;a.click();
+    URL.revokeObjectURL(url);
+
+    if(imagesProcessed===0){
+      toast(saved>0?`${'Saved'} (${saved}% ${'smaller'})`:`${'Saved'} — no compressible images found`);
+    }else{
+      toast(`${'Saved'} (${saved}% ${'smaller'}, ${imagesProcessed} image${imagesProcessed>1?'s':''} recompressed)`);
+    }
+  }catch(err){
+    console.error('Compression failed:',err);
+    toast('Compression failed','err');
+  }
+}
 // ═══════════════════════════════════════
 // DOWNLOAD GATE
 // ═══════════════════════════════════════
