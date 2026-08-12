@@ -1873,6 +1873,11 @@ async function compressAndSave(){
 // DOWNLOAD GATE
 // ═══════════════════════════════════════
 async function triggerDownload(){
+ 
+  if(window.activeInlineSpan){
+    await closeInlineEditor(true);
+  }
+  
   if(!pdfLibDoc){toast('No document loaded','err');return}
   if(currentToken || isPaidUser()){await logTokenUsage('download');await performDownload();return}
 
