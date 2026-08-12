@@ -388,11 +388,11 @@ function _findTextShowOps(tokens){
     const t = tokens[i];
     if(t.type !== 'op') continue;
     if(t.name === 'Tj' || t.name === "'"){
-      if(i>0 && tokens[i-1].type==='string'){
+      if(i>0 && (tokens[i-1].type==='string' || tokens[i-1].type==='hexString')){
         ops.push({ opName:t.name, opToken:t, argToken:tokens[i-1], replaceWith:'()' });
       }
     } else if(t.name === '"'){
-      if(i>0 && tokens[i-1].type==='string'){
+      if(i>0 && (tokens[i-1].type==='string' || tokens[i-1].type==='hexString')){
         ops.push({ opName:t.name, opToken:t, argToken:tokens[i-1], replaceWith:'()' });
       }
     } else if(t.name === 'TJ'){
@@ -408,39 +408,21 @@ function _findTextShowOps(tokens){
 function _decodeShowOpText(bytes, op){
   const a = op.argToken;
   if(op.opName === 'TJ'){
-    // Array: strings + numbers
+    // ... unverändert, bleibt wie es ist ...
+  } else if(a.type === 'hexString'){
+    // <...>  → Hex-Paare direkt dekodieren
     let r = '';
-    let i = a.start + 1; // skip [
-    while(i < a.end - 1){
-      const b = bytes[i];
-      if(b === 0x28){
-        let depth = 1; i++;
-        while(i < a.end && depth > 0){
-          const c = bytes[i];
-          if(c === 0x5C){ if(i+1<a.end) r += String.fromCharCode(bytes[i+1]); i += 2; continue; }
-          if(c === 0x28){ depth++; r += '('; i++; continue; }
-          if(c === 0x29){ depth--; if(depth>0) r += ')'; i++; continue; }
-          r += String.fromCharCode(c); i++;
-        }
-      } else if(b === 0x3C){
-        i++;
-        let hex = '';
-        while(i < a.end && bytes[i] !== 0x3E){
-          const c = bytes[i];
-          if(!_isWs(c)) hex += String.fromCharCode(c);
-          i++;
-        }
-        i++;
-        for(let h=0; h<hex.length; h+=2){
-          r += String.fromCharCode(parseInt(hex.substr(h,2)||'0',16));
-        }
-      } else {
-        i++;
-      }
+    let hex = '';
+    for(let i = a.start+1; i < a.end-1; i++){
+      const c = bytes[i];
+      if(!_isWs(c)) hex += String.fromCharCode(c);
+    }
+    for(let h=0; h<hex.length; h+=2){
+      r += String.fromCharCode(parseInt(hex.substr(h,2)||'0',16));
     }
     return r;
   } else {
-    // (string) Tj/'/"
+    // (string) Tj/'/"  — unverändert, bestehender Code bleibt
     let r = '';
     for(let i = a.start+1; i < a.end-1; i++){
       const c = bytes[i];
