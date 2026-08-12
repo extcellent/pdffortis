@@ -2000,7 +2000,7 @@ async function compressAndSave(){
     for(const page of pages){
       const resources=page.node.Resources();
       if(!resources) continue;
-      const xobjDict=resources.lookup(PDFLib.PDFName.of('XObject'),PDFLib.PDFDict);
+      const xobjDict=resources.lookupMaybe(PDFLib.PDFName.of('XObject'),PDFLib.PDFDict);
       if(!xobjDict) continue;
 
       for(const [,value] of xobjDict.entries()){
